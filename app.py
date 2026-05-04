@@ -3,28 +3,34 @@ import pandas as pd
 from datetime import timedelta
 from streamlit_lightweight_charts import renderLightweightCharts
 
-st.set_page_config(page_title="MoneyBag Journal | On-Chain Dashboard", layout="wide")
+# ==============================================================================
+# 1. PENGATURAN HALAMAN UTAMA
+# ==============================================================================
+st.set_page_config(
+    page_title="MoneyBag Journal | On-Chain Dashboard",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
 
 st.title("Bitcoin On-Chain: STH Cost Basis 📊")
 st.markdown("Dasbor interaktif untuk memantau momentum dan basis biaya pemegang jangka pendek (STH).")
 
-# SISTEM CACHE DIMATIKAN AGAR MEMBACA DATA FRESH
+# ==============================================================================
+# 2. FUNGSI MEMBACA DATA (DENGAN CACHE AGAR SUPER CEPAT)
+# ==============================================================================
+@st.cache_data(ttl=3600) # Data disimpan di memori selama 1 jam
 def load_data():
     try:
         df = pd.read_csv("Master_Onchain_Data.csv")
         
-        # 1. TAMPILKAN TABEL MENTAH KE LAYAR UNTUK TESTING
-        st.markdown("### 🔍 Mengintip Isi File CSV:")
-        st.dataframe(df.tail()) # Menampilkan 5 baris data paling bawah
-        
-        # 2. PROSES UBAH NAMA KOLOM
+        # Menerjemahkan nama kolom dari API
         df.rename(columns={
             'date': 'Date',
             'btc_price': 'BTC Price',
             'active_realized_price': 'STH Cost Basis'
         }, inplace=True)
         
-        # 3. PASTIKAN FORMAT TANGGAL BENAR
+        # Memastikan format tanggal benar
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
         df = df.dropna(subset=['Date']) 
         df = df.sort_values('Date')
@@ -37,7 +43,7 @@ def load_data():
 df = load_data()
 
 # ==============================================================================
-# JIKA DATA ADA, TAMPILKAN GRAFIK. JIKA KOSONG, TAMPILKAN PERINGATAN.
+# 3. ANTARMUKA DASBOR UTAMA
 # ==============================================================================
 if not df.empty:
     st.markdown("---")
@@ -55,6 +61,7 @@ if not df.empty:
         if opsi_waktu == "Custom":
             hari_kustom = st.number_input("Masukkan jumlah hari ke belakang:", min_value=7, value=120)
 
+    # Logika pemotongan data berdasarkan waktu
     tanggal_terakhir = df['Date'].max()
     
     if opsi_waktu == "1 Bulan":
@@ -72,9 +79,11 @@ if not df.empty:
     else:
         tanggal_mulai = df['Date'].min()
 
+    # Data yang sudah difilter siap digunakan
     df_filter = df[df['Date'] >= tanggal_mulai].copy()
     df_filter['Date_str'] = df_filter['Date'].dt.strftime('%Y-%m-%d')
 
+    # FITUR: PAPAN SKOR (KPI SCORECARDS)
     baris_terakhir = df_filter.iloc[-1]
     harga_sekarang = baris_terakhir.get('BTC Price', 0)
     harga_sth = baris_terakhir.get('STH Cost Basis', 0)
@@ -90,6 +99,7 @@ if not df.empty:
     col_kpi3.metric("Margin (Profit/Loss vs STH)", f"{margin_persen:,.2f}%", delta=f"{margin_persen:,.2f}%")
     st.markdown("---")
 
+    # PENGATURAN GRAFIK (LIGHTWEIGHT CHARTS)
     mode_penuh = st.toggle("🔲 Mode Layar Penuh (Tekan F11)")
     if mode_penuh:
         st.markdown("""<style>header {visibility: hidden;} footer {visibility: hidden;} .block-container {padding: 1rem 0rem; max-width: 100%;}</style>""", unsafe_allow_html=True)
@@ -119,4 +129,4 @@ if not df.empty:
     renderLightweightCharts([{"chart": pengaturan_dasar, "series": panel_utama}], 'onchain_chart')
 
 else:
-    st.error("⚠️ Proses terhenti: Tabel CSV terbaca, tapi tidak ada baris datanya (kosong).")
+    st.error("⚠️ Menunggu data automasi...")
