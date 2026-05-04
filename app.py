@@ -45,10 +45,10 @@ df = load_data()
 # 3. MAIN DASHBOARD INTERFACE
 # ==============================================================================
 if not df.empty:
-    # FOCUS MODE TOGGLE (Always visible)
-    focus_mode = st.toggle("🔲 Focus Mode (Chart Only)")
+    # FULL SCREEN TOGGLE (Always visible)
+    focus_mode = st.toggle("🔲 Full Screen")
 
-    # If NOT in focus mode, render the full UI (Title, Filters, KPIs)
+    # If NOT in full screen, render the full UI (Title, Filters, KPIs)
     if not focus_mode:
         st.title("Bitcoin On-Chain: STH Cost Basis 📊")
         st.markdown("Interactive dashboard to monitor short-term holder (STH) momentum and cost basis.")
