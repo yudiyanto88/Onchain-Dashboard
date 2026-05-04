@@ -12,7 +12,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Initialize Session State for memory (so chart doesn't reset in Full Screen)
+# Initialize Session State for memory
 if 'time_range' not in st.session_state:
     st.session_state.time_range = "All Time"
 if 'custom_days' not in st.session_state:
@@ -45,31 +45,33 @@ df = load_data()
 # 3. MAIN DASHBOARD INTERFACE & LAYOUT MANAGEMENT
 # ==============================================================================
 if not df.empty:
-    # Create Layout Containers to manage order visually
     header_kpi_container = st.container()
     controls_container = st.container()
     chart_container = st.container()
 
     # --------------------------------------------------------------------------
-    # A. CONTROLS (Rendered in middle, stays visible in Full Screen)
+    # A. CONTROLS (Full Screen di kiri, Time Range di kanan)
     # --------------------------------------------------------------------------
     with controls_container:
-        # We use vertical_alignment="bottom" to align the input box neatly with radio buttons
-        col_filter1, col_filter2 = st.columns([5, 1], vertical_alignment="bottom")
-        time_options = ["1 Month", "3 Months", "6 Months", "1 Year", "4 Years (Cycle)", "All Time", "Custom"]
-        
-        with col_filter1:
+        # Pembagian kolom: [Kiri, Kosong, Kanan (Radio), Kanan (Input Custom)]
+        col_toggle, col_space, col_radio, col_custom = st.columns([2, 2, 7, 1.5], vertical_alignment="bottom")
+
+        with col_toggle:
+            focus_mode = st.toggle("🔲 Full Screen")
+
+        with col_radio:
+            time_options = ["1 Month", "3 Months", "6 Months", "1 Year", "4 Years (Cycle)", "All Time", "Custom"]
             current_idx = time_options.index(st.session_state.time_range) if st.session_state.time_range in time_options else 5
             
             st.session_state.time_range = st.radio(
                 "Time Range:",
                 time_options,
                 index=current_idx,
-                horizontal=True
+                horizontal=True,
+                label_visibility="collapsed" # Menyembunyikan teks agar sejajar
             )
         
-        with col_filter2:
-            # Show input box neatly right next to 'Custom'
+        with col_custom:
             if st.session_state.time_range == "Custom":
                 st.session_state.custom_days = st.number_input(
                     "Days back", 
@@ -78,9 +80,7 @@ if not df.empty:
                     label_visibility="collapsed" 
                 )
 
-        # Full Screen Toggle placed right below filters, right above chart
-        st.markdown("<br>", unsafe_allow_html=True) # Add a tiny breathing space
-        focus_mode = st.toggle("🔲 Full Screen")
+        st.markdown("<br>", unsafe_allow_html=True)
 
     # --------------------------------------------------------------------------
     # B. DATA FILTERING LOGIC
@@ -107,10 +107,9 @@ if not df.empty:
     df_filter['Date_str'] = df_filter['Date'].dt.strftime('%Y-%m-%d')
 
     # --------------------------------------------------------------------------
-    # C. HEADERS & KPI SCORECARDS (Placed at top visually)
+    # C. HEADERS & KPI SCORECARDS
     # --------------------------------------------------------------------------
     with header_kpi_container:
-        # If NOT in full screen, show the title and KPIs
         if not focus_mode:
             st.title("Bitcoin On-Chain: STH Cost Basis 📊")
             st.markdown("Interactive dashboard to monitor short-term holder (STH) momentum and cost basis.")
@@ -131,14 +130,13 @@ if not df.empty:
             col_kpi3.metric("Margin (Profit/Loss vs STH)", f"{margin_persen:,.2f}%", delta=f"{margin_persen:,.2f}%")
             st.markdown("---")
         else:
-            # Inject CSS to remove top whitespace and hide default headers when in Full Screen
             st.markdown("""<style>.block-container {padding-top: 1rem; padding-bottom: 1rem; max-width: 100%;} header {visibility: hidden;} footer {visibility: hidden;}</style>""", unsafe_allow_html=True)
 
     # --------------------------------------------------------------------------
-    # D. LIGHTWEIGHT CHARTS RENDERING (Always visible at bottom)
+    # D. LIGHTWEIGHT CHARTS RENDERING
     # --------------------------------------------------------------------------
     with chart_container:
-        tinggi_chart = 700 if focus_mode else 450 # Chart expands automatically
+        tinggi_chart = 700 if focus_mode else 450 
 
         pengaturan_dasar = {
             "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}},
