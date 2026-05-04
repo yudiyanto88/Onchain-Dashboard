@@ -7,7 +7,7 @@ from streamlit_lightweight_charts import renderLightweightCharts
 # 1. PAGE CONFIGURATION
 # ==============================================================================
 st.set_page_config(
-    page_title="MoneyBag Journal | On-Chain Dashboard",
+    page_title="Yudiyanto | On-Chain Dashboard",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
