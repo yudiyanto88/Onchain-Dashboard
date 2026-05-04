@@ -12,7 +12,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Initialize Session State for memory (so chart doesn't reset in Focus Mode)
+# Initialize Session State for memory (so chart doesn't reset in Full Screen)
 if 'time_range' not in st.session_state:
     st.session_state.time_range = "All Time"
 if 'custom_days' not in st.session_state:
@@ -42,24 +42,23 @@ def load_data():
 df = load_data()
 
 # ==============================================================================
-# 3. MAIN DASHBOARD INTERFACE
+# 3. MAIN DASHBOARD INTERFACE & LAYOUT MANAGEMENT
 # ==============================================================================
 if not df.empty:
-    # FULL SCREEN TOGGLE (Always visible)
-    focus_mode = st.toggle("🔲 Full Screen")
+    # Create Layout Containers to manage order visually
+    header_kpi_container = st.container()
+    controls_container = st.container()
+    chart_container = st.container()
 
-    # If NOT in full screen, render the full UI (Title, Filters, KPIs)
-    if not focus_mode:
-        st.title("Bitcoin On-Chain: STH Cost Basis 📊")
-        st.markdown("Interactive dashboard to monitor short-term holder (STH) momentum and cost basis.")
-        st.markdown("---")
-        
-        # FILTERS
-        col_filter1, col_filter2 = st.columns([6, 1])
+    # --------------------------------------------------------------------------
+    # A. CONTROLS (Rendered in middle, stays visible in Full Screen)
+    # --------------------------------------------------------------------------
+    with controls_container:
+        # We use vertical_alignment="bottom" to align the input box neatly with radio buttons
+        col_filter1, col_filter2 = st.columns([5, 1], vertical_alignment="bottom")
         time_options = ["1 Month", "3 Months", "6 Months", "1 Year", "4 Years (Cycle)", "All Time", "Custom"]
         
         with col_filter1:
-            # Match current session state to keep selection active
             current_idx = time_options.index(st.session_state.time_range) if st.session_state.time_range in time_options else 5
             
             st.session_state.time_range = st.radio(
@@ -76,11 +75,15 @@ if not df.empty:
                     "Days back", 
                     min_value=7, 
                     value=st.session_state.custom_days,
-                    label_visibility="collapsed" # This hides the text label above the box
+                    label_visibility="collapsed" 
                 )
 
+        # Full Screen Toggle placed right below filters, right above chart
+        st.markdown("<br>", unsafe_allow_html=True) # Add a tiny breathing space
+        focus_mode = st.toggle("🔲 Full Screen")
+
     # --------------------------------------------------------------------------
-    # DATA FILTERING LOGIC (Runs invisibly even in Focus Mode)
+    # B. DATA FILTERING LOGIC
     # --------------------------------------------------------------------------
     tanggal_terakhir = df['Date'].max()
     opsi_waktu = st.session_state.time_range
@@ -104,52 +107,59 @@ if not df.empty:
     df_filter['Date_str'] = df_filter['Date'].dt.strftime('%Y-%m-%d')
 
     # --------------------------------------------------------------------------
-    # KPI SCORECARDS (Only visible if NOT in Focus Mode)
+    # C. HEADERS & KPI SCORECARDS (Placed at top visually)
     # --------------------------------------------------------------------------
-    if not focus_mode:
-        baris_terakhir = df_filter.iloc[-1]
-        harga_sekarang = baris_terakhir.get('BTC Price', 0)
-        harga_sth = baris_terakhir.get('STH Cost Basis', 0)
-        
-        if pd.isna(harga_sth) or harga_sth == 0:
-            margin_persen = 0
+    with header_kpi_container:
+        # If NOT in full screen, show the title and KPIs
+        if not focus_mode:
+            st.title("Bitcoin On-Chain: STH Cost Basis 📊")
+            st.markdown("Interactive dashboard to monitor short-term holder (STH) momentum and cost basis.")
+            st.markdown("---")
+
+            baris_terakhir = df_filter.iloc[-1]
+            harga_sekarang = baris_terakhir.get('BTC Price', 0)
+            harga_sth = baris_terakhir.get('STH Cost Basis', 0)
+            
+            if pd.isna(harga_sth) or harga_sth == 0:
+                margin_persen = 0
+            else:
+                margin_persen = ((harga_sekarang - harga_sth) / harga_sth) * 100
+
+            col_kpi1, col_kpi2, col_kpi3 = st.columns(3)
+            col_kpi1.metric("Current BTC Price", f"${harga_sekarang:,.2f}")
+            col_kpi2.metric("STH Cost Basis", f"${harga_sth:,.2f}")
+            col_kpi3.metric("Margin (Profit/Loss vs STH)", f"{margin_persen:,.2f}%", delta=f"{margin_persen:,.2f}%")
+            st.markdown("---")
         else:
-            margin_persen = ((harga_sekarang - harga_sth) / harga_sth) * 100
-
-        col_kpi1, col_kpi2, col_kpi3 = st.columns(3)
-        col_kpi1.metric("Current BTC Price", f"${harga_sekarang:,.2f}")
-        col_kpi2.metric("STH Cost Basis", f"${harga_sth:,.2f}")
-        col_kpi3.metric("Margin (Profit/Loss vs STH)", f"{margin_persen:,.2f}%", delta=f"{margin_persen:,.2f}%")
-        st.markdown("---")
-    else:
-        # Inject CSS to remove whitespace when in Focus Mode
-        st.markdown("""<style>header {visibility: hidden;} footer {visibility: hidden;} .block-container {padding: 1rem 0rem; max-width: 100%;}</style>""", unsafe_allow_html=True)
+            # Inject CSS to remove top whitespace and hide default headers when in Full Screen
+            st.markdown("""<style>.block-container {padding-top: 1rem; padding-bottom: 1rem; max-width: 100%;} header {visibility: hidden;} footer {visibility: hidden;}</style>""", unsafe_allow_html=True)
 
     # --------------------------------------------------------------------------
-    # LIGHTWEIGHT CHARTS RENDERING
+    # D. LIGHTWEIGHT CHARTS RENDERING (Always visible at bottom)
     # --------------------------------------------------------------------------
-    tinggi_chart = 700 if focus_mode else 450 # Chart expands automatically in Focus Mode
+    with chart_container:
+        tinggi_chart = 700 if focus_mode else 450 # Chart expands automatically
 
-    pengaturan_dasar = {
-        "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}},
-        "grid": {"vertLines": {"color": "rgba(42, 46, 57, 0.3)"}, "horzLines": {"color": "rgba(42, 46, 57, 0.3)"}},
-        "crosshair": {"mode": 0},
-        "timeScale": {"rightOffset": 5},
-        "height": tinggi_chart
-    }
+        pengaturan_dasar = {
+            "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}},
+            "grid": {"vertLines": {"color": "rgba(42, 46, 57, 0.3)"}, "horzLines": {"color": "rgba(42, 46, 57, 0.3)"}},
+            "crosshair": {"mode": 0},
+            "timeScale": {"rightOffset": 5},
+            "height": tinggi_chart
+        }
 
-    def ambil_data_series(nama_kolom):
-        if nama_kolom in df_filter.columns:
-            temp = df_filter[['Date_str', nama_kolom]].rename(columns={'Date_str': 'time', nama_kolom: 'value'})
-            return temp.dropna().to_dict('records')
-        return []
+        def ambil_data_series(nama_kolom):
+            if nama_kolom in df_filter.columns:
+                temp = df_filter[['Date_str', nama_kolom]].rename(columns={'Date_str': 'time', nama_kolom: 'value'})
+                return temp.dropna().to_dict('records')
+            return []
 
-    panel_utama = [
-        {"type": 'Line', "data": ambil_data_series('BTC Price'), "options": {"color": '#f7931a', "lineWidth": 3, "title": 'BTC Price'}},
-        {"type": 'Line', "data": ambil_data_series('STH Cost Basis'), "options": {"color": '#ffffff', "lineWidth": 2, "title": 'STH Cost Basis'}}
-    ]
+        panel_utama = [
+            {"type": 'Line', "data": ambil_data_series('BTC Price'), "options": {"color": '#f7931a', "lineWidth": 3, "title": 'BTC Price'}},
+            {"type": 'Line', "data": ambil_data_series('STH Cost Basis'), "options": {"color": '#ffffff', "lineWidth": 2, "title": 'STH Cost Basis'}}
+        ]
 
-    renderLightweightCharts([{"chart": pengaturan_dasar, "series": panel_utama}], 'onchain_chart')
+        renderLightweightCharts([{"chart": pengaturan_dasar, "series": panel_utama}], 'onchain_chart')
 
 else:
     st.error("⚠️ Waiting for automated data...")
