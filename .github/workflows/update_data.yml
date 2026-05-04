@@ -1,0 +1,37 @@
+name: Auto Update On-chain Data
+
+on:
+  schedule:
+    # cron: 'Menit Jam Tanggal Bulan Hari' (Menggunakan zona waktu UTC)
+    # 0 0 * * * artinya jam 00:00 UTC setiap hari = Jam 07:00 WIB
+    - cron: '0 0 * * *'
+  workflow_dispatch: # Fitur sakti agar kita bisa menjalankan robot ini secara manual pakai tombol (untuk testing)
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest # Robot akan meminjam komputer Linux virtual dari GitHub
+
+    steps:
+    - name: Membuka repositori
+      uses: actions/checkout@v3
+
+    - name: Menyiapkan Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: Menginstal bahan yang dibutuhkan (Pandas & Requests)
+      run: |
+        python -m pip install --upgrade pip
+        pip install requests pandas
+
+    - name: Menjalankan script auto_update.py
+      run: python auto_update.py
+
+    - name: Menyimpan hasil CSV kembali ke GitHub
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action Bot"
+        git add Master_Onchain_Data.csv
+        # Robot hanya akan melakukan save (commit) JIKA ada data baru yang berubah
+        git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update data dari API" && git push)
