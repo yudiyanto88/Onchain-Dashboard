@@ -12,28 +12,15 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# CSS Custom untuk mengecilkan ukuran font pada KPI (Papan Skor)
-st.markdown("""
-<style>
-    [data-testid="stMetricValue"] {
-        font-size: 1.5rem !important; 
-    }
-</style>
-""", unsafe_allow_html=True)
-
-if 'time_range' not in st.session_state:
-    st.session_state.time_range = "All Time"
-if 'custom_days' not in st.session_state:
-    st.session_state.custom_days = 120
-if 'smooth_period' not in st.session_state:
-    st.session_state.smooth_period = "0d"
-if 'custom_smooth' not in st.session_state:
-    st.session_state.custom_smooth = 50
-if 'timeframe' not in st.session_state:
-    st.session_state.timeframe = "1D"
+# Inisialisasi memori untuk filter
+if 'time_range' not in st.session_state: st.session_state.time_range = "All Time"
+if 'custom_days' not in st.session_state: st.session_state.custom_days = 120
+if 'resolution' not in st.session_state: st.session_state.resolution = "Daily"
+if 'smooth_period' not in st.session_state: st.session_state.smooth_period = "0d"
+if 'custom_smooth' not in st.session_state: st.session_state.custom_smooth = 50
 
 # ==============================================================================
-# 2. DATA LOADING
+# 2. DATA LOADING (DARI CSV)
 # ==============================================================================
 @st.cache_data(ttl=3600)
 def load_data():
@@ -75,30 +62,28 @@ with tab1:
         controls_container = st.container()
         chart_container = st.container()
 
-        # --- A. KONTROL (FULL SCREEN, TIMEFRAME, SMOOTHING, METRIC TOGGLE, TIME RANGE) ---
+        # --- A. KONTROL (FULL SCREEN, TIMEFRAME, SMA, METRICS, RANGE) ---
         with controls_container:
-            col_toggle, col_tf, col_smooth, col_metrics, col_space, col_radio, col_custom = st.columns([1.5, 1.5, 1.5, 3.5, 0.5, 5, 1.5], vertical_alignment="bottom")
+            col_toggle, col_tf, col_sma, col_metrics, col_space, col_radio, col_custom = st.columns([1.5, 2, 2, 3, 0.5, 5, 1.5], vertical_alignment="bottom")
             
             with col_toggle:
                 focus_mode = st.toggle("Full Screen")
                 
             with col_tf:
-                tf_label = st.session_state.timeframe
-                with st.popover(f"Timeframe: {tf_label}"):
+                # Tombol dinamis untuk Timeframe (Resolusi Candlestick)
+                with st.popover(f"Timeframe: {st.session_state.resolution}"):
                     st.markdown("**Select Resolution:**")
-                    st.session_state.timeframe = st.radio(
+                    st.session_state.resolution = st.radio(
                         "Resolution", 
-                        ["1D", "3D", "1W", "1M"], 
-                        index=["1D", "3D", "1W", "1M"].index(st.session_state.timeframe),
-                        horizontal=True,
+                        ["Daily", "3 Days", "Weekly", "Monthly"], 
+                        index=["Daily", "3 Days", "Weekly", "Monthly"].index(st.session_state.resolution),
                         label_visibility="collapsed"
                     )
-
-            with col_smooth:
-                # Dynamic Label untuk Smoothing
-                smooth_val = f"{st.session_state.custom_smooth}d" if st.session_state.smooth_period == "Custom" else st.session_state.smooth_period
-                with st.popover(f"Smoothing: {smooth_val}"):
-                    st.markdown("**Select Smoothing Period:**")
+            
+            with col_sma:
+                # Tombol dinamis untuk SMA
+                with st.popover(f"SMA: {st.session_state.smooth_period}"):
+                    st.markdown("**Select Smoothing:**")
                     st.session_state.smooth_period = st.radio(
                         "Period", 
                         ["0d", "7d", "14d", "30d", "Custom"], 
@@ -115,25 +100,31 @@ with tab1:
                     ['STH Cost Basis', 'LTH Cost Basis', 'Realized Price', 'True Market Mean', 'CVDD'],
                     default=['STH Cost Basis', 'LTH Cost Basis', 'Realized Price', 'True Market Mean', 'CVDD'],
                     label_visibility="collapsed",
-                    placeholder="Pilih metrik yang ditampilkan..."
+                    placeholder="Pilih metrik..."
                 )
 
             with col_radio:
                 time_options = ["1 Month", "3 Months", "6 Months", "1 Year", "4 Years (Cycle)", "All Time", "Custom"]
                 current_idx = time_options.index(st.session_state.time_range) if st.session_state.time_range in time_options else 5
-                st.session_state.time_range = st.radio("Time Range:", time_options, index=current_idx, horizontal=True, label_visibility="collapsed")
+                
+                st.session_state.time_range = st.radio("Range:", time_options, index=current_idx, horizontal=True, label_visibility="collapsed")
             
             with col_custom:
                 if st.session_state.time_range == "Custom":
                     st.session_state.custom_days = st.number_input("Days back", min_value=7, value=st.session_state.custom_days, label_visibility="collapsed")
                     
             st.markdown("<br>", unsafe_allow_html=True)
-        
-        # --- B. KALKULASI TIMEFRAME (RESAMPLING) ---
-        if st.session_state.timeframe != "1D":
-            tf_map = {"3D": "3D", "1W": "W", "1M": "M"}
-            # Mengelompokkan data berdasarkan timeframe yang dipilih dan mengambil rata-ratanya
-            df = df.set_index('Date').resample(tf_map[st.session_state.timeframe]).mean().dropna().reset_index()
+
+        # --- B. TIMEFRAME RESAMPLING ---
+        if st.session_state.resolution != "Daily":
+            df.set_index('Date', inplace=True)
+            if st.session_state.resolution == "3 Days":
+                df = df.resample('3D').last()
+            elif st.session_state.resolution == "Weekly":
+                df = df.resample('W').last()
+            elif st.session_state.resolution == "Monthly":
+                df = df.resample('M').last()
+            df.reset_index(inplace=True)
 
         # --- C. KALKULASI SMA SMOOTHING ---
         window = 1
@@ -148,7 +139,7 @@ with tab1:
                 if col in df.columns:
                     df[col] = df[col].rolling(window=window, min_periods=1).mean()
 
-        # --- D. FILTER WAKTU (RANGE) ---
+        # --- D. FILTER RANGE (X-AXIS ZOOM) ---
         tanggal_terakhir = df['Date'].max()
         opsi_waktu = st.session_state.time_range
         
@@ -163,7 +154,7 @@ with tab1:
         df_filter = df[df['Date'] >= tanggal_mulai].copy()
         df_filter['Date_str'] = df_filter['Date'].dt.strftime('%Y-%m-%d')
 
-        # --- E. HEADERS & KPI ---
+        # --- E. CUSTOM HTML HEADERS & KPI ---
         with header_container:
             if not focus_mode:
                 st.title("On-Chain Price Levels")
@@ -172,28 +163,41 @@ with tab1:
 
                 baris_terakhir = df_filter.iloc[-1]
                 btc_price = baris_terakhir.get('BTC Price', 0)
-                sth_cb = baris_terakhir.get('STH Cost Basis', 0)
-                lth_cb = baris_terakhir.get('LTH Cost Basis', 0)
-                realized = baris_terakhir.get('Realized Price', 0)
-                tmm = baris_terakhir.get('True Market Mean', 0)
                 
-                # Fungsi penghitung selisih persentase (Sekarang hijau jika BTC > Cost Basis)
-                def hitung_delta(nilai_metrik):
-                    if pd.isna(nilai_metrik) or nilai_metrik == 0 or btc_price == 0:
-                        return 0
-                    return ((btc_price - nilai_metrik) / nilai_metrik) * 100
-                
+                # Fungsi Custom KPI untuk mengubah font dan warna secara utuh
+                def render_kpi(title, value, is_btc=False):
+                    if is_btc or pd.isna(value) or value == 0:
+                        color = "#ffffff"
+                        title_color = "#a3a8b8"
+                        delta_html = ""
+                    else:
+                        # Profit = BTC > Cost Basis
+                        delta_pct = ((btc_price - value) / btc_price) * 100
+                        is_profit = delta_pct >= 0
+                        color = "#00cc66" if is_profit else "#ff4d4d"
+                        title_color = color
+                        arrow = "↑" if is_profit else "↓"
+                        delta_html = f"<div style='margin-top: 4px;'><span style='font-size: 0.85rem; background-color: {color}20; padding: 2px 6px; border-radius: 4px;'>{arrow} {abs(delta_pct):.2f}%</span></div>"
+                        
+                    st.markdown(f"""
+                    <div style="display: flex; flex-direction: column; padding-bottom: 10px;">
+                        <span style="color: {title_color}; font-size: 0.95rem; font-weight: 600; margin-bottom: 2px;">{title}</span>
+                        <span style="color: {color}; font-size: 1.4rem; font-weight: 700;">${value:,.2f}</span>
+                        {delta_html}
+                    </div>
+                    """, unsafe_allow_html=True)
+
                 col_kpi1, col_kpi2, col_kpi3, col_kpi4, col_kpi5 = st.columns(5)
-                col_kpi1.metric("Current BTC Price", f"${btc_price:,.2f}")
-                col_kpi2.metric("STH Cost Basis", f"${sth_cb:,.2f}", f"{hitung_delta(sth_cb):,.2f}%")
-                col_kpi3.metric("LTH Cost Basis", f"${lth_cb:,.2f}", f"{hitung_delta(lth_cb):,.2f}%")
-                col_kpi4.metric("Realized Price", f"${realized:,.2f}", f"{hitung_delta(realized):,.2f}%")
-                col_kpi5.metric("True Market Mean", f"${tmm:,.2f}", f"{hitung_delta(tmm):,.2f}%")
+                with col_kpi1: render_kpi("Current BTC Price", btc_price, is_btc=True)
+                with col_kpi2: render_kpi("STH Cost Basis", baris_terakhir.get('STH Cost Basis', 0))
+                with col_kpi3: render_kpi("LTH Cost Basis", baris_terakhir.get('LTH Cost Basis', 0))
+                with col_kpi4: render_kpi("Realized Price", baris_terakhir.get('Realized Price', 0))
+                with col_kpi5: render_kpi("True Market Mean", baris_terakhir.get('True Market Mean', 0))
                 st.markdown("---")
             else:
                 st.markdown("""<style>.block-container {padding-top: 1rem; padding-bottom: 1rem; max-width: 100%;} header {visibility: hidden;} footer {visibility: hidden;}</style>""", unsafe_allow_html=True)
 
-        # --- F. LIGHTWEIGHT CHARTS (MULTI-LINE) ---
+        # --- F. LIGHTWEIGHT CHARTS ---
         with chart_container:
             tinggi_chart = 850 if focus_mode else 650 
 
@@ -211,9 +215,7 @@ with tab1:
                     return temp.dropna().to_dict('records')
                 return []
 
-            panel_utama = [
-                {"type": 'Line', "data": ambil_data_series('BTC Price'), "options": {"color": '#f7931a', "lineWidth": 3, "title": 'BTC Price'}}
-            ]
+            panel_utama = [{"type": 'Line', "data": ambil_data_series('BTC Price'), "options": {"color": '#f7931a', "lineWidth": 3, "title": 'BTC Price'}}]
             
             warna_metrik = {
                 'STH Cost Basis': '#ff4d4d',
