@@ -2,59 +2,39 @@ import requests
 import pandas as pd
 from datetime import datetime
 
-# ==============================================================================
-# SCRIPT AUTOMASI PENARIKAN DATA ON-CHAIN
-# Script ini bertugas mengambil data dari API, merapikannya menjadi tabel,
-# dan menyimpannya ke dalam file CSV agar bisa dibaca oleh Dashboard.
-# ==============================================================================
+print(f"[{datetime.now()}] Memulai proses penarikan data On-Chain Price Levels...")
 
-def update_data():
-    print(f"[{datetime.now()}] Memulai proses penarikan data...")
+# Gunakan timeframe=all agar filter di dasbor bekerja maksimal
+url_price_levels = "https://chartinspect.com/api/onchain/onchain-price-levels?timeframe=all&isProUser=false"
+url_tmm = "https://chartinspect.com/api/onchain/true-market-mean?timeframe=all&isProUser=false"
 
-    # 1. TENTUKAN SUMBER DATA (API URL)
-    # Saat ini difokuskan untuk menarik metrik STH Cost Basis & Deviation
-    url_sth_cost = "https://chartinspect.com/api/onchain/chain-caps?timeframe=all&forChart=cost-basis-convergence&isProUser=false"
+try:
+    # 1. Tarik Data Base Price Levels
+    print("Mengunduh data Price Levels...")
+    res1 = requests.get(url_price_levels)
+    data1 = res1.json().get('data', [])
+    df1 = pd.DataFrame(data1)
+    # Ambil kolom yang diperlukan saja
+    df1 = df1[['date', 'btc_price', 'sth_cost_basis', 'lth_cost_basis', 'realized_price', 'cvdd']]
+    
+    # 2. Tarik Data True Market Mean
+    print("Mengunduh data True Market Mean...")
+    res2 = requests.get(url_tmm)
+    data2 = res2.json().get('data', [])
+    df2 = pd.DataFrame(data2)
+    # Ambil tanggal dan nilai TMM saja (hindari duplikasi btc_price)
+    df2 = df2[['date', 'true_market_mean_price']]
+    
+    # 3. Jahit Data (Merge) berdasarkan Tanggal
+    print("Merapikan dan menggabungkan data...")
+    df_master = pd.merge(df1, df2, on='date', how='outer')
+    
+    # Urutkan berdasarkan tanggal dan simpan ke CSV
+    df_master['date'] = pd.to_datetime(df_master['date'])
+    df_master = df_master.sort_values('date')
+    df_master.to_csv("data_price_level.csv", index=False)
+    
+    print("Sukses! Data berhasil diperbarui dan disimpan di: data_price_level.csv")
 
-    try:
-        # 2. MENGAMBIL DATA DARI INTERNET
-        print("Mengunduh data dari API ChartInspect...")
-        response = requests.get(url_sth_cost)
-        response.raise_for_status() # Akan memunculkan error jika website mati/gagal
-        
-        json_utama = response.json()
-
-        # 3. MENCARI LOKASI DATA UTAMA
-        # Mengecek apakah data berada di dalam folder "data" atau langsung berupa array
-        if "data" in json_utama:
-            data_array = json_utama["data"]
-        else:
-            data_array = json_utama
-
-        # Pastikan data tidak kosong
-        if not data_array or len(data_array) == 0:
-            print("Peringatan: Data berhasil ditarik, tetapi isinya kosong.")
-            return
-
-        # 4. MENGUBAH JSON MENJADI TABEL (DATAFRAME)
-        # Pandas akan otomatis membaca header dan baris data tanpa perlu looping manual
-        print("Merapikan format data menjadi tabel...")
-        df = pd.DataFrame(data_array)
-
-        # (Opsional) Memastikan kolom waktu bernama 'Date' agar seragam untuk dashboard
-        # Jika API mengeluarkan nama kolom 'time' atau 't', kita ubah namanya:
-        if 'time' in df.columns:
-            df.rename(columns={'time': 'Date'}, inplace=True)
-        elif 't' in df.columns:
-            df.rename(columns={'t': 'Date'}, inplace=True)
-
-        # 5. MENYIMPAN DATA KE FILE CSV
-        nama_file_output = "Master_Onchain_Data.csv"
-        df.to_csv(nama_file_output, index=False)
-        print(f"Sukses! Data berhasil diperbarui dan disimpan di: {nama_file_output}")
-
-    except Exception as e:
-        print(f"Terjadi kesalahan saat memproses data: {e}")
-
-# Baris ini memastikan script langsung berjalan saat file ini dieksekusi
-if __name__ == "__main__":
-    update_data()
+except Exception as e:
+    print(f"Terjadi kesalahan saat menjalankan automasi: {e}")
