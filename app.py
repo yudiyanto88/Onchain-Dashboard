@@ -64,33 +64,29 @@ with tab1:
 
         # --- A. KONTROL (FULL SCREEN, TIMEFRAME, SMA, METRICS, RANGE) ---
         with controls_container:
-            col_toggle, col_tf, col_sma, col_metrics, col_space, col_radio, col_custom = st.columns([1.5, 2, 2, 3, 0.5, 5, 1.5], vertical_alignment="bottom")
+            # Menggunakan Dropdown Selectbox agar otomatis tertutup saat dipilih
+            col_toggle, col_tf, col_sma, col_sma_cst, col_metrics, col_space, col_radio, col_custom = st.columns(
+                [1.2, 1.8, 1.5, 0.8, 2.5, 0.2, 4.8, 1.2], vertical_alignment="bottom"
+            )
             
             with col_toggle:
                 focus_mode = st.toggle("Full Screen")
                 
             with col_tf:
-                with st.popover(f"Timeframe: {st.session_state.resolution}"):
-                    st.markdown("**Select Resolution:**")
-                    st.session_state.resolution = st.radio(
-                        "Resolution", 
-                        ["Daily", "3 Days", "Weekly", "Monthly"], 
-                        index=["Daily", "3 Days", "Weekly", "Monthly"].index(st.session_state.resolution),
-                        label_visibility="collapsed"
-                    )
+                tf_dict = {"Daily": "Timeframe: Daily", "3 Days": "Timeframe: 3 Days", "Weekly": "Timeframe: Weekly", "Monthly": "Timeframe: Monthly"}
+                tf_reverse = {v: k for k, v in tf_dict.items()}
+                selected_tf = st.selectbox("TF", list(tf_dict.values()), index=list(tf_dict.keys()).index(st.session_state.resolution), label_visibility="collapsed")
+                st.session_state.resolution = tf_reverse[selected_tf]
             
             with col_sma:
-                with st.popover(f"SMA: {st.session_state.smooth_period}"):
-                    st.markdown("**Select Smoothing:**")
-                    st.session_state.smooth_period = st.radio(
-                        "Period", 
-                        ["0d", "7d", "14d", "30d", "Custom"], 
-                        index=["0d", "7d", "14d", "30d", "Custom"].index(st.session_state.smooth_period),
-                        horizontal=True,
-                        label_visibility="collapsed"
-                    )
-                    if st.session_state.smooth_period == "Custom":
-                        st.session_state.custom_smooth = st.number_input("Days", min_value=1, value=st.session_state.custom_smooth)
+                sma_dict = {"0d": "SMA: 0d", "7d": "SMA: 7d", "14d": "SMA: 14d", "30d": "SMA: 30d", "Custom": "SMA: Custom"}
+                sma_reverse = {v: k for k, v in sma_dict.items()}
+                selected_sma = st.selectbox("SMA", list(sma_dict.values()), index=list(sma_dict.keys()).index(st.session_state.smooth_period), label_visibility="collapsed")
+                st.session_state.smooth_period = sma_reverse[selected_sma]
+                
+            with col_sma_cst:
+                if st.session_state.smooth_period == "Custom":
+                    st.session_state.custom_smooth = st.number_input("Days", min_value=1, value=st.session_state.custom_smooth, label_visibility="collapsed")
             
             with col_metrics:
                 active_metrics = st.multiselect(
@@ -104,7 +100,6 @@ with tab1:
             with col_radio:
                 time_options = ["1 Month", "3 Months", "6 Months", "1 Year", "4 Years (Cycle)", "All Time", "Custom"]
                 current_idx = time_options.index(st.session_state.time_range) if st.session_state.time_range in time_options else 5
-                
                 st.session_state.time_range = st.radio("Range:", time_options, index=current_idx, horizontal=True, label_visibility="collapsed")
             
             with col_custom:
@@ -116,12 +111,9 @@ with tab1:
         # --- B. TIMEFRAME RESAMPLING ---
         if st.session_state.resolution != "Daily":
             df.set_index('Date', inplace=True)
-            if st.session_state.resolution == "3 Days":
-                df = df.resample('3D').last()
-            elif st.session_state.resolution == "Weekly":
-                df = df.resample('W').last()
-            elif st.session_state.resolution == "Monthly":
-                df = df.resample('M').last()
+            if st.session_state.resolution == "3 Days": df = df.resample('3D').last()
+            elif st.session_state.resolution == "Weekly": df = df.resample('W').last()
+            elif st.session_state.resolution == "Monthly": df = df.resample('ME').last()
             df.reset_index(inplace=True)
 
         # --- C. KALKULASI SMA SMOOTHING ---
@@ -162,22 +154,21 @@ with tab1:
                 baris_terakhir = df_filter.iloc[-1]
                 btc_price = baris_terakhir.get('BTC Price', 0)
                 
-                # Fungsi Custom KPI (Perbaikan Warna Persentase)
                 def render_kpi(title, value, is_btc=False):
                     if is_btc or pd.isna(value) or value == 0:
                         color = "#ffffff"
                         title_color = "#a3a8b8"
                         delta_html = ""
                     else:
-                        # Logika: Metrik > BTC = Hijau (+), Metrik < BTC = Merah (-)
-                        delta_pct = ((value - btc_price) / btc_price) * 100
-                        is_profit = value >= btc_price
+                        # Profit = Harga BTC > Cost Basis
+                        delta_pct = ((btc_price - value) / btc_price) * 100
+                        is_profit = delta_pct >= 0
                         color = "#00cc66" if is_profit else "#ff4d4d"
                         title_color = color
                         arrow = "↑" if is_profit else "↓"
                         
-                        # Perbaikan: Menambahkan perintah 'color: {color};' ke dalam styling span persentase
-                        delta_html = f"<div style='margin-top: 4px;'><span style='color: {color}; font-size: 0.85rem; background-color: {color}20; padding: 2px 6px; border-radius: 4px; font-weight: 600;'>{arrow} {abs(delta_pct):.2f}%</span></div>"
+                        # PERBAIKAN: Menambahkan 'color: {color}' pada teks persentase
+                        delta_html = f"<div style='margin-top: 4px;'><span style='color: {color}; font-size: 0.85rem; background-color: {color}20; padding: 2px 6px; border-radius: 4px;'>{arrow} {abs(delta_pct):.2f}%</span></div>"
                         
                     st.markdown(f"""
                     <div style="display: flex; flex-direction: column; padding-bottom: 10px;">
