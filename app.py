@@ -12,6 +12,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+# Menyimpan status pilihan user di memori
 if 'time_range' not in st.session_state:
     st.session_state.time_range = "All Time"
 if 'custom_days' not in st.session_state:
@@ -20,9 +21,13 @@ if 'smooth_period' not in st.session_state:
     st.session_state.smooth_period = "0d"
 if 'custom_smooth' not in st.session_state:
     st.session_state.custom_smooth = 50
+if 'timeframe_period' not in st.session_state:
+    st.session_state.timeframe_period = "1D"
+if 'custom_tf' not in st.session_state:
+    st.session_state.custom_tf = 3
 
 # ==============================================================================
-# 2. DATA LOADING (DARI CSV)
+# 2. DATA LOADING
 # ==============================================================================
 @st.cache_data(ttl=3600)
 def load_data():
@@ -64,14 +69,25 @@ with tab1:
         controls_container = st.container()
         chart_container = st.container()
 
-        # --- A. KONTROL (FULL SCREEN, SMOOTHING, METRIC TOGGLE, TIME RANGE) ---
+        # --- A. KONTROL (FULL SCREEN, TIMEFRAME, SMOOTHING, METRIC TOGGLE, TIME RANGE) ---
         with controls_container:
-            # Mengatur proporsi lebar kolom kontrol
-            col_toggle, col_smooth, col_metrics, col_space, col_radio, col_custom = st.columns([1.5, 1.5, 3.5, 0.5, 5, 1.5], vertical_alignment="bottom")
+            col_toggle, col_tf, col_smooth, col_metrics, col_space, col_radio, col_custom = st.columns([1.2, 1.2, 1.5, 3.5, 0.3, 5, 1.3], vertical_alignment="bottom")
             
             with col_toggle:
                 focus_mode = st.toggle("Full Screen")
                 
+            with col_tf:
+                with st.popover("Timeframe"):
+                    st.markdown("**Select Timeframe:**")
+                    st.session_state.timeframe_period = st.radio(
+                        "Timeframe", 
+                        ["1D", "3D", "1W", "1M", "Custom"], 
+                        index=["1D", "3D", "1W", "1M", "Custom"].index(st.session_state.timeframe_period),
+                        label_visibility="collapsed"
+                    )
+                    if st.session_state.timeframe_period == "Custom":
+                        st.session_state.custom_tf = st.number_input("Days", min_value=2, value=st.session_state.custom_tf)
+
             with col_smooth:
                 with st.popover("Smoothing (SMA)"):
                     st.markdown("**Select Smoothing Period:**")
@@ -86,7 +102,6 @@ with tab1:
                         st.session_state.custom_smooth = st.number_input("Days", min_value=1, value=st.session_state.custom_smooth)
             
             with col_metrics:
-                # Multiselect untuk mematikan/menyalakan metrik di chart
                 active_metrics = st.multiselect(
                     "Show Metrics:",
                     ['STH Cost Basis', 'LTH Cost Basis', 'Realized Price', 'True Market Mean', 'CVDD'],
@@ -98,7 +113,6 @@ with tab1:
             with col_radio:
                 time_options = ["1 Month", "3 Months", "6 Months", "1 Year", "4 Years (Cycle)", "All Time", "Custom"]
                 current_idx = time_options.index(st.session_state.time_range) if st.session_state.time_range in time_options else 5
-                
                 st.session_state.time_range = st.radio("Time Range:", time_options, index=current_idx, horizontal=True, label_visibility="collapsed")
             
             with col_custom:
@@ -107,7 +121,19 @@ with tab1:
                     
             st.markdown("<br>", unsafe_allow_html=True)
         
-        # --- B. KALKULASI SMA SMOOTHING ---
+        # --- B. KALKULASI TIMEFRAME (RESAMPLING DATA) ---
+        if st.session_state.timeframe_period != "1D":
+            freq = "1D"
+            if st.session_state.timeframe_period == "3D": freq = "3D"
+            elif st.session_state.timeframe_period == "1W": freq = "7D"
+            elif st.session_state.timeframe_period == "1M": freq = "30D"
+            elif st.session_state.timeframe_period == "Custom": freq = f"{st.session_state.custom_tf}D"
+            
+            # Mengelompokkan data berdasarkan timeframe yang dipilih dan mengambil nilai rata-rata
+            df = df.set_index('Date').resample(freq).mean().reset_index()
+            df = df.dropna(subset=['BTC Price']) # Hapus baris kosong akibat resampling
+
+        # --- C. KALKULASI SMA SMOOTHING ---
         window = 1
         if st.session_state.smooth_period == "7d": window = 7
         elif st.session_state.smooth_period == "14d": window = 14
@@ -120,7 +146,7 @@ with tab1:
                 if col in df.columns:
                     df[col] = df[col].rolling(window=window, min_periods=1).mean()
 
-        # --- C. FILTER WAKTU ---
+        # --- D. FILTER WAKTU (TIME RANGE) ---
         tanggal_terakhir = df['Date'].max()
         opsi_waktu = st.session_state.time_range
         
@@ -135,7 +161,7 @@ with tab1:
         df_filter = df[df['Date'] >= tanggal_mulai].copy()
         df_filter['Date_str'] = df_filter['Date'].dt.strftime('%Y-%m-%d')
 
-        # --- D. HEADERS & KPI ---
+        # --- E. HEADERS & KPI ---
         with header_container:
             if not focus_mode:
                 st.title("On-Chain Price Levels")
@@ -149,11 +175,11 @@ with tab1:
                 realized = baris_terakhir.get('Realized Price', 0)
                 tmm = baris_terakhir.get('True Market Mean', 0)
                 
-                # Fungsi penghitung selisih persentase vs BTC Price
+                # PERBAIKAN LOGIKA DELTA: (Harga - Modal) / Modal. Jika Harga > Modal = Profit (+) = Hijau
                 def hitung_delta(nilai_metrik):
                     if pd.isna(nilai_metrik) or nilai_metrik == 0 or btc_price == 0:
                         return 0
-                    return ((nilai_metrik - btc_price) / btc_price) * 100
+                    return ((btc_price - nilai_metrik) / nilai_metrik) * 100
                 
                 col_kpi1, col_kpi2, col_kpi3, col_kpi4, col_kpi5 = st.columns(5)
                 col_kpi1.metric("Current BTC Price", f"${btc_price:,.2f}")
@@ -165,9 +191,8 @@ with tab1:
             else:
                 st.markdown("""<style>.block-container {padding-top: 1rem; padding-bottom: 1rem; max-width: 100%;} header {visibility: hidden;} footer {visibility: hidden;}</style>""", unsafe_allow_html=True)
 
-        # --- E. LIGHTWEIGHT CHARTS (MULTI-LINE) ---
+        # --- F. LIGHTWEIGHT CHARTS (MULTI-LINE) ---
         with chart_container:
-            # Tinggi ditambah signifikan agar lebih nyaman untuk visualisasi data berlapis
             tinggi_chart = 850 if focus_mode else 650 
 
             pengaturan_dasar = {
@@ -184,12 +209,10 @@ with tab1:
                     return temp.dropna().to_dict('records')
                 return []
 
-            # Harga BTC selalu ditampilkan sebagai dasar
             panel_utama = [
                 {"type": 'Line', "data": ambil_data_series('BTC Price'), "options": {"color": '#f7931a', "lineWidth": 3, "title": 'BTC Price'}}
             ]
             
-            # Memetakan warna unik untuk masing-masing metrik
             warna_metrik = {
                 'STH Cost Basis': '#ff4d4d',
                 'LTH Cost Basis': '#4da6ff',
@@ -198,7 +221,6 @@ with tab1:
                 'CVDD': '#00cc66'
             }
             
-            # Hanya memasukkan garis ke dalam chart jika metrik dipilih pada filter dropdown
             for metrik in active_metrics:
                 if metrik in warna_metrik:
                     panel_utama.append({
