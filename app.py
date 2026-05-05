@@ -12,7 +12,15 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Menyimpan status pilihan user di memori
+# CSS Custom untuk mengecilkan ukuran font pada KPI (Papan Skor)
+st.markdown("""
+<style>
+    [data-testid="stMetricValue"] {
+        font-size: 1.5rem !important; 
+    }
+</style>
+""", unsafe_allow_html=True)
+
 if 'time_range' not in st.session_state:
     st.session_state.time_range = "All Time"
 if 'custom_days' not in st.session_state:
@@ -21,10 +29,8 @@ if 'smooth_period' not in st.session_state:
     st.session_state.smooth_period = "0d"
 if 'custom_smooth' not in st.session_state:
     st.session_state.custom_smooth = 50
-if 'timeframe_period' not in st.session_state:
-    st.session_state.timeframe_period = "1D"
-if 'custom_tf' not in st.session_state:
-    st.session_state.custom_tf = 3
+if 'timeframe' not in st.session_state:
+    st.session_state.timeframe = "1D"
 
 # ==============================================================================
 # 2. DATA LOADING
@@ -71,25 +77,27 @@ with tab1:
 
         # --- A. KONTROL (FULL SCREEN, TIMEFRAME, SMOOTHING, METRIC TOGGLE, TIME RANGE) ---
         with controls_container:
-            col_toggle, col_tf, col_smooth, col_metrics, col_space, col_radio, col_custom = st.columns([1.2, 1.2, 1.5, 3.5, 0.3, 5, 1.3], vertical_alignment="bottom")
+            col_toggle, col_tf, col_smooth, col_metrics, col_space, col_radio, col_custom = st.columns([1.5, 1.5, 1.5, 3.5, 0.5, 5, 1.5], vertical_alignment="bottom")
             
             with col_toggle:
                 focus_mode = st.toggle("Full Screen")
                 
             with col_tf:
-                with st.popover("Timeframe"):
-                    st.markdown("**Select Timeframe:**")
-                    st.session_state.timeframe_period = st.radio(
-                        "Timeframe", 
-                        ["1D", "3D", "1W", "1M", "Custom"], 
-                        index=["1D", "3D", "1W", "1M", "Custom"].index(st.session_state.timeframe_period),
+                tf_label = st.session_state.timeframe
+                with st.popover(f"Timeframe: {tf_label}"):
+                    st.markdown("**Select Resolution:**")
+                    st.session_state.timeframe = st.radio(
+                        "Resolution", 
+                        ["1D", "3D", "1W", "1M"], 
+                        index=["1D", "3D", "1W", "1M"].index(st.session_state.timeframe),
+                        horizontal=True,
                         label_visibility="collapsed"
                     )
-                    if st.session_state.timeframe_period == "Custom":
-                        st.session_state.custom_tf = st.number_input("Days", min_value=2, value=st.session_state.custom_tf)
 
             with col_smooth:
-                with st.popover("Smoothing (SMA)"):
+                # Dynamic Label untuk Smoothing
+                smooth_val = f"{st.session_state.custom_smooth}d" if st.session_state.smooth_period == "Custom" else st.session_state.smooth_period
+                with st.popover(f"Smoothing: {smooth_val}"):
                     st.markdown("**Select Smoothing Period:**")
                     st.session_state.smooth_period = st.radio(
                         "Period", 
@@ -121,17 +129,11 @@ with tab1:
                     
             st.markdown("<br>", unsafe_allow_html=True)
         
-        # --- B. KALKULASI TIMEFRAME (RESAMPLING DATA) ---
-        if st.session_state.timeframe_period != "1D":
-            freq = "1D"
-            if st.session_state.timeframe_period == "3D": freq = "3D"
-            elif st.session_state.timeframe_period == "1W": freq = "7D"
-            elif st.session_state.timeframe_period == "1M": freq = "30D"
-            elif st.session_state.timeframe_period == "Custom": freq = f"{st.session_state.custom_tf}D"
-            
-            # Mengelompokkan data berdasarkan timeframe yang dipilih dan mengambil nilai rata-rata
-            df = df.set_index('Date').resample(freq).mean().reset_index()
-            df = df.dropna(subset=['BTC Price']) # Hapus baris kosong akibat resampling
+        # --- B. KALKULASI TIMEFRAME (RESAMPLING) ---
+        if st.session_state.timeframe != "1D":
+            tf_map = {"3D": "3D", "1W": "W", "1M": "M"}
+            # Mengelompokkan data berdasarkan timeframe yang dipilih dan mengambil rata-ratanya
+            df = df.set_index('Date').resample(tf_map[st.session_state.timeframe]).mean().dropna().reset_index()
 
         # --- C. KALKULASI SMA SMOOTHING ---
         window = 1
@@ -146,7 +148,7 @@ with tab1:
                 if col in df.columns:
                     df[col] = df[col].rolling(window=window, min_periods=1).mean()
 
-        # --- D. FILTER WAKTU (TIME RANGE) ---
+        # --- D. FILTER WAKTU (RANGE) ---
         tanggal_terakhir = df['Date'].max()
         opsi_waktu = st.session_state.time_range
         
@@ -175,7 +177,7 @@ with tab1:
                 realized = baris_terakhir.get('Realized Price', 0)
                 tmm = baris_terakhir.get('True Market Mean', 0)
                 
-                # PERBAIKAN LOGIKA DELTA: (Harga - Modal) / Modal. Jika Harga > Modal = Profit (+) = Hijau
+                # Fungsi penghitung selisih persentase (Sekarang hijau jika BTC > Cost Basis)
                 def hitung_delta(nilai_metrik):
                     if pd.isna(nilai_metrik) or nilai_metrik == 0 or btc_price == 0:
                         return 0
