@@ -22,7 +22,7 @@ if 'custom_smooth' not in st.session_state:
     st.session_state.custom_smooth = 50
 
 # ==============================================================================
-# 2. DATA LOADING (DARI CSV BARU)
+# 2. DATA LOADING
 # ==============================================================================
 @st.cache_data(ttl=3600)
 def load_data():
@@ -74,8 +74,6 @@ with tab1:
             with col_smooth:
                 with st.popover("⚙️ Smoothing (SMA)"):
                     st.markdown("**Select Smoothing Period:**")
-                    
-                    # Logika Smoothing Menu
                     st.session_state.smooth_period = st.radio(
                         "Period", 
                         ["0d", "7d", "14d", "30d", "Custom"], 
@@ -83,7 +81,6 @@ with tab1:
                         horizontal=True,
                         label_visibility="collapsed"
                     )
-                    
                     if st.session_state.smooth_period == "Custom":
                         st.session_state.custom_smooth = st.number_input("Days", min_value=1, value=st.session_state.custom_smooth)
 
@@ -110,7 +107,6 @@ with tab1:
             metrics_to_smooth = ['STH Cost Basis', 'LTH Cost Basis', 'Realized Price', 'True Market Mean', 'CVDD']
             for col in metrics_to_smooth:
                 if col in df.columns:
-                    # Menghitung Rata-Rata Pergerakan (Rolling Mean)
                     df[col] = df[col].rolling(window=window, min_periods=1).mean()
 
         # --- C. FILTER WAKTU ---
@@ -128,7 +124,7 @@ with tab1:
         df_filter = df[df['Date'] >= tanggal_mulai].copy()
         df_filter['Date_str'] = df_filter['Date'].dt.strftime('%Y-%m-%d')
 
-        # --- D. HEADERS & KPI ---
+        # --- D. HEADERS & KPI (5 KOLOM + DELTA PERSENTASE) ---
         with header_container:
             if not focus_mode:
                 st.title("On-Chain Price Levels 📊")
@@ -138,19 +134,39 @@ with tab1:
                 baris_terakhir = df_filter.iloc[-1]
                 harga_sekarang = baris_terakhir.get('BTC Price', 0)
                 sth_cb = baris_terakhir.get('STH Cost Basis', 0)
+                lth_cb = baris_terakhir.get('LTH Cost Basis', 0)
                 realized = baris_terakhir.get('Realized Price', 0)
-                
-                col_kpi1, col_kpi2, col_kpi3 = st.columns(3)
+                tmm = baris_terakhir.get('True Market Mean', 0)
+
+                # Fungsi untuk menghitung jarak margin (%) dari Harga BTC
+                def hitung_margin(harga, basis):
+                    if pd.isna(basis) or basis == 0: return 0
+                    return ((harga - basis) / basis) * 100
+
+                margin_sth = hitung_margin(harga_sekarang, sth_cb)
+                margin_lth = hitung_margin(harga_sekarang, lth_cb)
+                margin_rp = hitung_margin(harga_sekarang, realized)
+                margin_tmm = hitung_margin(harga_sekarang, tmm)
+
+                # Menampilkan 5 metrik berjejer
+                col_kpi1, col_kpi2, col_kpi3, col_kpi4, col_kpi5 = st.columns(5)
                 col_kpi1.metric("Current BTC Price", f"${harga_sekarang:,.2f}")
-                col_kpi2.metric("STH Cost Basis", f"${sth_cb:,.2f}")
-                col_kpi3.metric("Realized Price", f"${realized:,.2f}")
+                
+                # Bantuan visual: Jika delta positif (hijau), berarti BTC Price lebih mahal (Premium) dari Cost Basis
+                col_kpi2.metric("STH Cost Basis", f"${sth_cb:,.2f}", f"{margin_sth:,.2f}% vs BTC")
+                col_kpi3.metric("LTH Cost Basis", f"${lth_cb:,.2f}", f"{margin_lth:,.2f}% vs BTC")
+                col_kpi4.metric("Realized Price", f"${realized:,.2f}", f"{margin_rp:,.2f}% vs BTC")
+                col_kpi5.metric("True Market Mean", f"${tmm:,.2f}", f"{margin_tmm:,.2f}% vs BTC")
+                
                 st.markdown("---")
             else:
-                st.markdown("""<style>.block-container {padding-top: 1rem; padding-bottom: 1rem; max-width: 100%;} header {visibility: hidden;} footer {visibility: hidden;}</style>""", unsafe_allow_html=True)
+                # Membuat mode Full Screen benar-benar rapat ke ujung layar (menghilangkan padding samping)
+                st.markdown("""<style>.block-container {padding: 1rem 0rem; max-width: 100%;} header {visibility: hidden;} footer {visibility: hidden;}</style>""", unsafe_allow_html=True)
 
-        # --- E. LIGHTWEIGHT CHARTS (MULTI-LINE) ---
+        # --- E. LIGHTWEIGHT CHARTS (UKURAN DIPERBESAR) ---
         with chart_container:
-            tinggi_chart = 700 if focus_mode else 550 
+            # Tinggi chart dinaikkan secara signifikan
+            tinggi_chart = 850 if focus_mode else 650 
 
             pengaturan_dasar = {
                 "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}},
@@ -166,7 +182,6 @@ with tab1:
                     return temp.dropna().to_dict('records')
                 return []
 
-            # 6 Garis dalam 1 Chart
             panel_utama = [
                 {"type": 'Line', "data": ambil_data_series('BTC Price'), "options": {"color": '#f7931a', "lineWidth": 3, "title": 'BTC Price'}},
                 {"type": 'Line', "data": ambil_data_series('STH Cost Basis'), "options": {"color": '#ff4d4d', "lineWidth": 2, "title": 'STH Cost Basis'}},
