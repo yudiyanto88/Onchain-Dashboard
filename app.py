@@ -70,7 +70,6 @@ with tab1:
                 focus_mode = st.toggle("Full Screen")
                 
             with col_tf:
-                # Tombol dinamis untuk Timeframe (Resolusi Candlestick)
                 with st.popover(f"Timeframe: {st.session_state.resolution}"):
                     st.markdown("**Select Resolution:**")
                     st.session_state.resolution = st.radio(
@@ -81,7 +80,6 @@ with tab1:
                     )
             
             with col_sma:
-                # Tombol dinamis untuk SMA
                 with st.popover(f"SMA: {st.session_state.smooth_period}"):
                     st.markdown("**Select Smoothing:**")
                     st.session_state.smooth_period = st.radio(
@@ -164,20 +162,22 @@ with tab1:
                 baris_terakhir = df_filter.iloc[-1]
                 btc_price = baris_terakhir.get('BTC Price', 0)
                 
-                # Fungsi Custom KPI untuk mengubah font dan warna secara utuh
+                # Fungsi Custom KPI (Perbaikan Warna Persentase)
                 def render_kpi(title, value, is_btc=False):
                     if is_btc or pd.isna(value) or value == 0:
                         color = "#ffffff"
                         title_color = "#a3a8b8"
                         delta_html = ""
                     else:
-                        # Profit = BTC > Cost Basis
-                        delta_pct = ((btc_price - value) / btc_price) * 100
-                        is_profit = delta_pct >= 0
+                        # Logika: Metrik > BTC = Hijau (+), Metrik < BTC = Merah (-)
+                        delta_pct = ((value - btc_price) / btc_price) * 100
+                        is_profit = value >= btc_price
                         color = "#00cc66" if is_profit else "#ff4d4d"
                         title_color = color
                         arrow = "↑" if is_profit else "↓"
-                        delta_html = f"<div style='margin-top: 4px;'><span style='font-size: 0.85rem; background-color: {color}20; padding: 2px 6px; border-radius: 4px;'>{arrow} {abs(delta_pct):.2f}%</span></div>"
+                        
+                        # Perbaikan: Menambahkan perintah 'color: {color};' ke dalam styling span persentase
+                        delta_html = f"<div style='margin-top: 4px;'><span style='color: {color}; font-size: 0.85rem; background-color: {color}20; padding: 2px 6px; border-radius: 4px; font-weight: 600;'>{arrow} {abs(delta_pct):.2f}%</span></div>"
                         
                     st.markdown(f"""
                     <div style="display: flex; flex-direction: column; padding-bottom: 10px;">
