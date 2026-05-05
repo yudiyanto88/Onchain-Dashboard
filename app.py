@@ -4,7 +4,7 @@ from datetime import timedelta
 from streamlit_lightweight_charts import renderLightweightCharts
 
 # ==============================================================================
-# 1. PAGE CONFIGURATION & SUNTIKAN CSS (UNTUK LEBAR MAKSIMAL)
+# 1. PAGE CONFIGURATION & SESSION STATE
 # ==============================================================================
 st.set_page_config(
     page_title="Yudiyanto | On-Chain Dashboard",
@@ -12,15 +12,15 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Memaksa lebar container menjadi 100% dari ujung ke ujung layar
+# CSS tambahan untuk melebarkan area konten (mengurangi ruang kosong di kiri-kanan)
 st.markdown("""
-    <style>
-        .block-container {
-            padding-left: 2rem;
-            padding-right: 2rem;
-            max-width: 100%;
-        }
-    </style>
+<style>
+    .block-container {
+        padding-left: 2rem;
+        padding-right: 2rem;
+        max-width: 100%;
+    }
+</style>
 """, unsafe_allow_html=True)
 
 if 'time_range' not in st.session_state:
@@ -33,7 +33,7 @@ if 'custom_smooth' not in st.session_state:
     st.session_state.custom_smooth = 50
 
 # ==============================================================================
-# 2. DATA LOADING (DARI CSV)
+# 2. DATA LOADING
 # ==============================================================================
 @st.cache_data(ttl=3600)
 def load_data():
@@ -62,7 +62,7 @@ df_raw = load_data()
 # ==============================================================================
 # 3. TOP TABS NAVIGATION
 # ==============================================================================
-tab1, tab2, tab3 = st.tabs(["📊 Price Levels", "📈 Momentum (Soon)", "🌊 Oscillators (Soon)"])
+tab1, tab2, tab3 = st.tabs(["Price Levels", "Momentum (Soon)", "Oscillators (Soon)"])
 
 # ------------------------------------------------------------------------------
 # TAB 1: ON-CHAIN PRICE LEVELS
@@ -75,26 +75,15 @@ with tab1:
         controls_container = st.container()
         chart_container = st.container()
 
-        # --- A. KONTROL (FULL SCREEN, FILTER METRIK, SMOOTHING, TIME RANGE) ---
+        # --- A. KONTROL (FULL SCREEN, SMOOTHING, METRIC FILTER, TIME RANGE) ---
         with controls_container:
-            # Kolom diatur ulang untuk menambahkan tombol Select Metrics
-            col_toggle, col_filter, col_smooth, col_space, col_radio, col_custom = st.columns([1.5, 1.5, 2, 0.5, 6, 1.5], vertical_alignment="bottom")
+            col_toggle, col_smooth, col_metrics, col_radio, col_custom = st.columns([1.5, 1.5, 4, 6, 1.5], vertical_alignment="bottom")
             
             with col_toggle:
-                focus_mode = st.toggle("🔲 Full Screen")
+                focus_mode = st.toggle("Full Screen")
                 
-            with col_filter:
-                with st.popover("👁️ Select Metrics"):
-                    st.markdown("**Show/Hide Lines:**")
-                    show_btc = st.checkbox("BTC Price", value=True)
-                    show_sth = st.checkbox("STH Cost Basis", value=True)
-                    show_lth = st.checkbox("LTH Cost Basis", value=True)
-                    show_rp = st.checkbox("Realized Price", value=True)
-                    show_tmm = st.checkbox("True Market Mean", value=True)
-                    show_cvdd = st.checkbox("CVDD", value=True)
-                    
             with col_smooth:
-                with st.popover("⚙️ Smoothing (SMA)"):
+                with st.popover("Smoothing (SMA)"):
                     st.markdown("**Select Smoothing Period:**")
                     st.session_state.smooth_period = st.radio(
                         "Period", 
@@ -103,8 +92,19 @@ with tab1:
                         horizontal=True,
                         label_visibility="collapsed"
                     )
+                    
                     if st.session_state.smooth_period == "Custom":
                         st.session_state.custom_smooth = st.number_input("Days", min_value=1, value=st.session_state.custom_smooth)
+
+            with col_metrics:
+                daftar_metrik = ['STH Cost Basis', 'LTH Cost Basis', 'Realized Price', 'True Market Mean', 'CVDD']
+                selected_metrics = st.multiselect(
+                    "Select metrics to display:",
+                    options=daftar_metrik,
+                    default=daftar_metrik,
+                    label_visibility="collapsed",
+                    placeholder="Choose metrics..."
+                )
 
             with col_radio:
                 time_options = ["1 Month", "3 Months", "6 Months", "1 Year", "4 Years (Cycle)", "All Time", "Custom"]
@@ -126,8 +126,7 @@ with tab1:
         elif st.session_state.smooth_period == "Custom": window = st.session_state.custom_smooth
         
         if window > 1:
-            metrics_to_smooth = ['STH Cost Basis', 'LTH Cost Basis', 'Realized Price', 'True Market Mean', 'CVDD']
-            for col in metrics_to_smooth:
+            for col in daftar_metrik:
                 if col in df.columns:
                     df[col] = df[col].rolling(window=window, min_periods=1).mean()
 
@@ -146,10 +145,10 @@ with tab1:
         df_filter = df[df['Date'] >= tanggal_mulai].copy()
         df_filter['Date_str'] = df_filter['Date'].dt.strftime('%Y-%m-%d')
 
-        # --- D. HEADERS & SCORECARDS KPI ---
+        # --- D. HEADERS & KPI ---
         with header_container:
             if not focus_mode:
-                st.title("On-Chain Price Levels 📊")
+                st.title("On-Chain Price Levels")
                 st.markdown("Bitcoin's current market price alongside fundamental price levels derived from on-chain metrics.")
                 st.markdown("---")
 
@@ -160,30 +159,31 @@ with tab1:
                 realized = baris_terakhir.get('Realized Price', 0)
                 tmm = baris_terakhir.get('True Market Mean', 0)
                 
-                # Kalkulasi Margin (Berapa % Harga BTC berada di atas/bawah Cost Basis)
-                margin_sth = ((harga_sekarang - sth_cb) / sth_cb) * 100 if sth_cb else 0
-                margin_lth = ((harga_sekarang - lth_cb) / lth_cb) * 100 if lth_cb else 0
-                margin_tmm = ((harga_sekarang - tmm) / tmm) * 100 if tmm else 0
+                # Kalkulasi Margin STH (%)
+                if pd.isna(sth_cb) or sth_cb == 0:
+                    margin_sth = 0
+                else:
+                    margin_sth = ((harga_sekarang - sth_cb) / sth_cb) * 100
                 
-                # 5 Kolom KPI
-                col_kpi1, col_kpi2, col_kpi3, col_kpi4, col_kpi5 = st.columns(5)
+                # Baris 1 KPI
+                col_kpi1, col_kpi2, col_kpi3 = st.columns(3)
                 col_kpi1.metric("Current BTC Price", f"${harga_sekarang:,.2f}")
+                col_kpi2.metric("STH Cost Basis", f"${sth_cb:,.2f}")
+                col_kpi3.metric("Margin (Price vs STH)", f"{margin_sth:,.2f}%", delta=f"{margin_sth:,.2f}%")
                 
-                # Streamlit Delta akan otomatis mewarnai hijau jika +, merah jika -
-                col_kpi2.metric("STH Cost Basis", f"${sth_cb:,.2f}", f"{margin_sth:,.2f}% (STH Profit)")
-                col_kpi3.metric("LTH Cost Basis", f"${lth_cb:,.2f}", f"{margin_lth:,.2f}% (LTH Profit)")
-                
-                col_kpi4.metric("Realized Price", f"${realized:,.2f}")
-                col_kpi5.metric("True Market Mean", f"${tmm:,.2f}", f"{margin_tmm:,.2f}%")
+                # Baris 2 KPI
+                col_kpi4, col_kpi5, col_kpi6 = st.columns(3)
+                col_kpi4.metric("LTH Cost Basis", f"${lth_cb:,.2f}")
+                col_kpi5.metric("Realized Price", f"${realized:,.2f}")
+                col_kpi6.metric("True Market Mean", f"${tmm:,.2f}")
                 
                 st.markdown("---")
             else:
-                # Menghilangkan whitespace tambahan di mode Full Screen
                 st.markdown("""<style>header {visibility: hidden;} footer {visibility: hidden;}</style>""", unsafe_allow_html=True)
 
-        # --- E. LIGHTWEIGHT CHARTS (DIUBAH TINGGINYA & FITUR TOGGLE) ---
+        # --- E. LIGHTWEIGHT CHARTS ---
         with chart_container:
-            tinggi_chart = 850 if focus_mode else 650 # Chart Dipertinggi
+            tinggi_chart = 850 if focus_mode else 650 
 
             pengaturan_dasar = {
                 "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}},
@@ -199,30 +199,36 @@ with tab1:
                     return temp.dropna().to_dict('records')
                 return []
 
-            panel_utama = []
-            
-            # Garis hanya dirender jika checkbox di menu "Select Metrics" dicentang
-            if show_btc: panel_utama.append({"type": 'Line', "data": ambil_data_series('BTC Price'), "options": {"color": '#f7931a', "lineWidth": 3, "title": 'BTC Price'}})
-            if show_sth: panel_utama.append({"type": 'Line', "data": ambil_data_series('STH Cost Basis'), "options": {"color": '#ff4d4d', "lineWidth": 2, "title": 'STH Cost Basis'}})
-            if show_lth: panel_utama.append({"type": 'Line', "data": ambil_data_series('LTH Cost Basis'), "options": {"color": '#4da6ff', "lineWidth": 2, "title": 'LTH Cost Basis'}})
-            if show_rp:  panel_utama.append({"type": 'Line', "data": ambil_data_series('Realized Price'), "options": {"color": '#ffffff', "lineWidth": 2, "title": 'Realized Price'}})
-            if show_tmm: panel_utama.append({"type": 'Line', "data": ambil_data_series('True Market Mean'), "options": {"color": '#cc33ff', "lineWidth": 2, "title": 'True Market Mean'}})
-            if show_cvdd: panel_utama.append({"type": 'Line', "data": ambil_data_series('CVDD'), "options": {"color": '#00cc66', "lineWidth": 2, "title": 'CVDD'}})
+            warna_garis = {
+                'STH Cost Basis': '#ff4d4d',
+                'LTH Cost Basis': '#4da6ff',
+                'Realized Price': '#ffffff',
+                'True Market Mean': '#cc33ff',
+                'CVDD': '#00cc66'
+            }
 
-            # Jika semua centang dimatikan, cegah error dengan mengirim series kosong
-            if len(panel_utama) == 0:
-                st.warning("⚠️ Silakan pilih minimal 1 metrik dari menu 'Select Metrics' untuk menampilkan grafik.")
-            else:
-                renderLightweightCharts([{"chart": pengaturan_dasar, "series": panel_utama}], 'onchain_price_levels')
+            panel_utama = [
+                {"type": 'Line', "data": ambil_data_series('BTC Price'), "options": {"color": '#f7931a', "lineWidth": 3, "title": 'BTC Price'}}
+            ]
+
+            # Menambahkan garis metrik HANYA jika dipilih di kotak filter
+            for metrik in selected_metrics:
+                panel_utama.append({
+                    "type": 'Line', 
+                    "data": ambil_data_series(metrik), 
+                    "options": {"color": warna_garis[metrik], "lineWidth": 2, "title": metrik}
+                })
+
+            renderLightweightCharts([{"chart": pengaturan_dasar, "series": panel_utama}], 'onchain_price_levels')
 
     else:
-        st.error("⚠️ Menunggu data automasi...")
+        st.error("Waiting for automated data. Please ensure GitHub Actions has created data_price_level.csv.")
 
 # ------------------------------------------------------------------------------
-# TAB 2 & 3
+# TAB 2 & 3: TEMPAT UNTUK METRIK BERIKUTNYA
 # ------------------------------------------------------------------------------
 with tab2:
-    st.info("🚧 Momentum chart is under construction. Coming soon!")
+    st.info("Momentum chart is under construction. Coming soon!")
     
 with tab3:
-    st.info("🚧 Oscillators chart is under construction. Coming soon!")
+    st.info("Oscillators chart is under construction. Coming soon!")
