@@ -12,7 +12,6 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Inisialisasi memori untuk filter
 if 'time_range' not in st.session_state: st.session_state.time_range = "All Time"
 if 'custom_days' not in st.session_state: st.session_state.custom_days = 120
 if 'resolution' not in st.session_state: st.session_state.resolution = "Daily"
@@ -20,7 +19,7 @@ if 'smooth_period' not in st.session_state: st.session_state.smooth_period = "0d
 if 'custom_smooth' not in st.session_state: st.session_state.custom_smooth = 50
 
 # ==============================================================================
-# 2. DATA LOADING (DARI CSV)
+# 2. DATA LOADING
 # ==============================================================================
 @st.cache_data(ttl=3600)
 def load_data():
@@ -62,40 +61,33 @@ with tab1:
         controls_container = st.container()
         chart_container = st.container()
 
-        # --- A. KONTROL (FULL SCREEN, TIMEFRAME, SMA, METRICS, RANGE) ---
+        # --- A. KONTROL (TIMEFRAME, SMA, METRICS, RANGE) ---
         with controls_container:
-            # Menggunakan Dropdown Selectbox agar otomatis tertutup saat dipilih
-            col_toggle, col_tf, col_sma, col_sma_cst, col_metrics, col_space, col_radio, col_custom = st.columns(
-                [1.2, 1.8, 1.5, 0.8, 2.5, 0.2, 4.8, 1.2], vertical_alignment="bottom"
+            # Baris 1: Filter Chart & Rentang Waktu
+            col_fs, col_tf, col_sma, col_sma_cst, col_space, col_radio, col_custom = st.columns(
+                [1.2, 1.5, 1.5, 1, 0.5, 5, 1.2], vertical_alignment="bottom"
             )
             
-            with col_toggle:
+            with col_fs:
                 focus_mode = st.toggle("Full Screen")
                 
             with col_tf:
-                tf_dict = {"Daily": "Timeframe: Daily", "3 Days": "Timeframe: 3 Days", "Weekly": "Timeframe: Weekly", "Monthly": "Timeframe: Monthly"}
-                tf_reverse = {v: k for k, v in tf_dict.items()}
-                selected_tf = st.selectbox("TF", list(tf_dict.values()), index=list(tf_dict.keys()).index(st.session_state.resolution), label_visibility="collapsed")
-                st.session_state.resolution = tf_reverse[selected_tf]
+                st.session_state.resolution = st.selectbox(
+                    "Timeframe", 
+                    ["Daily", "3 Days", "Weekly", "Monthly"], 
+                    index=["Daily", "3 Days", "Weekly", "Monthly"].index(st.session_state.resolution)
+                )
             
             with col_sma:
-                sma_dict = {"0d": "SMA: 0d", "7d": "SMA: 7d", "14d": "SMA: 14d", "30d": "SMA: 30d", "Custom": "SMA: Custom"}
-                sma_reverse = {v: k for k, v in sma_dict.items()}
-                selected_sma = st.selectbox("SMA", list(sma_dict.values()), index=list(sma_dict.keys()).index(st.session_state.smooth_period), label_visibility="collapsed")
-                st.session_state.smooth_period = sma_reverse[selected_sma]
+                st.session_state.smooth_period = st.selectbox(
+                    "SMA", 
+                    ["0d", "7d", "14d", "30d", "Custom"], 
+                    index=["0d", "7d", "14d", "30d", "Custom"].index(st.session_state.smooth_period)
+                )
                 
             with col_sma_cst:
                 if st.session_state.smooth_period == "Custom":
                     st.session_state.custom_smooth = st.number_input("Days", min_value=1, value=st.session_state.custom_smooth, label_visibility="collapsed")
-            
-            with col_metrics:
-                active_metrics = st.multiselect(
-                    "Show Metrics:",
-                    ['STH Cost Basis', 'LTH Cost Basis', 'Realized Price', 'True Market Mean', 'CVDD'],
-                    default=['STH Cost Basis', 'LTH Cost Basis', 'Realized Price', 'True Market Mean', 'CVDD'],
-                    label_visibility="collapsed",
-                    placeholder="Pilih metrik..."
-                )
 
             with col_radio:
                 time_options = ["1 Month", "3 Months", "6 Months", "1 Year", "4 Years (Cycle)", "All Time", "Custom"]
@@ -105,6 +97,24 @@ with tab1:
             with col_custom:
                 if st.session_state.time_range == "Custom":
                     st.session_state.custom_days = st.number_input("Days back", min_value=7, value=st.session_state.custom_days, label_visibility="collapsed")
+            
+            # Baris 2: Filter Metrik dengan gaya Tombol (Tabs/Pills)
+            try:
+                active_metrics = st.pills(
+                    "Show Metrics:",
+                    ['STH Cost Basis', 'LTH Cost Basis', 'Realized Price', 'True Market Mean', 'CVDD'],
+                    default=['STH Cost Basis', 'LTH Cost Basis', 'Realized Price', 'True Market Mean', 'CVDD'],
+                    selection_mode="multi",
+                    label_visibility="collapsed"
+                )
+            except AttributeError:
+                # Fallback otomatis jika Streamlit versi lama belum mendukung st.pills
+                active_metrics = st.multiselect(
+                    "Show Metrics:",
+                    ['STH Cost Basis', 'LTH Cost Basis', 'Realized Price', 'True Market Mean', 'CVDD'],
+                    default=['STH Cost Basis', 'LTH Cost Basis', 'Realized Price', 'True Market Mean', 'CVDD'],
+                    label_visibility="collapsed"
+                )
                     
             st.markdown("<br>", unsafe_allow_html=True)
 
@@ -167,7 +177,6 @@ with tab1:
                         title_color = color
                         arrow = "↑" if is_profit else "↓"
                         
-                        # PERBAIKAN: Menambahkan 'color: {color}' pada teks persentase
                         delta_html = f"<div style='margin-top: 4px;'><span style='color: {color}; font-size: 0.85rem; background-color: {color}20; padding: 2px 6px; border-radius: 4px;'>{arrow} {abs(delta_pct):.2f}%</span></div>"
                         
                     st.markdown(f"""
