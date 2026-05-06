@@ -12,7 +12,6 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Inisialisasi State Independen untuk masing-masing Tab
 if 'tr_p' not in st.session_state: st.session_state.tr_p = "All Time"
 if 'cd_p' not in st.session_state: st.session_state.cd_p = 120
 if 'tf_p' not in st.session_state: st.session_state.tf_p = "Daily"
@@ -49,8 +48,7 @@ def load_data_momentum():
 df_price_raw = load_data_price()
 df_mom_raw = load_data_momentum()
 
-# Mesin filter yang mendukung mode Dual-Line (Raw + SMA)
-def apply_filters(df, res_state, smooth_state, custom_smooth, time_state, custom_days, metrics_to_smooth, dual_sma_mode=False):
+def apply_filters(df, res_state, smooth_state, custom_smooth, time_state, custom_days, metrics_to_smooth):
     if df.empty: return df, 1
     dff = df.copy()
     
@@ -72,10 +70,7 @@ def apply_filters(df, res_state, smooth_state, custom_smooth, time_state, custom
     if w > 1:
         for c in metrics_to_smooth:
             if c in dff.columns:
-                if dual_sma_mode:
-                    dff[f"{c}_SMA"] = dff[c].rolling(w, min_periods=1).mean()
-                else:
-                    dff[c] = dff[c].rolling(w, min_periods=1).mean()
+                dff[f"{c}_SMA"] = dff[c].rolling(w, min_periods=1).mean()
                     
     # 3. Time Range Filter
     t_max = dff['Date'].max()
@@ -103,17 +98,43 @@ tab1, tab2, tab3 = st.tabs(["Price Levels", "Profit & Loss", "Oscillators (Soon)
 # ------------------------------------------------------------------------------
 with tab1:
     if not df_price_raw.empty:
-        # Deklarasi Container untuk mengontrol urutan render Top-Down
         header_p = st.container()
         controls_p = st.container()
         chart_p = st.container()
 
-        # Render Kontrol Terlebih Dahulu (Visual berada di tengah)
+        with header_p:
+            st.title("On-Chain Price Levels")
+            st.markdown("---")
+            # Filter Data untuk KPI
+            df_p, w_p = apply_filters(df_price_raw, st.session_state.tf_p, st.session_state.sma_p, st.session_state.cs_p, st.session_state.tr_p, st.session_state.cd_p, ['STH Cost Basis', 'LTH Cost Basis', 'Realized Price', 'True Market Mean', 'CVDD'])
+            
+            last_p = df_p.iloc[-1]
+            btc_p = last_p.get('BTC Price', 0)
+            
+            def render_kpi_p(title, value, is_btc=False):
+                if is_btc or pd.isna(value) or value == 0:
+                    c, tc, d = "#ffffff", "#a3a8b8", ""
+                else:
+                    dp = ((btc_p - value) / btc_p) * 100
+                    ip = dp >= 0
+                    c = "#00cc66" if ip else "#ff4d4d"
+                    tc, ar = c, "↑" if ip else "↓"
+                    d = f"<div style='margin-top:4px;'><span style='color:{c}; font-size:0.85rem; background-color:{c}20; padding:2px 6px; border-radius:4px;'>{ar} {abs(dp):.2f}%</span></div>"
+                st.markdown(f"<div style='padding-bottom:10px;'><span style='color:{tc}; font-size:0.95rem; font-weight:600;'>{title}</span><br><span style='color:{c}; font-size:1.4rem; font-weight:700;'>${value:,.2f}</span>{d}</div>", unsafe_allow_html=True)
+
+            k1, k2, k3, k4, k5 = st.columns(5)
+            with k1: render_kpi_p("Current BTC Price", btc_p, True)
+            with k2: render_kpi_p("STH Cost Basis", last_p.get('STH Cost Basis', 0))
+            with k3: render_kpi_p("LTH Cost Basis", last_p.get('LTH Cost Basis', 0))
+            with k4: render_kpi_p("Realized Price", last_p.get('Realized Price', 0))
+            with k5: render_kpi_p("True Market Mean", last_p.get('True Market Mean', 0))
+            st.markdown("---")
+
         with controls_p:
             col_fs, col_tf, col_sma, col_sma_cst, col_space, col_radio, col_custom = st.columns([1.2, 1.5, 1.5, 1, 0.5, 5, 1.2], vertical_alignment="bottom")
             with col_fs: focus_p = st.toggle("Full Screen", key="tg_p")
-            with col_tf: st.session_state.tf_p = st.selectbox("Timeframe", ["Daily", "3 Days", "Weekly", "Monthly"], index=["Daily", "3 Days", "Weekly", "Monthly"].index(st.session_state.tf_p), key="tfs_p")
-            with col_sma: st.session_state.sma_p = st.selectbox("SMA", ["0d", "7d", "14d", "30d", "Custom"], index=["0d", "7d", "14d", "30d", "Custom"].index(st.session_state.sma_p), key="smas_p")
+            with col_tf: st.session_state.tf_p = st.selectbox("Timeframe", ["Daily", "3 Days", "Weekly", "Monthly"], index=["Daily", "3 Days", "Weekly", "Monthly"].index(st.session_state.tf_p), key="tfs_p", label_visibility="collapsed")
+            with col_sma: st.session_state.sma_p = st.selectbox("SMA", ["0d", "7d", "14d", "30d", "Custom"], index=["0d", "7d", "14d", "30d", "Custom"].index(st.session_state.sma_p), key="smas_p", label_visibility="collapsed")
             with col_sma_cst:
                 if st.session_state.sma_p == "Custom": st.session_state.cs_p = st.number_input("Days", min_value=1, value=st.session_state.cs_p, label_visibility="collapsed", key="cst_p")
             with col_radio:
@@ -128,49 +149,25 @@ with tab1:
             except: active_metrics_p = st.multiselect("Metrics", metric_opts_p, default=metric_opts_p, label_visibility="collapsed")
             st.markdown("<br>", unsafe_allow_html=True)
 
-        df_p, _ = apply_filters(df_price_raw, st.session_state.tf_p, st.session_state.sma_p, st.session_state.cs_p, st.session_state.tr_p, st.session_state.cd_p, ['STH Cost Basis', 'LTH Cost Basis', 'Realized Price', 'True Market Mean', 'CVDD'], dual_sma_mode=False)
+        if focus_p:
+            st.markdown("""<style>.block-container{padding-top:1rem; padding-bottom:1rem; max-width:100%;} header, footer{visibility:hidden;}</style>""", unsafe_allow_html=True)
 
-        # Render Header & KPI (Visual berada paling atas)
-        with header_p:
-            if not focus_p:
-                st.title("On-Chain Price Levels")
-                st.markdown("---")
-                last_p = df_p.iloc[-1]
-                btc_p = last_p.get('BTC Price', 0)
-                
-                def render_kpi_p(title, value, is_btc=False):
-                    if is_btc or pd.isna(value) or value == 0:
-                        c, tc, d = "#ffffff", "#a3a8b8", ""
-                    else:
-                        dp = ((btc_p - value) / btc_p) * 100
-                        ip = dp >= 0
-                        c = "#00cc66" if ip else "#ff4d4d"
-                        tc, ar = c, "↑" if ip else "↓"
-                        d = f"<div style='margin-top:4px;'><span style='color:{c}; font-size:0.85rem; background-color:{c}20; padding:2px 6px; border-radius:4px;'>{ar} {abs(dp):.2f}%</span></div>"
-                    st.markdown(f"<div style='padding-bottom:10px;'><span style='color:{tc}; font-size:0.95rem; font-weight:600;'>{title}</span><br><span style='color:{c}; font-size:1.4rem; font-weight:700;'>${value:,.2f}</span>{d}</div>", unsafe_allow_html=True)
-
-                k1, k2, k3, k4, k5 = st.columns(5)
-                with k1: render_kpi_p("Current BTC Price", btc_p, True)
-                with k2: render_kpi_p("STH Cost Basis", last_p.get('STH Cost Basis', 0))
-                with k3: render_kpi_p("LTH Cost Basis", last_p.get('LTH Cost Basis', 0))
-                with k4: render_kpi_p("Realized Price", last_p.get('Realized Price', 0))
-                with k5: render_kpi_p("True Market Mean", last_p.get('True Market Mean', 0))
-                st.markdown("---")
-            else:
-                st.markdown("""<style>.block-container{padding-top:1rem; padding-bottom:1rem; max-width:100%;} header, footer{visibility:hidden;}</style>""", unsafe_allow_html=True)
-
-        # Render Chart
         with chart_p:
             chart_p_opts = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 850 if focus_p else 650}
             series_p = [{"type": 'Line', "data": get_s(df_p, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 3, "title": 'BTC Price'}}]
             
             colors_p = {'🔴 STH Cost Basis': ('#ff4d4d', 'STH Cost Basis'), '🔵 LTH Cost Basis': ('#4da6ff', 'LTH Cost Basis'), '⚪ Realized Price': ('#ffffff', 'Realized Price'), '🟣 True Market Mean': ('#cc33ff', 'True Market Mean'), '🟢 CVDD': ('#00cc66', 'CVDD')}
             for m in active_metrics_p:
-                if m in colors_p: series_p.append({"type": 'Line', "data": get_s(df_p, colors_p[m][1]), "options": {"color": colors_p[m][0], "lineWidth": 2, "title": colors_p[m][1]}})
+                if m in colors_p:
+                    met_color, met_name = colors_p[m]
+                    series_p.append({"type": 'Line', "data": get_s(df_p, met_name), "options": {"color": met_color, "lineWidth": 2, "title": met_name}})
+                    if w_p > 1:
+                        series_p.append({"type": 'Line', "data": get_s(df_p, f"{met_name}_SMA"), "options": {"color": met_color, "lineWidth": 1, "lineStyle": 2, "title": f"{met_name} SMA({w_p})"}})
+            
             renderLightweightCharts([{"chart": chart_p_opts, "series": series_p}], 'chart_price')
 
 # ------------------------------------------------------------------------------
-# TAB 2: PROFIT & LOSS (DUAL-LINE RAW & SMA)
+# TAB 2: PROFIT & LOSS 
 # ------------------------------------------------------------------------------
 with tab2:
     if not df_mom_raw.empty:
@@ -178,11 +175,34 @@ with tab2:
         controls_m = st.container()
         chart_m = st.container()
 
+        with header_m:
+            st.title("Profit & Loss")
+            st.markdown("---")
+            
+            df_m, w_m = apply_filters(df_mom_raw, st.session_state.tf_m, st.session_state.sma_m, st.session_state.cs_m, st.session_state.tr_m, st.session_state.cd_m, ['aSOPR', 'LTH SOPR', 'STH SOPR', 'STH P/L Ratio', 'LTH P/L Ratio', 'Net Realized PL'])
+            
+            last_m = df_m.iloc[-1]
+            btc_m = last_m.get('BTC Price', 0)
+            
+            def render_kpi_m(title, value, threshold=1.0, is_money=False):
+                if pd.isna(value) or value == 0: color = "#a3a8b8"
+                else: color = "#00cc66" if value >= threshold else "#ff4d4d"
+                val_str = f"${value:,.2f}" if is_money else f"{value:.4f}"
+                st.markdown(f"<div style='padding-bottom:10px;'><span style='color:{color}; font-size:0.95rem; font-weight:600;'>{title}</span><br><span style='color:{color}; font-size:1.4rem; font-weight:700;'>{val_str}</span></div>", unsafe_allow_html=True)
+
+            k1, k2, k3, k4, k5 = st.columns(5)
+            with k1: st.markdown(f"<div style='padding-bottom:10px;'><span style='color:#a3a8b8; font-size:0.95rem; font-weight:600;'>Current BTC Price</span><br><span style='color:#ffffff; font-size:1.4rem; font-weight:700;'>${btc_m:,.2f}</span></div>", unsafe_allow_html=True)
+            with k2: render_kpi_m("aSOPR", last_m.get('aSOPR', 0), 1.0)
+            with k3: render_kpi_m("LTH SOPR", last_m.get('LTH SOPR', 0), 1.0)
+            with k4: render_kpi_m("STH SOPR", last_m.get('STH SOPR', 0), 1.0)
+            with k5: render_kpi_m("Net Realized PL", last_m.get('Net Realized PL', 0), 0.0, True)
+            st.markdown("---")
+
         with controls_m:
             col_fs, col_tf, col_sma, col_sma_cst, col_space, col_radio, col_custom = st.columns([1.2, 1.5, 1.5, 1, 0.5, 5, 1.2], vertical_alignment="bottom")
             with col_fs: focus_m = st.toggle("Full Screen", key="tg_m")
-            with col_tf: st.session_state.tf_m = st.selectbox("Timeframe", ["Daily", "3 Days", "Weekly", "Monthly"], index=["Daily", "3 Days", "Weekly", "Monthly"].index(st.session_state.tf_m), key="tfs_m")
-            with col_sma: st.session_state.sma_m = st.selectbox("SMA", ["0d", "7d", "14d", "30d", "Custom"], index=["0d", "7d", "14d", "30d", "Custom"].index(st.session_state.sma_m), key="smas_m")
+            with col_tf: st.session_state.tf_m = st.selectbox("Timeframe", ["Daily", "3 Days", "Weekly", "Monthly"], index=["Daily", "3 Days", "Weekly", "Monthly"].index(st.session_state.tf_m), key="tfs_m", label_visibility="collapsed")
+            with col_sma: st.session_state.sma_m = st.selectbox("SMA", ["0d", "7d", "14d", "30d", "Custom"], index=["0d", "7d", "14d", "30d", "Custom"].index(st.session_state.sma_m), key="smas_m", label_visibility="collapsed")
             with col_sma_cst:
                 if st.session_state.sma_m == "Custom": st.session_state.cs_m = st.number_input("Days", min_value=1, value=st.session_state.cs_m, label_visibility="collapsed", key="cst_m")
             with col_radio:
@@ -191,54 +211,29 @@ with tab2:
             with col_custom:
                 if st.session_state.tr_m == "Custom": st.session_state.cd_m = st.number_input("Days back", min_value=7, value=st.session_state.cd_m, label_visibility="collapsed", key="cdin_m")
             
-            # Pilihan Metrik Tanpa Judul Kategori
-            m_opts_1 = ['🔵 aSOPR', '🔴 STH SOPR', '🟢 LTH SOPR']
-            m_opts_2 = ['⚪ Net Realized PL', '🟣 STH P/L Ratio', '🟤 LTH P/L Ratio']
+            m_opts_all = ['🔵 aSOPR', '🔴 STH SOPR', '🟢 LTH SOPR', '⚪ Net Realized PL', '🟣 STH P/L Ratio', '🟤 LTH P/L Ratio']
             
-            try: 
-                sel_m1 = st.pills("M1", m_opts_1, default=['🔵 aSOPR'], selection_mode="multi", label_visibility="collapsed")
-                sel_m2 = st.pills("M2", m_opts_2, default=['⚪ Net Realized PL'], selection_mode="multi", label_visibility="collapsed")
-            except: 
-                sel_m1 = st.multiselect("M1", m_opts_1, default=['🔵 aSOPR'], label_visibility="collapsed")
-                sel_m2 = st.multiselect("M2", m_opts_2, default=['⚪ Net Realized PL'], label_visibility="collapsed")
+            try: sel_m = st.pills("Metrics", m_opts_all, default=['🔵 aSOPR', '⚪ Net Realized PL'], selection_mode="multi", label_visibility="collapsed")
+            except: sel_m = st.multiselect("Metrics", m_opts_all, default=['🔵 aSOPR', '⚪ Net Realized PL'], label_visibility="collapsed")
                 
             st.markdown("<br>", unsafe_allow_html=True)
 
-        # Menerapkan filter dengan mode dual_sma_mode = True
-        df_m, w_val = apply_filters(df_mom_raw, st.session_state.tf_m, st.session_state.sma_m, st.session_state.cs_m, st.session_state.tr_m, st.session_state.cd_m, ['aSOPR', 'LTH SOPR', 'STH SOPR', 'STH P/L Ratio', 'LTH P/L Ratio', 'Net Realized PL'], dual_sma_mode=True)
-
-        with header_m:
-            if not focus_m:
-                st.title("Profit & Loss")
-                st.markdown("---")
-                
-                last_m = df_m.iloc[-1]
-                btc_m = last_m.get('BTC Price', 0)
-                
-                # Fungsi render KPI Khusus Profit/Loss (Warna utuh, tanpa persen)
-                def render_kpi_m(title, value, threshold=1.0, is_money=False):
-                    if pd.isna(value) or value == 0:
-                        color = "#a3a8b8"
-                    else:
-                        color = "#00cc66" if value >= threshold else "#ff4d4d"
-                    val_str = f"${value:,.2f}" if is_money else f"{value:.4f}"
-                    st.markdown(f"<div style='padding-bottom:10px;'><span style='color:{color}; font-size:0.95rem; font-weight:600;'>{title}</span><br><span style='color:{color}; font-size:1.4rem; font-weight:700;'>{val_str}</span></div>", unsafe_allow_html=True)
-
-                k1, k2, k3, k4, k5 = st.columns(5)
-                with k1: 
-                    st.markdown(f"<div style='padding-bottom:10px;'><span style='color:#a3a8b8; font-size:0.95rem; font-weight:600;'>Current BTC Price</span><br><span style='color:#ffffff; font-size:1.4rem; font-weight:700;'>${btc_m:,.2f}</span></div>", unsafe_allow_html=True)
-                with k2: render_kpi_m("aSOPR", last_m.get('aSOPR', 0), 1.0)
-                with k3: render_kpi_m("LTH SOPR", last_m.get('LTH SOPR', 0), 1.0)
-                with k4: render_kpi_m("STH SOPR", last_m.get('STH SOPR', 0), 1.0)
-                with k5: render_kpi_m("Net Realized PL", last_m.get('Net Realized PL', 0), 0.0, True)
-                st.markdown("---")
+        if focus_m:
+            st.markdown("""<style>.block-container{padding-top:1rem; padding-bottom:1rem; max-width:100%;} header, footer{visibility:hidden;}</style>""", unsafe_allow_html=True)
 
         with chart_m:
             chart_m_opts = {
                 "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, 
                 "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, 
                 "crosshair": {"mode": 0}, "height": 850 if focus_m else 650,
-                "rightPriceScale": {"visible": True}, "leftPriceScale": {"visible": True}
+                "rightPriceScale": {"visible": True}, 
+                "leftPriceScale": {"visible": True},
+                "priceScale": {
+                    "net_pl_scale": {
+                        "visible": False, 
+                        "scaleMargins": {"top": 0.8, "bottom": 0}
+                    }
+                }
             }
             
             series_m = [{"type": 'Line', "data": get_s(df_m, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
@@ -254,24 +249,19 @@ with tab2:
                 '🟤 LTH P/L Ratio': ('#cc9966', 'LTH P/L Ratio')
             }
             
-            for m in (sel_m1 + sel_m2):
+            for m in sel_m:
                 if m in colors_m:
-                    met_name = colors_m[m][1]
-                    met_color = colors_m[m][0]
-                    # 1. Garis Raw (Solid)
-                    series_m.append({"type": 'Line', "data": get_s(df_m, met_name), "options": {"color": met_color, "lineWidth": 2, "priceScaleId": 'left', "title": f"{met_name} (Raw)"}})
-                    # 2. Garis SMA (Putus-putus)
-                    if w_val > 1:
-                        series_m.append({"type": 'Line', "data": get_s(df_m, f"{met_name}_SMA"), "options": {"color": met_color, "lineWidth": 2, "lineStyle": 2, "priceScaleId": 'left', "title": f"SMA {w_val}"}})
+                    met_color, met_name = colors_m[m]
+                    series_m.append({"type": 'Line', "data": get_s(df_m, met_name), "options": {"color": met_color, "lineWidth": 2, "priceScaleId": 'left', "title": met_name}})
+                    if w_m > 1:
+                        series_m.append({"type": 'Line', "data": get_s(df_m, f"{met_name}_SMA"), "options": {"color": met_color, "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": f"{met_name} SMA({w_m})"}})
                 
                 elif m == '⚪ Net Realized PL':
                     net_pl_raw = get_s(df_m, 'Net Realized PL')
                     for d in net_pl_raw: d['color'] = '#00cc66' if d['value'] >= 0 else '#ff4d4d'
-                    # 1. Histogram Raw
-                    series_m.append({"type": 'Histogram', "data": net_pl_raw, "options": {"priceScaleId": 'right', "title": 'Net PL (Raw)'}})
-                    # 2. Garis SMA (Putus-putus) diletakkan di atas Histogram
-                    if w_val > 1:
-                        series_m.append({"type": 'Line', "data": get_s(df_m, 'Net Realized PL_SMA'), "options": {"color": '#ffffff', "lineWidth": 2, "lineStyle": 2, "priceScaleId": 'right', "title": f"SMA {w_val}"}})
+                    series_m.append({"type": 'Histogram', "data": net_pl_raw, "options": {"priceScaleId": 'net_pl_scale', "title": 'Net PL'}})
+                    if w_m > 1:
+                        series_m.append({"type": 'Line', "data": get_s(df_m, 'Net Realized PL_SMA'), "options": {"color": '#ffffff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'net_pl_scale', "title": f"Net PL SMA({w_m})"}})
 
             renderLightweightCharts([{"chart": chart_m_opts, "series": series_m}], 'chart_momentum')
     else:
