@@ -12,7 +12,7 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CSS SUPER CUSTOM UNTUK SIDEBAR TABS DAN SELECTBOX (BEBAS CLIPPING) ---
+# --- CSS SUPER CUSTOM UNTUK SIDEBAR TABS, SELECTBOX, DAN MENCEGAH CLIPPING ---
 st.markdown("""
 <style>
 /* ======================================================
@@ -77,22 +77,28 @@ div[data-testid="stNumberInput"] label {
     min-height: 0px !important;
 }
 
+/* Memotong Tinggi Selectbox agar tidak boros spasi */
 div[data-baseweb="select"] > div {
     min-height: 32px !important;
     height: 32px !important;
     border-radius: 6px !important;
 }
-
 div[data-baseweb="select"] > div > div {
     padding-top: 0px !important;
     padding-bottom: 0px !important;
 }
 
 /* ======================================================
-   C. MERAPIKAN SPASI UMUM
+   C. MERAPIKAN SPASI UTAMA & MENCEGAH TEKS TERPOTONG
    ====================================================== */
-.block-container { padding-top: 1.5rem; padding-bottom: 1.5rem; max-width: 100%; }
+/* Padding top ditingkatkan menjadi 3rem agar aman dari top header Streamlit */
+.block-container { 
+    padding-top: 3rem !important; 
+    padding-bottom: 1.5rem !important; 
+    max-width: 100%; 
+}
 
+/* Ukuran font Metrics Pill */
 div[data-testid="stPill"] button {
     font-size: 0.85rem !important;
     padding: 2px 12px !important;
@@ -102,23 +108,16 @@ div[data-testid="stPill"] button {
 """, unsafe_allow_html=True)
 
 # Inisialisasi Session State
-if 'tr_p' not in st.session_state: st.session_state.tr_p = "All Time"
-if 'cd_p' not in st.session_state: st.session_state.cd_p = 120
-if 'tf_p' not in st.session_state: st.session_state.tf_p = "Daily"
-if 'sma_p' not in st.session_state: st.session_state.sma_p = "0d"
-if 'cs_p' not in st.session_state: st.session_state.cs_p = 50
-
-if 'tr_ms' not in st.session_state: st.session_state.tr_ms = "All Time"
-if 'cd_ms' not in st.session_state: st.session_state.cd_ms = 120
-if 'tf_ms' not in st.session_state: st.session_state.tf_ms = "Daily"
-if 'sma_ms' not in st.session_state: st.session_state.sma_ms = "0d"
-if 'cs_ms' not in st.session_state: st.session_state.cs_ms = 50
-
-if 'tr_mpl' not in st.session_state: st.session_state.tr_mpl = "All Time"
-if 'cd_mpl' not in st.session_state: st.session_state.cd_mpl = 120
-if 'tf_mpl' not in st.session_state: st.session_state.tf_mpl = "Daily"
-if 'sma_mpl' not in st.session_state: st.session_state.sma_mpl = "0d"
-if 'cs_mpl' not in st.session_state: st.session_state.cs_mpl = 50
+for key in ['tr_p', 'tr_ms', 'tr_mpl']:
+    if key not in st.session_state: st.session_state[key] = "All Time"
+for key in ['cd_p', 'cd_ms', 'cd_mpl']:
+    if key not in st.session_state: st.session_state[key] = 120
+for key in ['tf_p', 'tf_ms', 'tf_mpl']:
+    if key not in st.session_state: st.session_state[key] = "Daily"
+for key in ['sma_p', 'sma_ms', 'sma_mpl']:
+    if key not in st.session_state: st.session_state[key] = "0d"
+for key in ['cs_p', 'cs_ms', 'cs_mpl']:
+    if key not in st.session_state: st.session_state[key] = 50
 
 # ==============================================================================
 # 2. DATA LOADING & FILTERING ENGINE
@@ -204,6 +203,7 @@ if selected_menu == "Price Levels":
         last_p = df_p.iloc[-1]
         btc_p = last_p.get('BTC Price', 0)
         
+        # Format HTML disesuaikan dengan line-height dan padding aman agar tidak terpotong
         def render_kpi_p(title, value, is_btc=False):
             if is_btc or pd.isna(value) or value == 0: c, tc, d = "#ffffff", "#a3a8b8", ""
             else:
@@ -212,13 +212,13 @@ if selected_menu == "Price Levels":
                 c = "#00cc66" if ip else "#ff4d4d"
                 tc, ar = c, "↑" if ip else "↓"
                 d = f"<div style='margin-top:4px;'><span style='color:{c}; font-size:0.85rem; background-color:{c}20; padding:2px 6px; border-radius:4px;'>{ar} {abs(dp):.2f}%</span></div>"
-            # Solusi Teks Terpotong: Pakai padding-top dan line-height agar area text lebih longgar
-            st.markdown(f"<div style='padding-top: 8px; line-height: 1.3;'><span style='color:{tc}; font-size:0.95rem; font-weight:600;'>{title}</span><br><span style='color:{c}; font-size:1.4rem; font-weight:700;'>${value:,.2f}</span>{d}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:{tc}; font-size:0.95rem; font-weight:600;'>{title}</span><br><span style='color:{c}; font-size:1.4rem; font-weight:700;'>${value:,.2f}</span>{d}</div>", unsafe_allow_html=True)
 
+        # Menyelaraskan konten menggunakan vertical_alignment="center"
         col_title, k1, k2, k3, k4, k5 = st.columns([1.5, 1, 1, 1, 1, 1], vertical_alignment="center")
         
         with col_title:
-            st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px; padding-top: 8px; line-height: 1.3;'><h3 style='color: #a855f7; margin: 0; font-weight: 700;'>On-Chain Price Levels</h3></div>", unsafe_allow_html=True)
+            st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700;'>On-Chain Price Levels</h3></div>", unsafe_allow_html=True)
             
         with k1: render_kpi_p("Current BTC Price", btc_p, True)
         with k2: render_kpi_p("STH Cost Basis", last_p.get('STH Cost Basis', 0))
@@ -249,6 +249,7 @@ if selected_menu == "Price Levels":
 
         chart_p_opts = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 850 if focus_p else 650}
         
+        # WARNA ASLI BITCOIN (#f7931a) dengan lineWidth 2
         series_p = [{"type": 'Line', "data": get_s(df_p, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "title": 'BTC Price'}}]
         
         colors_p = {'🔴 STH Cost Basis': ('#ff4d4d', 'STH Cost Basis'), '🔵 LTH Cost Basis': ('#4da6ff', 'LTH Cost Basis'), '⚪ Realized Price': ('#ffffff', 'Realized Price'), '🟣 True Market Mean': ('#cc33ff', 'True Market Mean'), '🟢 CVDD': ('#00cc66', 'CVDD')}
@@ -273,14 +274,14 @@ elif selected_menu == "Profit & Loss":
             if pd.isna(value) or value == 0: color = "#a3a8b8"
             else: color = "#00cc66" if value >= threshold else "#ff4d4d"
             val_str = f"${value:,.2f}" if is_money else f"{value:.4f}"
-            st.markdown(f"<div style='padding-top: 8px; line-height: 1.3;'><span style='color:{color}; font-size:0.95rem; font-weight:600;'>{title}</span><br><span style='color:{color}; font-size:1.4rem; font-weight:700;'>{val_str}</span></div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:{color}; font-size:0.95rem; font-weight:600;'>{title}</span><br><span style='color:{color}; font-size:1.4rem; font-weight:700;'>{val_str}</span></div>", unsafe_allow_html=True)
 
         col_title, k1, k2, k3, k4, k5 = st.columns([1.5, 1, 1, 1, 1, 1], vertical_alignment="center")
         
         with col_title:
-            st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px; padding-top: 8px; line-height: 1.3;'><h3 style='color: #a855f7; margin: 0; font-weight: 700;'>Profit & Loss</h3></div>", unsafe_allow_html=True)
+            st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700;'>Profit & Loss</h3></div>", unsafe_allow_html=True)
             
-        with k1: st.markdown(f"<div style='padding-top: 8px; line-height: 1.3;'><span style='color:#a3a8b8; font-size:0.95rem; font-weight:600;'>Current BTC Price</span><br><span style='color:#ffffff; font-size:1.4rem; font-weight:700;'>${btc_m:,.2f}</span></div>", unsafe_allow_html=True)
+        with k1: st.markdown(f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:#a3a8b8; font-size:0.95rem; font-weight:600;'>Current BTC Price</span><br><span style='color:#ffffff; font-size:1.4rem; font-weight:700;'>${btc_m:,.2f}</span></div>", unsafe_allow_html=True)
         with k2: render_kpi_m("aSOPR", last_m.get('aSOPR', 0), 1.0)
         with k3: render_kpi_m("LTH SOPR", last_m.get('LTH SOPR', 0), 1.0)
         with k4: render_kpi_m("STH SOPR", last_m.get('STH SOPR', 0), 1.0)
@@ -324,6 +325,7 @@ elif selected_menu == "Profit & Loss":
             "lth_scale": {"visible": True, "position": "left", "autoScale": True}
         }
         
+        # WARNA ASLI BITCOIN (#f7931a) dengan lineWidth 2
         series_sopr = [{"type": 'Line', "data": get_s(df_ms, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
         
         df_ms['Neutral_Line'] = 1.0
@@ -371,6 +373,7 @@ elif selected_menu == "Profit & Loss":
 
         chart_opts_pl = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 850 if focus_mpl else 650, "rightPriceScale": {"visible": True}, "leftPriceScale": {"visible": True}}
         
+        # WARNA ASLI BITCOIN (#f7931a) dengan lineWidth 2
         series_pl = [{"type": 'Line', "data": get_s(df_mpl, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
 
         colors_pl = {'🟣 STH P/L Ratio': ('#cc33ff', 'STH P/L Ratio'), '🟤 LTH P/L Ratio': ('#cc9966', 'LTH P/L Ratio')}
