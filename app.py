@@ -7,28 +7,26 @@ from streamlit_lightweight_charts import renderLightweightCharts
 # 1. PAGE CONFIGURATION, SESSION STATE & CSS
 # ==============================================================================
 st.set_page_config(
-    page_title="MoneyBag Journal | On-Chain Dashboard",
+    page_title="Yudiyanto | On-Chain Dashboard",
     layout="wide",
-    initial_sidebar_state="expanded" # Sidebar otomatis terbuka di awal
+    initial_sidebar_state="expanded"
 )
 
-# --- CSS UNTUK MENYERAGAMKAN TEKS BARIS KONTROL DAN MENGURANGI SPASI ---
+# --- CSS UNTUK MENYERAGAMKAN TEKS KONTROL DAN MENGURANGI SPASI ---
 st.markdown("""
 <style>
-/* Menyeragamkan ukuran font pada label kontrol (baris 1) */
-div[data-testid="stSelectbox"] label, 
-div[data-testid="stRadio"] label, 
-div[data-testid="stToggle"] label,
-div[data-testid="stNumberInput"] label {
+/* Memaksa font-size 0.85rem di SEMUA elemen kontrol agar ukurannya sama rata */
+.stSelectbox label p, .stRadio label p, .stToggle label p, .stNumberInput label p {
     font-size: 0.85rem !important;
+    color: #a3a8b8 !important; /* Warna abu-abu untuk label atas */
     padding-bottom: 2px !important;
-    min-height: 0px !important;
 }
 
-/* Menyeragamkan ukuran font pada nilai kontrol (baris 2: toggle, opsi radio) */
-div[data-testid="stRadio"] p, 
-div[data-testid="stToggle"] p,
-div[data-testid="stSelectbox"] span {
+/* Memaksa teks nilai di dalam selectbox, radio, toggle agar sama kecilnya */
+div[data-testid="stSelectbox"] div[data-baseweb="select"] span,
+div[data-testid="stRadio"] div[role="radiogroup"] p,
+div[data-testid="stToggle"] div[data-testid="stMarkdownContainer"] p,
+div[data-testid="stNumberInput"] input {
     font-size: 0.85rem !important;
 }
 
@@ -40,13 +38,11 @@ div[data-testid="stPill"] button {
 }
 
 /* Mengurangi margin vertikal pada blok container Streamlit */
-.block-container { padding-top: 1.5rem; padding-bottom: 1.5rem; max-width: 100%; }
+.block-container { padding-top: 1rem; padding-bottom: 1rem; max-width: 100%; }
 div[data-testid="stVerticalBlock"] { gap: 0.5rem !important; }
 
 /* Custom Styling untuk Sidebar Menu */
-section[data-testid="stSidebar"] {
-    background-color: #0e1117;
-}
+section[data-testid="stSidebar"] { background-color: #0e1117; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -132,6 +128,53 @@ def get_s(df, col): return df[['Date_str', col]].dropna().rename(columns={'Date_
 
 t_opts = ["1 Month", "3 Months", "6 Months", "1 Year", "4 Years (Cycle)", "All Time", "Custom"]
 
+# --- FUNGSI RENDER HEADER (JUDUL KIRI + GARIS + KPI KANAN) ---
+def render_header(subtitle, btc_p, kpi_dict):
+    kpi_html = f"""
+    <div style='display: flex; flex-direction: column; min-width: 100px;'>
+        <span style='color: #a3a8b8; font-size: 0.85rem; font-weight: 600;'>Current BTC Price</span>
+        <span style='color: #ffffff; font-size: 1.3rem; font-weight: 700;'>${btc_p:,.2f}</span>
+    </div>
+    """
+    for k, v in kpi_dict.items():
+        if pd.isna(v) or v == 0:
+            c, dp_str = "#a3a8b8", ""
+        else:
+            if subtitle == "Price Levels":
+                dp = ((btc_p - v) / btc_p) * 100
+                ip = dp >= 0
+                c = "#00cc66" if ip else "#ff4d4d"
+                ar = "↑" if ip else "↓"
+                dp_str = f"<div style='margin-top:2px;'><span style='color:{c}; font-size:0.75rem; background-color:{c}20; padding:2px 6px; border-radius:4px;'>{ar} {abs(dp):.2f}%</span></div>"
+            else:
+                threshold = 1.0 if 'SOPR' in k else 0.0
+                c = "#00cc66" if v >= threshold else "#ff4d4d"
+                dp_str = ""
+        
+        val_str = f"${v:,.2f}" if ('Price' in k or 'Basis' in k or 'PL' in k or 'Mean' in k or 'CVDD' in k) else f"{v:.4f}"
+        
+        kpi_html += f"""
+        <div style='display: flex; flex-direction: column; min-width: 100px;'>
+            <span style='color: {c}; font-size: 0.85rem; font-weight: 600;'>{k}</span>
+            <span style='color: {c}; font-size: 1.3rem; font-weight: 700;'>{val_str}</span>
+            {dp_str}
+        </div>
+        """
+        
+    full_html = f"""
+    <div style="display: flex; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 12px; margin-bottom: 15px; flex-wrap: wrap; gap: 20px;">
+        <div style="flex: 0 0 auto; border-right: 1px solid rgba(255,255,255,0.2); padding-right: 25px;">
+            <h1 style="margin: 0; padding: 0; font-size: 1.6rem; color: #ffffff; line-height: 1.2;">Yudiyanto | On-Chain Dashboard</h1>
+            <h2 style="margin: 0; padding: 0; font-size: 1.4rem; color: #a855f7; font-weight: 700;">{subtitle}</h2>
+        </div>
+        <div style="display: flex; flex: 1; flex-wrap: wrap; justify-content: space-between; gap: 10px;">
+            {kpi_html}
+        </div>
+    </div>
+    """
+    st.markdown(full_html, unsafe_allow_html=True)
+
+
 # ==============================================================================
 # 3. SIDEBAR NAVIGATION
 # ==============================================================================
@@ -158,29 +201,14 @@ if selected_menu == "Price Levels":
     if not df_price_raw.empty:
         df_p, w_p = apply_filters(df_price_raw, st.session_state.tf_p, st.session_state.sma_p, st.session_state.cs_p, st.session_state.tr_p, st.session_state.cd_p, ['STH Cost Basis', 'LTH Cost Basis', 'Realized Price', 'True Market Mean', 'CVDD'])
 
-        st.title("On-Chain Price Levels")
-        
         last_p = df_p.iloc[-1]
-        btc_p = last_p.get('BTC Price', 0)
-        
-        def render_kpi_p(title, value, is_btc=False):
-            if is_btc or pd.isna(value) or value == 0: c, tc, d = "#ffffff", "#a3a8b8", ""
-            else:
-                dp = ((btc_p - value) / btc_p) * 100
-                ip = dp >= 0
-                c = "#00cc66" if ip else "#ff4d4d"
-                tc, ar = c, "↑" if ip else "↓"
-                d = f"<div style='margin-top:4px;'><span style='color:{c}; font-size:0.85rem; background-color:{c}20; padding:2px 6px; border-radius:4px;'>{ar} {abs(dp):.2f}%</span></div>"
-            st.markdown(f"<div><span style='color:{tc}; font-size:0.95rem; font-weight:600;'>{title}</span><br><span style='color:{c}; font-size:1.4rem; font-weight:700;'>${value:,.2f}</span>{d}</div>", unsafe_allow_html=True)
-
-        k1, k2, k3, k4, k5 = st.columns(5)
-        with k1: render_kpi_p("Current BTC Price", btc_p, True)
-        with k2: render_kpi_p("STH Cost Basis", last_p.get('STH Cost Basis', 0))
-        with k3: render_kpi_p("LTH Cost Basis", last_p.get('LTH Cost Basis', 0))
-        with k4: render_kpi_p("Realized Price", last_p.get('Realized Price', 0))
-        with k5: render_kpi_p("True Market Mean", last_p.get('True Market Mean', 0))
-        
-        st.markdown("---")
+        kpi_data_p = {
+            'STH Cost Basis': last_p.get('STH Cost Basis', 0),
+            'LTH Cost Basis': last_p.get('LTH Cost Basis', 0),
+            'Realized Price': last_p.get('Realized Price', 0),
+            'True Market Mean': last_p.get('True Market Mean', 0)
+        }
+        render_header("Price Levels", last_p.get('BTC Price', 0), kpi_data_p)
 
         col_fs, col_tf, col_sma, col_sma_cst, col_radio, col_custom = st.columns([1, 1.5, 1.5, 1, 5, 1.2], vertical_alignment="bottom", gap="small")
         with col_fs: focus_p = st.toggle("Full Screen", key="tg_p")
@@ -204,8 +232,8 @@ if selected_menu == "Price Levels":
         # RENDER CHART ON-CHAIN
         chart_p_opts = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 850 if focus_p else 650}
         
-        # WARNA BTC LEBIH MENCERAH (#FFAA00)
-        series_p = [{"type": 'Line', "data": get_s(df_p, 'BTC Price'), "options": {"color": '#FFAA00', "lineWidth": 1, "title": 'BTC Price'}}]
+        # WARNA BTC ASLI DENGAN LINEWIDTH 2
+        series_p = [{"type": 'Line', "data": get_s(df_p, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "title": 'BTC Price'}}]
         
         colors_p = {'🔴 STH Cost Basis': ('#ff4d4d', 'STH Cost Basis'), '🔵 LTH Cost Basis': ('#4da6ff', 'LTH Cost Basis'), '⚪ Realized Price': ('#ffffff', 'Realized Price'), '🟣 True Market Mean': ('#cc33ff', 'True Market Mean'), '🟢 CVDD': ('#00cc66', 'CVDD')}
         
@@ -225,31 +253,18 @@ if selected_menu == "Price Levels":
 # ------------------------------------------------------------------------------
 elif selected_menu == "Profit & Loss":
     if not df_mom_raw.empty:
-        st.title("Profit & Loss")
-        
         last_m = df_mom_raw.iloc[-1]
-        btc_m = last_m.get('BTC Price', 0)
-        
-        def render_kpi_m(title, value, threshold=1.0, is_money=False):
-            if pd.isna(value) or value == 0: color = "#a3a8b8"
-            else: color = "#00cc66" if value >= threshold else "#ff4d4d"
-            val_str = f"${value:,.2f}" if is_money else f"{value:.4f}"
-            st.markdown(f"<div><span style='color:{color}; font-size:0.95rem; font-weight:600;'>{title}</span><br><span style='color:{color}; font-size:1.4rem; font-weight:700;'>{val_str}</span></div>", unsafe_allow_html=True)
-
-        k1, k2, k3, k4, k5 = st.columns(5)
-        with k1: st.markdown(f"<div><span style='color:#a3a8b8; font-size:0.95rem; font-weight:600;'>Current BTC Price</span><br><span style='color:#ffffff; font-size:1.4rem; font-weight:700;'>${btc_m:,.2f}</span></div>", unsafe_allow_html=True)
-        with k2: render_kpi_m("aSOPR", last_m.get('aSOPR', 0), 1.0)
-        with k3: render_kpi_m("LTH SOPR", last_m.get('LTH SOPR', 0), 1.0)
-        with k4: render_kpi_m("STH SOPR", last_m.get('STH SOPR', 0), 1.0)
-        with k5: render_kpi_m("Net Realized PL", last_m.get('Net Realized PL', 0), 0.0, True)
-        
-        st.markdown("---")
+        kpi_data_m = {
+            'aSOPR': last_m.get('aSOPR', 0),
+            'LTH SOPR': last_m.get('LTH SOPR', 0),
+            'STH SOPR': last_m.get('STH SOPR', 0),
+            'Net Realized PL': last_m.get('Net Realized PL', 0)
+        }
+        render_header("Profit & Loss", last_m.get('BTC Price', 0), kpi_data_m)
 
         # ===========================================
         # CHART 1: SOPR GROUP
         # ===========================================
-        st.subheader("SOPR Oscillators")
-        
         df_ms, w_ms = apply_filters(df_mom_raw, st.session_state.tf_ms, st.session_state.sma_ms, st.session_state.cs_ms, st.session_state.tr_ms, st.session_state.cd_ms, ['aSOPR', 'LTH SOPR', 'STH SOPR'])
 
         col_fs_ms, col_tf_ms, col_sma_ms, col_sma_cst_ms, col_radio_ms, col_custom_ms = st.columns([1, 1.5, 1.5, 1, 5, 1.2], vertical_alignment="bottom", gap="small")
@@ -275,14 +290,13 @@ elif selected_menu == "Profit & Loss":
             "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, 
             "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, 
             "crosshair": {"mode": 0}, 
-            "height": 850 if focus_ms else 650, 
+            "height": 850 if focus_ms else 600, 
             "rightPriceScale": {"visible": True}, 
             "leftPriceScale": {"visible": True},
             "lth_scale": {"visible": True, "position": "left", "autoScale": True}
         }
         
-        # WARNA BTC LEBIH MENCERAH (#FFAA00)
-        series_sopr = [{"type": 'Line', "data": get_s(df_ms, 'BTC Price'), "options": {"color": '#FFAA00', "lineWidth": 1, "priceScaleId": 'right', "title": 'BTC Price'}}]
+        series_sopr = [{"type": 'Line', "data": get_s(df_ms, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
         
         df_ms['Neutral_Line'] = 1.0
         series_sopr.append({"type": 'Line', "data": get_s(df_ms, 'Neutral_Line'), "options": {"color": '#ffffff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": 'Neutral (1.0)'}})
@@ -306,8 +320,6 @@ elif selected_menu == "Profit & Loss":
         # ===========================================
         # CHART 2: REALIZED P/L GROUP
         # ===========================================
-        st.subheader("Realized Profit & Loss")
-        
         df_mpl, w_mpl = apply_filters(df_mom_raw, st.session_state.tf_mpl, st.session_state.sma_mpl, st.session_state.cs_mpl, st.session_state.tr_mpl, st.session_state.cd_mpl, ['STH P/L Ratio', 'LTH P/L Ratio', 'Net Realized PL'])
 
         col_fs_mpl, col_tf_mpl, col_sma_mpl, col_sma_cst_mpl, col_radio_mpl, col_custom_mpl = st.columns([1, 1.5, 1.5, 1, 5, 1.2], vertical_alignment="bottom", gap="small")
@@ -329,10 +341,9 @@ elif selected_menu == "Profit & Loss":
         try: sel_pl = st.pills("P/L Metrics", all_opts_pl, default=['⚪ Net Realized PL'], selection_mode="multi", label_visibility="collapsed")
         except: sel_pl = st.multiselect("P/L Metrics", all_opts_pl, default=['⚪ Net Realized PL'], label_visibility="collapsed")
 
-        chart_opts_pl = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 850 if focus_mpl else 650, "rightPriceScale": {"visible": True}, "leftPriceScale": {"visible": True}}
+        chart_opts_pl = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 850 if focus_mpl else 600, "rightPriceScale": {"visible": True}, "leftPriceScale": {"visible": True}}
         
-        # WARNA BTC LEBIH MENCERAH (#FFAA00)
-        series_pl = [{"type": 'Line', "data": get_s(df_mpl, 'BTC Price'), "options": {"color": '#FFAA00', "lineWidth": 1, "priceScaleId": 'right', "title": 'BTC Price'}}]
+        series_pl = [{"type": 'Line', "data": get_s(df_mpl, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
 
         colors_pl = {'🟣 STH P/L Ratio': ('#cc33ff', 'STH P/L Ratio'), '🟤 LTH P/L Ratio': ('#cc9966', 'LTH P/L Ratio')}
         
