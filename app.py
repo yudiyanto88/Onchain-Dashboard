@@ -7,29 +7,29 @@ from streamlit_lightweight_charts import renderLightweightCharts
 # 1. PAGE CONFIGURATION, SESSION STATE & CSS
 # ==============================================================================
 st.set_page_config(
-    page_title="MoneyBag Journal | On-Chain Dashboard",
+    page_title="Yudiyanto | On-Chain Dashboard",
     layout="wide",
-    initial_sidebar_state="expanded" # Sidebar otomatis terbuka di awal
+    initial_sidebar_state="expanded"
 )
 
 # --- CSS UNTUK MENYERAGAMKAN TEKS BARIS KONTROL DAN MENGURANGI SPASI ---
 st.markdown("""
 <style>
-/* Menyeragamkan ukuran font pada label kontrol (baris 1) */
+/* Memaksa SEMUA teks di dalam Selectbox, Radio, Toggle, dan NumberInput menjadi 0.85rem */
+div[data-testid="stSelectbox"] *, 
+div[data-testid="stRadio"] *, 
+div[data-testid="stToggle"] *,
+div[data-testid="stNumberInput"] * {
+    font-size: 0.85rem !important;
+}
+
+/* Mengurangi padding pada label agar lebih merapat */
 div[data-testid="stSelectbox"] label, 
 div[data-testid="stRadio"] label, 
 div[data-testid="stToggle"] label,
 div[data-testid="stNumberInput"] label {
-    font-size: 0.85rem !important;
     padding-bottom: 2px !important;
     min-height: 0px !important;
-}
-
-/* Menyeragamkan ukuran font pada nilai kontrol (baris 2: toggle, opsi radio) */
-div[data-testid="stRadio"] p, 
-div[data-testid="stToggle"] p,
-div[data-testid="stSelectbox"] span {
-    font-size: 0.85rem !important;
 }
 
 /* Menyeragamkan teks tombol Selection Metric (Pills) */
@@ -137,7 +137,7 @@ t_opts = ["1 Month", "3 Months", "6 Months", "1 Year", "4 Years (Cycle)", "All T
 # ==============================================================================
 with st.sidebar:
     st.markdown("<h2 style='text-align: center; color: #ffffff;'>MoneyBag Journal</h2>", unsafe_allow_html=True)
-    st.markdown("<p style='text-align: center; color: #a855f7; font-weight: 600; margin-top: -15px;'>ON-CHAIN DASHBOARD</p>", unsafe_allow_html=True)
+    st.markdown("<h3 style='text-align: center; color: #a855f7; font-weight: 700; margin-top: -15px;'>ON-CHAIN DASHBOARD</h3>", unsafe_allow_html=True)
     st.markdown("---")
     
     selected_menu = st.radio(
@@ -158,8 +158,6 @@ if selected_menu == "Price Levels":
     if not df_price_raw.empty:
         df_p, w_p = apply_filters(df_price_raw, st.session_state.tf_p, st.session_state.sma_p, st.session_state.cs_p, st.session_state.tr_p, st.session_state.cd_p, ['STH Cost Basis', 'LTH Cost Basis', 'Realized Price', 'True Market Mean', 'CVDD'])
 
-        st.title("On-Chain Price Levels")
-        
         last_p = df_p.iloc[-1]
         btc_p = last_p.get('BTC Price', 0)
         
@@ -173,7 +171,12 @@ if selected_menu == "Price Levels":
                 d = f"<div style='margin-top:4px;'><span style='color:{c}; font-size:0.85rem; background-color:{c}20; padding:2px 6px; border-radius:4px;'>{ar} {abs(dp):.2f}%</span></div>"
             st.markdown(f"<div><span style='color:{tc}; font-size:0.95rem; font-weight:600;'>{title}</span><br><span style='color:{c}; font-size:1.4rem; font-weight:700;'>${value:,.2f}</span>{d}</div>", unsafe_allow_html=True)
 
-        k1, k2, k3, k4, k5 = st.columns(5)
+        # Layout sebaris: Judul Halaman di kiri, KPI di kanan
+        col_title, k1, k2, k3, k4, k5 = st.columns([1.5, 1, 1, 1, 1, 1], vertical_alignment="center")
+        
+        with col_title:
+            st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700;'>On-Chain Price Levels</h3></div>", unsafe_allow_html=True)
+            
         with k1: render_kpi_p("Current BTC Price", btc_p, True)
         with k2: render_kpi_p("STH Cost Basis", last_p.get('STH Cost Basis', 0))
         with k3: render_kpi_p("LTH Cost Basis", last_p.get('LTH Cost Basis', 0))
@@ -204,8 +207,8 @@ if selected_menu == "Price Levels":
         # RENDER CHART ON-CHAIN
         chart_p_opts = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 850 if focus_p else 650}
         
-        # WARNA BTC LEBIH MENCERAH (#FFAA00)
-        series_p = [{"type": 'Line', "data": get_s(df_p, 'BTC Price'), "options": {"color": '#FFAA00', "lineWidth": 1, "title": 'BTC Price'}}]
+        # WARNA BTC ORIGINAL (#f7931a) dengan ketebalan 2
+        series_p = [{"type": 'Line', "data": get_s(df_p, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "title": 'BTC Price'}}]
         
         colors_p = {'🔴 STH Cost Basis': ('#ff4d4d', 'STH Cost Basis'), '🔵 LTH Cost Basis': ('#4da6ff', 'LTH Cost Basis'), '⚪ Realized Price': ('#ffffff', 'Realized Price'), '🟣 True Market Mean': ('#cc33ff', 'True Market Mean'), '🟢 CVDD': ('#00cc66', 'CVDD')}
         
@@ -225,8 +228,6 @@ if selected_menu == "Price Levels":
 # ------------------------------------------------------------------------------
 elif selected_menu == "Profit & Loss":
     if not df_mom_raw.empty:
-        st.title("Profit & Loss")
-        
         last_m = df_mom_raw.iloc[-1]
         btc_m = last_m.get('BTC Price', 0)
         
@@ -236,7 +237,12 @@ elif selected_menu == "Profit & Loss":
             val_str = f"${value:,.2f}" if is_money else f"{value:.4f}"
             st.markdown(f"<div><span style='color:{color}; font-size:0.95rem; font-weight:600;'>{title}</span><br><span style='color:{color}; font-size:1.4rem; font-weight:700;'>{val_str}</span></div>", unsafe_allow_html=True)
 
-        k1, k2, k3, k4, k5 = st.columns(5)
+        # Layout sebaris: Judul Halaman di kiri, KPI di kanan
+        col_title, k1, k2, k3, k4, k5 = st.columns([1.5, 1, 1, 1, 1, 1], vertical_alignment="center")
+        
+        with col_title:
+            st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700;'>Profit & Loss</h3></div>", unsafe_allow_html=True)
+            
         with k1: st.markdown(f"<div><span style='color:#a3a8b8; font-size:0.95rem; font-weight:600;'>Current BTC Price</span><br><span style='color:#ffffff; font-size:1.4rem; font-weight:700;'>${btc_m:,.2f}</span></div>", unsafe_allow_html=True)
         with k2: render_kpi_m("aSOPR", last_m.get('aSOPR', 0), 1.0)
         with k3: render_kpi_m("LTH SOPR", last_m.get('LTH SOPR', 0), 1.0)
@@ -281,8 +287,8 @@ elif selected_menu == "Profit & Loss":
             "lth_scale": {"visible": True, "position": "left", "autoScale": True}
         }
         
-        # WARNA BTC LEBIH MENCERAH (#FFAA00)
-        series_sopr = [{"type": 'Line', "data": get_s(df_ms, 'BTC Price'), "options": {"color": '#FFAA00', "lineWidth": 1, "priceScaleId": 'right', "title": 'BTC Price'}}]
+        # WARNA BTC ORIGINAL (#f7931a) dengan ketebalan 2
+        series_sopr = [{"type": 'Line', "data": get_s(df_ms, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
         
         df_ms['Neutral_Line'] = 1.0
         series_sopr.append({"type": 'Line', "data": get_s(df_ms, 'Neutral_Line'), "options": {"color": '#ffffff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": 'Neutral (1.0)'}})
@@ -331,8 +337,8 @@ elif selected_menu == "Profit & Loss":
 
         chart_opts_pl = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 850 if focus_mpl else 650, "rightPriceScale": {"visible": True}, "leftPriceScale": {"visible": True}}
         
-        # WARNA BTC LEBIH MENCERAH (#FFAA00)
-        series_pl = [{"type": 'Line', "data": get_s(df_mpl, 'BTC Price'), "options": {"color": '#FFAA00', "lineWidth": 1, "priceScaleId": 'right', "title": 'BTC Price'}}]
+        # WARNA BTC ORIGINAL (#f7931a) dengan ketebalan 2
+        series_pl = [{"type": 'Line', "data": get_s(df_mpl, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
 
         colors_pl = {'🟣 STH P/L Ratio': ('#cc33ff', 'STH P/L Ratio'), '🟤 LTH P/L Ratio': ('#cc9966', 'LTH P/L Ratio')}
         
