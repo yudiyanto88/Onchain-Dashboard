@@ -7,23 +7,29 @@ from streamlit_lightweight_charts import renderLightweightCharts
 # 1. PAGE CONFIGURATION, SESSION STATE & CSS
 # ==============================================================================
 st.set_page_config(
-    page_title="Yudiyanto | On-Chain Dashboard",
+    page_title="MoneyBag Journal | On-Chain Dashboard",
     layout="wide",
-    initial_sidebar_state="collapsed"
+    initial_sidebar_state="expanded" # Sidebar otomatis terbuka di awal
 )
 
-# --- CSS UNTUK MERAPIKAN SPASI, MENGECILKAN FONT KONTROL, TAPI KPI TETAP ---
+# --- CSS UNTUK MENYERAGAMKAN TEKS BARIS KONTROL DAN MENGURANGI SPASI ---
 st.markdown("""
 <style>
-/* Mengecilkan font dan padding pada kontrol Panel (Selectbox, Radio, Toggle) & Pills */
+/* Menyeragamkan ukuran font pada label kontrol (baris 1) */
 div[data-testid="stSelectbox"] label, 
 div[data-testid="stRadio"] label, 
 div[data-testid="stToggle"] label,
-div[data-testid="stPill"] label,
 div[data-testid="stNumberInput"] label {
     font-size: 0.85rem !important;
     padding-bottom: 2px !important;
     min-height: 0px !important;
+}
+
+/* Menyeragamkan ukuran font pada nilai kontrol (baris 2: toggle, opsi radio) */
+div[data-testid="stRadio"] p, 
+div[data-testid="stToggle"] p,
+div[data-testid="stSelectbox"] span {
+    font-size: 0.85rem !important;
 }
 
 /* Menyeragamkan teks tombol Selection Metric (Pills) */
@@ -36,10 +42,15 @@ div[data-testid="stPill"] button {
 /* Mengurangi margin vertikal pada blok container Streamlit */
 .block-container { padding-top: 1.5rem; padding-bottom: 1.5rem; max-width: 100%; }
 div[data-testid="stVerticalBlock"] { gap: 0.5rem !important; }
+
+/* Custom Styling untuk Sidebar Menu */
+section[data-testid="stSidebar"] {
+    background-color: #0e1117;
+}
 </style>
 """, unsafe_allow_html=True)
 
-# Inisialisasi State Independen
+# Inisialisasi Session State
 if 'tr_p' not in st.session_state: st.session_state.tr_p = "All Time"
 if 'cd_p' not in st.session_state: st.session_state.cd_p = 120
 if 'tf_p' not in st.session_state: st.session_state.tf_p = "Daily"
@@ -122,14 +133,28 @@ def get_s(df, col): return df[['Date_str', col]].dropna().rename(columns={'Date_
 t_opts = ["1 Month", "3 Months", "6 Months", "1 Year", "4 Years (Cycle)", "All Time", "Custom"]
 
 # ==============================================================================
-# 3. TABS NAVIGATION
+# 3. SIDEBAR NAVIGATION
 # ==============================================================================
-tab1, tab2, tab3 = st.tabs(["Price Levels", "Profit & Loss", "Oscillators (Soon)"])
+with st.sidebar:
+    st.markdown("<h2 style='text-align: center; color: #ffffff;'>MoneyBag Journal</h2>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #a855f7; font-weight: 600; margin-top: -15px;'>ON-CHAIN DASHBOARD</p>", unsafe_allow_html=True)
+    st.markdown("---")
+    
+    selected_menu = st.radio(
+        "Menu Navigasi",
+        ["Price Levels", "Profit & Loss", "Oscillators (Soon)"],
+        label_visibility="collapsed"
+    )
+    st.markdown("---")
+
+# ==============================================================================
+# 4. MAIN DASHBOARD RENDER
+# ==============================================================================
 
 # ------------------------------------------------------------------------------
-# TAB 1: ON-CHAIN PRICE LEVELS
+# PAGE 1: ON-CHAIN PRICE LEVELS
 # ------------------------------------------------------------------------------
-with tab1:
+if selected_menu == "Price Levels":
     if not df_price_raw.empty:
         df_p, w_p = apply_filters(df_price_raw, st.session_state.tf_p, st.session_state.sma_p, st.session_state.cs_p, st.session_state.tr_p, st.session_state.cd_p, ['STH Cost Basis', 'LTH Cost Basis', 'Realized Price', 'True Market Mean', 'CVDD'])
 
@@ -139,8 +164,7 @@ with tab1:
         btc_p = last_p.get('BTC Price', 0)
         
         def render_kpi_p(title, value, is_btc=False):
-            if is_btc or pd.isna(value) or value == 0:
-                c, tc, d = "#ffffff", "#a3a8b8", ""
+            if is_btc or pd.isna(value) or value == 0: c, tc, d = "#ffffff", "#a3a8b8", ""
             else:
                 dp = ((btc_p - value) / btc_p) * 100
                 ip = dp >= 0
@@ -156,7 +180,7 @@ with tab1:
         with k4: render_kpi_p("Realized Price", last_p.get('Realized Price', 0))
         with k5: render_kpi_p("True Market Mean", last_p.get('True Market Mean', 0))
         
-        st.markdown("---") # Garis pemisah sebelum kontrol
+        st.markdown("---")
 
         col_fs, col_tf, col_sma, col_sma_cst, col_radio, col_custom = st.columns([1, 1.5, 1.5, 1, 5, 1.2], vertical_alignment="bottom", gap="small")
         with col_fs: focus_p = st.toggle("Full Screen", key="tg_p")
@@ -177,9 +201,11 @@ with tab1:
         try: active_metrics_p = st.pills("Metrics", all_opts_p, default=opts_p_base, selection_mode="multi", label_visibility="collapsed")
         except: active_metrics_p = st.multiselect("Metrics", all_opts_p, default=opts_p_base, label_visibility="collapsed")
 
-        # RENDER CHART ON-CHAIN (Semua line raw = 1)
+        # RENDER CHART ON-CHAIN
         chart_p_opts = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 850 if focus_p else 650}
-        series_p = [{"type": 'Line', "data": get_s(df_p, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 1, "title": 'BTC Price'}}]
+        
+        # WARNA BTC LEBIH MENCERAH (#FFAA00)
+        series_p = [{"type": 'Line', "data": get_s(df_p, 'BTC Price'), "options": {"color": '#FFAA00', "lineWidth": 1, "title": 'BTC Price'}}]
         
         colors_p = {'🔴 STH Cost Basis': ('#ff4d4d', 'STH Cost Basis'), '🔵 LTH Cost Basis': ('#4da6ff', 'LTH Cost Basis'), '⚪ Realized Price': ('#ffffff', 'Realized Price'), '🟣 True Market Mean': ('#cc33ff', 'True Market Mean'), '🟢 CVDD': ('#00cc66', 'CVDD')}
         
@@ -189,17 +215,15 @@ with tab1:
             if base_m in colors_p:
                 m_color = colors_p[base_m][0]
                 m_name = colors_p[base_m][1]
-                if is_sma:
-                    series_p.append({"type": 'Line', "data": get_s(df_p, f"{m_name}_SMA"), "options": {"color": m_color, "lineWidth": 1, "lineStyle": 2, "title": f"{m_name} SMA"}})
-                else:
-                    series_p.append({"type": 'Line', "data": get_s(df_p, m_name), "options": {"color": m_color, "lineWidth": 1, "title": m_name}})
+                if is_sma: series_p.append({"type": 'Line', "data": get_s(df_p, f"{m_name}_SMA"), "options": {"color": m_color, "lineWidth": 1, "lineStyle": 2, "title": f"{m_name} SMA"}})
+                else: series_p.append({"type": 'Line', "data": get_s(df_p, m_name), "options": {"color": m_color, "lineWidth": 1, "title": m_name}})
                     
         renderLightweightCharts([{"chart": chart_p_opts, "series": series_p}], 'chart_price')
 
 # ------------------------------------------------------------------------------
-# TAB 2: PROFIT & LOSS 
+# PAGE 2: PROFIT & LOSS 
 # ------------------------------------------------------------------------------
-with tab2:
+elif selected_menu == "Profit & Loss":
     if not df_mom_raw.empty:
         st.title("Profit & Loss")
         
@@ -247,7 +271,6 @@ with tab2:
         try: sel_sopr = st.pills("SOPR Metrics", all_opts_sopr, default=['🔵 aSOPR', '🟢 LTH SOPR'], selection_mode="multi", label_visibility="collapsed")
         except: sel_sopr = st.multiselect("SOPR Metrics", all_opts_sopr, default=['🔵 aSOPR', '🟢 LTH SOPR'], label_visibility="collapsed")
 
-        # Setup 3 Sumbu untuk Chart SOPR
         chart_opts_sopr = {
             "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, 
             "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, 
@@ -255,10 +278,11 @@ with tab2:
             "height": 850 if focus_ms else 650, 
             "rightPriceScale": {"visible": True}, 
             "leftPriceScale": {"visible": True},
-            "lth_scale": {"visible": True, "position": "left", "autoScale": True}  # Custom Skala Ke-3 di Kiri
+            "lth_scale": {"visible": True, "position": "left", "autoScale": True}
         }
         
-        series_sopr = [{"type": 'Line', "data": get_s(df_ms, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 1, "priceScaleId": 'right', "title": 'BTC Price'}}]
+        # WARNA BTC LEBIH MENCERAH (#FFAA00)
+        series_sopr = [{"type": 'Line', "data": get_s(df_ms, 'BTC Price'), "options": {"color": '#FFAA00', "lineWidth": 1, "priceScaleId": 'right', "title": 'BTC Price'}}]
         
         df_ms['Neutral_Line'] = 1.0
         series_sopr.append({"type": 'Line', "data": get_s(df_ms, 'Neutral_Line'), "options": {"color": '#ffffff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": 'Neutral (1.0)'}})
@@ -270,16 +294,13 @@ with tab2:
             base_m = m.split(" (SMA")[0]
             if base_m in colors_sopr:
                 c_col, c_name = colors_sopr[base_m]
-                
-                # Assign LTH SOPR ke custom skala (lth_scale), yang lain ke skala kiri normal (left)
                 target_scale = "lth_scale" if base_m == '🟢 LTH SOPR' else "left"
                 
-                if is_sma: 
-                    series_sopr.append({"type": 'Line', "data": get_s(df_ms, f"{c_name}_SMA"), "options": {"color": c_col, "lineWidth": 1, "lineStyle": 2, "priceScaleId": target_scale, "title": f"{c_name} SMA"}})
-                else: 
-                    series_sopr.append({"type": 'Line', "data": get_s(df_ms, c_name), "options": {"color": c_col, "lineWidth": 1, "priceScaleId": target_scale, "title": c_name}})
+                if is_sma: series_sopr.append({"type": 'Line', "data": get_s(df_ms, f"{c_name}_SMA"), "options": {"color": c_col, "lineWidth": 1, "lineStyle": 2, "priceScaleId": target_scale, "title": f"{c_name} SMA"}})
+                else: series_sopr.append({"type": 'Line', "data": get_s(df_ms, c_name), "options": {"color": c_col, "lineWidth": 1, "priceScaleId": target_scale, "title": c_name}})
         
         renderLightweightCharts([{"chart": chart_opts_sopr, "series": series_sopr}], 'chart_sopr')
+        st.markdown("<br>", unsafe_allow_html=True)
 
 
         # ===========================================
@@ -309,7 +330,9 @@ with tab2:
         except: sel_pl = st.multiselect("P/L Metrics", all_opts_pl, default=['⚪ Net Realized PL'], label_visibility="collapsed")
 
         chart_opts_pl = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 850 if focus_mpl else 650, "rightPriceScale": {"visible": True}, "leftPriceScale": {"visible": True}}
-        series_pl = [{"type": 'Line', "data": get_s(df_mpl, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 1, "priceScaleId": 'right', "title": 'BTC Price'}}]
+        
+        # WARNA BTC LEBIH MENCERAH (#FFAA00)
+        series_pl = [{"type": 'Line', "data": get_s(df_mpl, 'BTC Price'), "options": {"color": '#FFAA00', "lineWidth": 1, "priceScaleId": 'right', "title": 'BTC Price'}}]
 
         colors_pl = {'🟣 STH P/L Ratio': ('#cc33ff', 'STH P/L Ratio'), '🟤 LTH P/L Ratio': ('#cc9966', 'LTH P/L Ratio')}
         
@@ -335,5 +358,8 @@ with tab2:
     else:
         st.info("Menunggu data Profit & Loss. Pastikan GitHub Actions sudah jalan!")
 
-with tab3:
+# ------------------------------------------------------------------------------
+# PAGE 3: OSCILLATORS (SOON)
+# ------------------------------------------------------------------------------
+elif selected_menu == "Oscillators (Soon)":
     st.info("Oscillators chart is under construction. Coming soon!")
