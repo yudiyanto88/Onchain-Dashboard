@@ -12,32 +12,35 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- SUNTIKAN CSS KHUSUS UNTUK TOMBOL METRIK (SHINY TECH & STRIKETHROUGH) ---
+# --- SUNTIKAN CSS SUPER KUAT UNTUK TOMBOL METRIK (MEMATIKAN MERAH STREAMLIT) ---
 st.markdown("""
 <style>
-/* Menargetkan tombol pills Streamlit secara akurat */
-/* Kondisi Tombol OFF (Mati, Abu-abu, Tercoret, Transparan) */
-button[data-testid="stBaseButton-pill"][aria-pressed="false"] {
+/* Mematikan semua warna default dari Streamlit di container stPill */
+div[data-testid*="stPill"] button,
+div[data-testid*="stPill"] button:hover {
+    background: transparent !important;
     background-color: transparent !important;
-    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important;
     color: #666666 !important;
     text-decoration: line-through !important;
     transition: all 0.3s ease;
 }
 
-/* Hover effect saat tombol OFF agar terlihat bisa di-klik */
-button[data-testid="stBaseButton-pill"][aria-pressed="false"]:hover {
-    border: 1px solid rgba(255, 255, 255, 0.3) !important;
-    color: #999999 !important;
-}
-
-/* Kondisi Tombol ON (Menyala, Putih, Gradasi Ungu, Garis Glowing) */
-button[data-testid="stBaseButton-pill"][aria-pressed="true"] {
-    background: linear-gradient(135deg, rgba(60, 20, 100, 0.8), rgba(20, 0, 50, 0.6)) !important;
+/* Memaksa gaya ON (Menyala, Putih, Gradasi Ungu, Garis Glowing) */
+div[data-testid*="stPill"] button[data-selected="true"], 
+div[data-testid*="stPill"] button[aria-pressed="true"],
+div[data-testid*="stPill"] button[data-selected="true"]:hover, 
+div[data-testid*="stPill"] button[aria-pressed="true"]:hover {
+    background: linear-gradient(135deg, rgba(60, 20, 100, 0.9), rgba(20, 0, 50, 0.8)) !important;
     border: 1px solid #a855f7 !important;
-    box-shadow: 0 0 8px rgba(168, 85, 247, 0.6) !important;
+    box-shadow: 0 0 10px rgba(168, 85, 247, 0.7) !important;
     color: #ffffff !important;
     text-decoration: none !important;
+}
+
+/* Memaksa text p di dalam button agar mengikuti warna parent */
+div[data-testid*="stPill"] button p {
+    color: inherit !important;
 }
 
 /* Menyembunyikan elemen header & footer saat Full Screen */
@@ -90,7 +93,7 @@ def load_data_momentum():
 df_price_raw = load_data_price()
 df_mom_raw = load_data_momentum()
 
-# Mesin filter yang mendukung mode Dual-Line (Raw + SMA)
+# Mesin filter
 def apply_filters(df, res_state, smooth_state, custom_smooth, time_state, custom_days, metrics_to_smooth):
     if df.empty: return df, 1
     dff = df.copy()
@@ -145,6 +148,7 @@ with tab1:
     if not df_price_raw.empty:
         df_p, w_p = apply_filters(df_price_raw, st.session_state.tf_p, st.session_state.sma_p, st.session_state.cs_p, st.session_state.tr_p, st.session_state.cd_p, ['STH Cost Basis', 'LTH Cost Basis', 'Realized Price', 'True Market Mean', 'CVDD'])
 
+        # 1. JUDUL & KPI
         st.title("On-Chain Price Levels")
         st.markdown("---")
         last_p = df_p.iloc[-1]
@@ -169,6 +173,7 @@ with tab1:
         with k5: render_kpi_p("True Market Mean", last_p.get('True Market Mean', 0))
         st.markdown("---")
 
+        # 2. PANEL KONTROL
         col_fs, col_tf, col_sma, col_sma_cst, col_space, col_radio, col_custom = st.columns([1.2, 1.5, 1.5, 1, 0.5, 5, 1.2], vertical_alignment="bottom")
         with col_fs: focus_p = st.toggle("Full Screen", key="tg_p")
         with col_tf: st.session_state.tf_p = st.selectbox("Timeframe", ["Daily", "3 Days", "Weekly", "Monthly"], index=["Daily", "3 Days", "Weekly", "Monthly"].index(st.session_state.tf_p), key="tfs_p")
@@ -181,26 +186,25 @@ with tab1:
         with col_custom:
             if st.session_state.tr_p == "Custom": st.session_state.cd_p = st.number_input("Days back", min_value=7, value=st.session_state.cd_p, label_visibility="collapsed", key="cdin_p")
         
+        # 3. SELECTION METRIC
         opts_p_base = ['🔴 STH Cost Basis', '🔵 LTH Cost Basis', '⚪ Realized Price', '🟣 True Market Mean', '🟢 CVDD']
         all_opts_p = opts_p_base.copy()
-        if w_p > 1:
-            opts_p_sma = [f"{m} (SMA {w_p})" for m in opts_p_base]
-            all_opts_p.extend(opts_p_sma)
+        if w_p > 1: all_opts_p.extend([f"{m} (SMA {w_p})" for m in opts_p_base])
             
         try: active_metrics_p = st.pills("Metrics", all_opts_p, default=opts_p_base, selection_mode="multi", label_visibility="collapsed")
         except: active_metrics_p = st.multiselect("Metrics", all_opts_p, default=opts_p_base, label_visibility="collapsed")
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # MENGGUNAKAN MODE 1 (LOGARITHMIC) UNTUK MENCEGAH NILAI NEGATIF DI AXIS HARGA
+        # 4. RENDER CHART TAB 1 (LOGARITHMIC SCALE - ANTI NEGATIF)
         chart_p_opts = {
             "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, 
             "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, 
-            "crosshair": {"mode": 0}, 
-            "height": 850 if focus_p else 650,
-            "rightPriceScale": {"mode": 1, "autoScale": True} # <--- Mode Logaritma Murni
+            "crosshair": {"mode": 0}, "height": 850 if focus_p else 650,
+            # mode: 1 = Logarithmic. Menghentikan angka tembus ke negatif dan lebih rapi!
+            "rightPriceScale": {"visible": True, "mode": 1, "autoScale": True}
         }
         
-        # Ketebalan BTC Price disesuaikan menjadi 2 (sebelumnya 3)
+        # LINE WIDTH BTC DITURUNKAN JADI 2
         series_p = [{"type": 'Line', "data": get_s(df_p, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "title": 'BTC Price'}}]
         
         colors_p = {'🔴 STH Cost Basis': ('#ff4d4d', 'STH Cost Basis'), '🔵 LTH Cost Basis': ('#4da6ff', 'LTH Cost Basis'), '⚪ Realized Price': ('#ffffff', 'Realized Price'), '🟣 True Market Mean': ('#cc33ff', 'True Market Mean'), '🟢 CVDD': ('#00cc66', 'CVDD')}
@@ -211,15 +215,13 @@ with tab1:
             if base_m in colors_p:
                 m_color = colors_p[base_m][0]
                 m_name = colors_p[base_m][1]
-                if is_sma:
-                    series_p.append({"type": 'Line', "data": get_s(df_p, f"{m_name}_SMA"), "options": {"color": m_color, "lineWidth": 1, "lineStyle": 2, "title": f"{m_name} SMA"}})
-                else:
-                    series_p.append({"type": 'Line', "data": get_s(df_p, m_name), "options": {"color": m_color, "lineWidth": 2, "title": m_name}})
+                if is_sma: series_p.append({"type": 'Line', "data": get_s(df_p, f"{m_name}_SMA"), "options": {"color": m_color, "lineWidth": 1, "lineStyle": 2, "title": f"{m_name} SMA"}})
+                else: series_p.append({"type": 'Line', "data": get_s(df_p, m_name), "options": {"color": m_color, "lineWidth": 2, "title": m_name}})
                     
         renderLightweightCharts([{"chart": chart_p_opts, "series": series_p}], 'chart_price')
 
 # ------------------------------------------------------------------------------
-# TAB 2: PROFIT & LOSS (DUAL CHARTS WITH INDEPENDENT CONTROLS)
+# TAB 2: PROFIT & LOSS (DUAL CHARTS WITH INDEPENDENT CONTROLS & 3 SCALES)
 # ------------------------------------------------------------------------------
 with tab2:
     if not df_mom_raw.empty:
@@ -244,7 +246,7 @@ with tab2:
         st.markdown("---")
 
         # ===========================================
-        # CHART 1: SOPR GROUP (LOGARITHMIC SCALE)
+        # CHART 1: SOPR GROUP
         # ===========================================
         st.subheader("SOPR Oscillators")
         
@@ -266,18 +268,21 @@ with tab2:
         all_opts_sopr = opts_sopr_base.copy()
         if w_ms > 1: all_opts_sopr.extend([f"{m} (SMA {w_ms})" for m in opts_sopr_base])
             
-        try: sel_sopr = st.pills("SOPR Metrics", all_opts_sopr, default=['🔵 aSOPR', '🔴 STH SOPR', '🟢 LTH SOPR'], selection_mode="multi", label_visibility="collapsed")
-        except: sel_sopr = st.multiselect("SOPR Metrics", all_opts_sopr, default=['🔵 aSOPR', '🔴 STH SOPR', '🟢 LTH SOPR'], label_visibility="collapsed")
+        try: sel_sopr = st.pills("SOPR Metrics", all_opts_sopr, default=['🔵 aSOPR', '🟢 LTH SOPR'], selection_mode="multi", label_visibility="collapsed")
+        except: sel_sopr = st.multiselect("SOPR Metrics", all_opts_sopr, default=['🔵 aSOPR', '🟢 LTH SOPR'], label_visibility="collapsed")
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # MENGGUNAKAN LOG SCALE DI LEFT AXIS (Membuat STH/aSOPR dan LTH SOPR harmonis dan cegah minus)
+        # CONFIG CHART SOPR (3 SKALA BEDA!)
         chart_opts_sopr = {
             "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, 
             "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, 
-            "crosshair": {"mode": 0}, 
-            "height": 850 if focus_ms else 650, 
-            "rightPriceScale": {"mode": 1, "visible": True}, # BTC Log Scale
-            "leftPriceScale": {"mode": 1, "visible": True}  # SOPR Log Scale <--- KUNCI PENYELESAIAN
+            "crosshair": {"mode": 0}, "height": 850 if focus_ms else 650, 
+            # 1. Skala Kanan (BTC Price - Logarithmic)
+            "rightPriceScale": {"visible": True, "mode": 1}, 
+            # 2. Skala Kiri (aSOPR & STH SOPR)
+            "leftPriceScale": {"visible": True},
+            # 3. Skala Tersembunyi Khusus LTH SOPR (Tidak tampil visual teksnya, tapi auto-scale sempurna)
+            "lth_scale": {"visible": False}
         }
         
         series_sopr = [{"type": 'Line', "data": get_s(df_ms, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
@@ -292,15 +297,18 @@ with tab2:
             base_m = m.split(" (SMA")[0]
             if base_m in colors_sopr:
                 c_col, c_name = colors_sopr[base_m]
-                if is_sma: series_sopr.append({"type": 'Line', "data": get_s(df_ms, f"{c_name}_SMA"), "options": {"color": c_col, "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": f"{c_name} SMA"}})
-                else: series_sopr.append({"type": 'Line', "data": get_s(df_ms, c_name), "options": {"color": c_col, "lineWidth": 2, "priceScaleId": 'left', "title": c_name}})
+                # Logika Multi-Scale: LTH SOPR dikirim ke lth_scale (skala ke-3), sisanya ke left
+                target_scale = 'lth_scale' if 'LTH SOPR' in c_name else 'left'
+                
+                if is_sma: series_sopr.append({"type": 'Line', "data": get_s(df_ms, f"{c_name}_SMA"), "options": {"color": c_col, "lineWidth": 1, "lineStyle": 2, "priceScaleId": target_scale, "title": f"{c_name} SMA"}})
+                else: series_sopr.append({"type": 'Line', "data": get_s(df_ms, c_name), "options": {"color": c_col, "lineWidth": 2, "priceScaleId": target_scale, "title": c_name}})
         
         renderLightweightCharts([{"chart": chart_opts_sopr, "series": series_sopr}], 'chart_sopr')
         st.markdown("<br><hr><br>", unsafe_allow_html=True)
 
 
         # ===========================================
-        # CHART 2: REALIZED P/L GROUP (NORMAL SCALE)
+        # CHART 2: REALIZED P/L GROUP
         # ===========================================
         st.subheader("Realized Profit & Loss")
         
@@ -326,14 +334,17 @@ with tab2:
         except: sel_pl = st.multiselect("P/L Metrics", all_opts_pl, default=['⚪ Net Realized PL'], label_visibility="collapsed")
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # Net PL BISA Minus, jadi biarkan Normal (mode: 0)
+        # CONFIG CHART P/L (3 SKALA BEDA)
         chart_opts_pl = {
             "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, 
             "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, 
-            "crosshair": {"mode": 0}, 
-            "height": 850 if focus_mpl else 650, 
-            "rightPriceScale": {"visible": True}, 
-            "leftPriceScale": {"visible": True}
+            "crosshair": {"mode": 0}, "height": 850 if focus_mpl else 650, 
+            # 1. Skala Kanan (BTC Price - Logarithmic)
+            "rightPriceScale": {"visible": True, "mode": 1}, 
+            # 2. Skala Kiri (Net Realized PL - Normal karena bisa Negatif)
+            "leftPriceScale": {"visible": True},
+            # 3. Skala Tersembunyi Khusus Ratio (STH/LTH PL Ratio)
+            "ratio_scale": {"visible": False}
         }
         
         series_pl = [{"type": 'Line', "data": get_s(df_mpl, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
@@ -346,24 +357,21 @@ with tab2:
             
             if base_m in colors_pl:
                 c_col, c_name = colors_pl[base_m]
-                if is_sma: series_pl.append({"type": 'Line', "data": get_s(df_mpl, f"{c_name}_SMA"), "options": {"color": c_col, "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": f"{c_name} SMA"}})
-                else: series_pl.append({"type": 'Line', "data": get_s(df_mpl, c_name), "options": {"color": c_col, "lineWidth": 2, "priceScaleId": 'left', "title": c_name}})
+                if is_sma: series_pl.append({"type": 'Line', "data": get_s(df_mpl, f"{c_name}_SMA"), "options": {"color": c_col, "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'ratio_scale', "title": f"{c_name} SMA"}})
+                else: series_pl.append({"type": 'Line', "data": get_s(df_mpl, c_name), "options": {"color": c_col, "lineWidth": 2, "priceScaleId": 'ratio_scale', "title": c_name}})
             
             elif base_m == '⚪ Net Realized PL':
                 if is_sma:
-                    series_pl.append({"type": 'Line', "data": get_s(df_mpl, 'Net Realized PL_SMA'), "options": {"color": '#ffffff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'right', "title": "Net PL SMA"}})
+                    series_pl.append({"type": 'Line', "data": get_s(df_mpl, 'Net Realized PL_SMA'), "options": {"color": '#ffffff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": "Net PL SMA"}})
                 else:
                     net_pl_raw = get_s(df_mpl, 'Net Realized PL')
                     for d in net_pl_raw: d['color'] = '#00cc66' if d['value'] >= 0 else '#ff4d4d'
-                    series_pl.append({"type": 'Histogram', "data": net_pl_raw, "options": {"priceScaleId": 'right', "title": 'Net PL Raw'}})
+                    series_pl.append({"type": 'Histogram', "data": net_pl_raw, "options": {"priceScaleId": 'left', "title": 'Net PL Raw'}})
 
         renderLightweightCharts([{"chart": chart_opts_pl, "series": series_pl}], 'chart_netpl')
 
     else:
         st.info("Menunggu data Profit & Loss. Pastikan GitHub Actions sudah jalan!")
 
-# ------------------------------------------------------------------------------
-# TAB 3: OSCILLATORS (SOON)
-# ------------------------------------------------------------------------------
 with tab3:
     st.info("Oscillators chart is under construction. Coming soon!")
