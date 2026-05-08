@@ -12,9 +12,9 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
+# --- CSS BAWAAN (Sesuai kesepakatan, dibiarkan seperti sebelumnya) ---
 st.markdown("""
 <style>
-/* CSS bawaan sebelumnya tetap dipertahankan, kita abaikan perbaikan kompleks untuk saat ini */
 div[data-testid="stPill"] button[data-selected="false"],
 div[data-testid="stPill"] button[aria-pressed="false"] {
     background-color: transparent !important;
@@ -23,7 +23,6 @@ div[data-testid="stPill"] button[aria-pressed="false"] {
     text-decoration: line-through !important;
     transition: all 0.3s ease;
 }
-
 div[data-testid="stPill"] button[data-selected="true"], 
 div[data-testid="stPill"] button[aria-pressed="true"] {
     background: linear-gradient(135deg, rgba(60, 20, 100, 0.8), rgba(20, 0, 50, 0.6)) !important;
@@ -32,27 +31,24 @@ div[data-testid="stPill"] button[aria-pressed="true"] {
     color: #ffffff !important;
     text-decoration: none !important;
 }
-
-/* Menyembunyikan elemen header & footer saat Full Screen */
 .block-container { padding-top: 1rem; padding-bottom: 1rem; max-width: 100%; }
 </style>
 """, unsafe_allow_html=True)
 
-# Inisialisasi State Independen untuk Tab 1 (Price)
+# Inisialisasi State Independen
 if 'tr_p' not in st.session_state: st.session_state.tr_p = "All Time"
 if 'cd_p' not in st.session_state: st.session_state.cd_p = 120
 if 'tf_p' not in st.session_state: st.session_state.tf_p = "Daily"
 if 'sma_p' not in st.session_state: st.session_state.sma_p = "0d"
 if 'cs_p' not in st.session_state: st.session_state.cs_p = 50
 
-# Inisialisasi State Independen untuk Tab 2 (SOPR Group)
 if 'tr_ms' not in st.session_state: st.session_state.tr_ms = "All Time"
 if 'cd_ms' not in st.session_state: st.session_state.cd_ms = 120
 if 'tf_ms' not in st.session_state: st.session_state.tf_ms = "Daily"
 if 'sma_ms' not in st.session_state: st.session_state.sma_ms = "0d"
 if 'cs_ms' not in st.session_state: st.session_state.cs_ms = 50
+if 'log_ms' not in st.session_state: st.session_state.log_ms = False
 
-# Inisialisasi State Independen untuk Tab 2 (Realized P/L Group)
 if 'tr_mpl' not in st.session_state: st.session_state.tr_mpl = "All Time"
 if 'cd_mpl' not in st.session_state: st.session_state.cd_mpl = 120
 if 'tf_mpl' not in st.session_state: st.session_state.tf_mpl = "Daily"
@@ -83,12 +79,10 @@ def load_data_momentum():
 df_price_raw = load_data_price()
 df_mom_raw = load_data_momentum()
 
-# Mesin filter yang mendukung mode Dual-Line (Raw + SMA)
 def apply_filters(df, res_state, smooth_state, custom_smooth, time_state, custom_days, metrics_to_smooth):
     if df.empty: return df, 1
     dff = df.copy()
     
-    # 1. Resampling Timeframe
     if res_state != "Daily":
         dff.set_index('Date', inplace=True)
         if res_state == "3 Days": dff = dff.resample('3D').last()
@@ -96,7 +90,6 @@ def apply_filters(df, res_state, smooth_state, custom_smooth, time_state, custom
         elif res_state == "Monthly": dff = dff.resample('ME').last()
         dff.reset_index(inplace=True)
         
-    # 2. Smoothing (SMA)
     w = 1
     if smooth_state == "7d": w = 7
     elif smooth_state == "14d": w = 14
@@ -108,7 +101,6 @@ def apply_filters(df, res_state, smooth_state, custom_smooth, time_state, custom
             if c in dff.columns:
                 dff[f"{c}_SMA"] = dff[c].rolling(w, min_periods=1).mean()
                     
-    # 3. Time Range Filter
     t_max = dff['Date'].max()
     if time_state == "1 Month": t_min = t_max - timedelta(days=30)
     elif time_state == "3 Months": t_min = t_max - timedelta(days=90)
@@ -138,7 +130,6 @@ with tab1:
     if not df_price_raw.empty:
         df_p, w_p = apply_filters(df_price_raw, st.session_state.tf_p, st.session_state.sma_p, st.session_state.cs_p, st.session_state.tr_p, st.session_state.cd_p, ['STH Cost Basis', 'LTH Cost Basis', 'Realized Price', 'True Market Mean', 'CVDD'])
 
-        # 1. JUDUL & KPI
         st.title("On-Chain Price Levels")
         st.markdown("---")
         last_p = df_p.iloc[-1]
@@ -163,7 +154,6 @@ with tab1:
         with k5: render_kpi_p("True Market Mean", last_p.get('True Market Mean', 0))
         st.markdown("---")
 
-        # 2. PANEL KONTROL
         col_fs, col_tf, col_sma, col_sma_cst, col_space, col_radio, col_custom = st.columns([1.2, 1.5, 1.5, 1, 0.5, 5, 1.2], vertical_alignment="bottom")
         with col_fs: focus_p = st.toggle("Full Screen", key="tg_p")
         with col_tf: st.session_state.tf_p = st.selectbox("Timeframe", ["Daily", "3 Days", "Weekly", "Monthly"], index=["Daily", "3 Days", "Weekly", "Monthly"].index(st.session_state.tf_p), key="tfs_p")
@@ -176,22 +166,18 @@ with tab1:
         with col_custom:
             if st.session_state.tr_p == "Custom": st.session_state.cd_p = st.number_input("Days back", min_value=7, value=st.session_state.cd_p, label_visibility="collapsed", key="cdin_p")
         
-        # 3. SELECTION METRIC
         opts_p_base = ['🔴 STH Cost Basis', '🔵 LTH Cost Basis', '⚪ Realized Price', '🟣 True Market Mean', '🟢 CVDD']
         all_opts_p = opts_p_base.copy()
-        if w_p > 1:
-            opts_p_sma = [f"{m} (SMA {w_p})" for m in opts_p_base]
-            all_opts_p.extend(opts_p_sma)
+        if w_p > 1: all_opts_p.extend([f"{m} (SMA {w_p})" for m in opts_p_base])
             
         try: active_metrics_p = st.pills("Metrics", all_opts_p, default=opts_p_base, selection_mode="multi", label_visibility="collapsed")
         except: active_metrics_p = st.multiselect("Metrics", all_opts_p, default=opts_p_base, label_visibility="collapsed")
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # 4. RENDER CHART (Penyesuaian Ketebalan Garis)
         chart_p_opts = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 850 if focus_p else 650}
         
-        # Penyesuaian garis BTC menjadi lineWidth: 2 (sebelumnya 3)
-        series_p = [{"type": 'Line', "data": get_s(df_p, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "title": 'BTC Price'}}]
+        # Ketebalan BTC Price dikurangi dari 3 menjadi 1
+        series_p = [{"type": 'Line', "data": get_s(df_p, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 1, "title": 'BTC Price'}}]
         
         colors_p = {'🔴 STH Cost Basis': ('#ff4d4d', 'STH Cost Basis'), '🔵 LTH Cost Basis': ('#4da6ff', 'LTH Cost Basis'), '⚪ Realized Price': ('#ffffff', 'Realized Price'), '🟣 True Market Mean': ('#cc33ff', 'True Market Mean'), '🟢 CVDD': ('#00cc66', 'CVDD')}
         
@@ -204,13 +190,13 @@ with tab1:
                 if is_sma:
                     series_p.append({"type": 'Line', "data": get_s(df_p, f"{m_name}_SMA"), "options": {"color": m_color, "lineWidth": 1, "lineStyle": 2, "title": f"{m_name} SMA"}})
                 else:
-                    # Penyesuaian garis Metrik Raw menjadi lineWidth: 1 (sebelumnya 2)
+                    # Ketebalan Cost Basis Raw dikurangi dari 2 menjadi 1
                     series_p.append({"type": 'Line', "data": get_s(df_p, m_name), "options": {"color": m_color, "lineWidth": 1, "title": m_name}})
                     
         renderLightweightCharts([{"chart": chart_p_opts, "series": series_p}], 'chart_price')
 
 # ------------------------------------------------------------------------------
-# TAB 2: PROFIT & LOSS 
+# TAB 2: PROFIT & LOSS
 # ------------------------------------------------------------------------------
 with tab2:
     if not df_mom_raw.empty:
@@ -235,20 +221,20 @@ with tab2:
         st.markdown("---")
 
         # ===========================================
-        # CHART 1: SOPR GROUP (Dengan Log Scale & 3 Axis)
+        # CHART 1: SOPR GROUP (Dengan Fitur Log Scale)
         # ===========================================
         st.subheader("SOPR Oscillators")
         
         df_ms, w_ms = apply_filters(df_mom_raw, st.session_state.tf_ms, st.session_state.sma_ms, st.session_state.cs_ms, st.session_state.tr_ms, st.session_state.cd_ms, ['aSOPR', 'LTH SOPR', 'STH SOPR'])
 
-        # Kontrol Panel SOPR ditambah tombol LOG SCALE
-        col_fs_ms, col_tf_ms, col_sma_ms, col_sma_cst_ms, col_log_ms, col_radio_ms, col_custom_ms = st.columns([1.2, 1.5, 1.5, 1, 1, 4.5, 1.2], vertical_alignment="bottom")
+        # Menambahkan Log Scale Toggle di panel kontrol SOPR
+        col_fs_ms, col_log_ms, col_tf_ms, col_sma_ms, col_sma_cst_ms, col_radio_ms, col_custom_ms = st.columns([1.2, 1.2, 1.5, 1.5, 1, 4.5, 1.2], vertical_alignment="bottom")
         with col_fs_ms: focus_ms = st.toggle("Full Screen", key="tg_ms")
+        with col_log_ms: st.session_state.log_ms = st.toggle("Log Scale", key="tg_log_ms")
         with col_tf_ms: st.session_state.tf_ms = st.selectbox("Timeframe", ["Daily", "3 Days", "Weekly", "Monthly"], index=["Daily", "3 Days", "Weekly", "Monthly"].index(st.session_state.tf_ms), key="tfs_ms")
         with col_sma_ms: st.session_state.sma_ms = st.selectbox("SMA", ["0d", "7d", "14d", "30d", "Custom"], index=["0d", "7d", "14d", "30d", "Custom"].index(st.session_state.sma_ms), key="smas_ms")
         with col_sma_cst_ms:
             if st.session_state.sma_ms == "Custom": st.session_state.cs_ms = st.number_input("Days", min_value=1, value=st.session_state.cs_ms, label_visibility="collapsed", key="cst_ms")
-        with col_log_ms: log_sopr = st.toggle("Log Scale", key="log_sopr")
         with col_radio_ms:
             c_idx_ms = t_opts.index(st.session_state.tr_ms) if st.session_state.tr_ms in t_opts else 5
             st.session_state.tr_ms = st.radio("Range:", t_opts, index=c_idx_ms, horizontal=True, label_visibility="collapsed", key="rg_ms")
@@ -263,17 +249,17 @@ with tab2:
         except: sel_sopr = st.multiselect("SOPR Metrics", all_opts_sopr, default=['🔵 aSOPR', '🟢 LTH SOPR'], label_visibility="collapsed")
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # Logika mode chart (0: Linear, 2: Logarithmic)
-        scale_mode = 2 if log_sopr else 0
-
+        # Logika Log Scale
+        is_log = st.session_state.get('log_ms', False)
+        
         chart_opts_sopr = {
             "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, 
             "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, 
             "crosshair": {"mode": 0}, 
             "height": 850 if focus_ms else 650, 
-            "rightPriceScale": {"visible": True}, 
-            "leftPriceScale": {"visible": True, "mode": scale_mode},
-            "scale3": {"visible": True, "mode": scale_mode} # Skala khusus ke-3 untuk LTH SOPR
+            "rightPriceScale": {"visible": True, "logScale": is_log}, # Skala Kanan (BTC)
+            "leftPriceScale": {"visible": True, "logScale": is_log},  # Skala Kiri (aSOPR & STH SOPR)
+            "lth_scale": {"visible": True, "logScale": is_log}        # Skala Ke-3 (LTH SOPR - Mencegah "gepeng")
         }
         
         series_sopr = [{"type": 'Line', "data": get_s(df_ms, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
@@ -281,22 +267,21 @@ with tab2:
         df_ms['Neutral_Line'] = 1.0
         series_sopr.append({"type": 'Line', "data": get_s(df_ms, 'Neutral_Line'), "options": {"color": '#ffffff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": 'Neutral (1.0)'}})
 
-        # Menentukan ID Skala untuk masing-masing metrik
-        colors_sopr = {
-            '🔵 aSOPR': ('#00e6e6', 'aSOPR', 'left'), 
-            '🔴 STH SOPR': ('#ff4d4d', 'STH SOPR', 'left'), 
-            '🟢 LTH SOPR': ('#00cc66', 'LTH SOPR', 'scale3') # LTH SOPR diarahkan ke skala mandiri
-        }
+        colors_sopr = {'🔵 aSOPR': ('#00e6e6', 'aSOPR'), '🔴 STH SOPR': ('#ff4d4d', 'STH SOPR'), '🟢 LTH SOPR': ('#00cc66', 'LTH SOPR')}
         
         for m in sel_sopr:
             is_sma = "(SMA" in m
             base_m = m.split(" (SMA")[0]
             if base_m in colors_sopr:
-                c_col, c_name, c_scale = colors_sopr[base_m]
+                c_col, c_name = colors_sopr[base_m]
+                
+                # Memisahkan Skala LTH SOPR ke Skala ke-3 ('lth_scale')
+                target_scale = 'lth_scale' if c_name == 'LTH SOPR' else 'left'
+                
                 if is_sma: 
-                    series_sopr.append({"type": 'Line', "data": get_s(df_ms, f"{c_name}_SMA"), "options": {"color": c_col, "lineWidth": 1, "lineStyle": 2, "priceScaleId": c_scale, "title": f"{c_name} SMA"}})
+                    series_sopr.append({"type": 'Line', "data": get_s(df_ms, f"{c_name}_SMA"), "options": {"color": c_col, "lineWidth": 1, "lineStyle": 2, "priceScaleId": target_scale, "title": f"{c_name} SMA"}})
                 else: 
-                    series_sopr.append({"type": 'Line', "data": get_s(df_ms, c_name), "options": {"color": c_col, "lineWidth": 2, "priceScaleId": c_scale, "title": c_name}})
+                    series_sopr.append({"type": 'Line', "data": get_s(df_ms, c_name), "options": {"color": c_col, "lineWidth": 2, "priceScaleId": target_scale, "title": c_name}})
         
         renderLightweightCharts([{"chart": chart_opts_sopr, "series": series_sopr}], 'chart_sopr')
         st.markdown("<br><hr><br>", unsafe_allow_html=True)
