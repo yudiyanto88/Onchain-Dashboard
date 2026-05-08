@@ -12,24 +12,31 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- CSS UNTUK MERAPATKAN JARAK DAN MENGECILKAN TEKS KONTROL ---
+# --- SUNTIKAN CSS KHUSUS UNTUK TOMBOL METRIK (SHINY TECH & STRIKETHROUGH) ---
 st.markdown("""
 <style>
-/* Global layout padding */
+/* Kondisi Tombol OFF (Mati, Abu-abu, Tercoret, Transparan) */
+div[data-testid="stPill"] button[data-selected="false"],
+div[data-testid="stPill"] button[aria-pressed="false"] {
+    background-color: transparent !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    color: #666666 !important;
+    text-decoration: line-through !important;
+    transition: all 0.3s ease;
+}
+
+/* Kondisi Tombol ON (Menyala, Putih, Gradasi Ungu, Garis Glowing) */
+div[data-testid="stPill"] button[data-selected="true"], 
+div[data-testid="stPill"] button[aria-pressed="true"] {
+    background: linear-gradient(135deg, rgba(60, 20, 100, 0.8), rgba(20, 0, 50, 0.6)) !important;
+    border: 1px solid #a855f7 !important;
+    box-shadow: 0 0 8px rgba(168, 85, 247, 0.6) !important;
+    color: #ffffff !important;
+    text-decoration: none !important;
+}
+
+/* Menyembunyikan elemen header & footer saat Full Screen */
 .block-container { padding-top: 1rem; padding-bottom: 1rem; max-width: 100%; }
-hr { margin-top: 5px !important; margin-bottom: 10px !important; }
-
-/* Kecilkan teks pada panel kontrol saja (Timeframe, SMA, dll) */
-.stSelectbox label p, .stNumberInput label p, .stRadio label p, .stToggle label p {
-    font-size: 0.8rem !important;
-    color: #a3a8b8 !important;
-    margin-bottom: 0px !important;
-}
-
-/* Mengurangi sedikit jarak antar tab */
-.stTabs [data-baseweb="tab-list"] {
-    margin-bottom: -5px !important;
-}
 </style>
 """, unsafe_allow_html=True)
 
@@ -101,6 +108,7 @@ def apply_filters(df, res_state, smooth_state, custom_smooth, time_state, custom
     if w > 1:
         for c in metrics_to_smooth:
             if c in dff.columns:
+                # Membuat kolom duplikat khusus untuk garis SMA putus-putus
                 dff[f"{c}_SMA"] = dff[c].rolling(w, min_periods=1).mean()
                     
     # 3. Time Range Filter
@@ -148,7 +156,7 @@ with tab1:
                 c = "#00cc66" if ip else "#ff4d4d"
                 tc, ar = c, "↑" if ip else "↓"
                 d = f"<div style='margin-top:4px;'><span style='color:{c}; font-size:0.85rem; background-color:{c}20; padding:2px 6px; border-radius:4px;'>{ar} {abs(dp):.2f}%</span></div>"
-            st.markdown(f"<div style='padding-bottom:5px;'><span style='color:{tc}; font-size:0.95rem; font-weight:600;'>{title}</span><br><span style='color:{c}; font-size:1.4rem; font-weight:700;'>${value:,.2f}</span>{d}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='padding-bottom:10px;'><span style='color:{tc}; font-size:0.95rem; font-weight:600;'>{title}</span><br><span style='color:{c}; font-size:1.4rem; font-weight:700;'>${value:,.2f}</span>{d}</div>", unsafe_allow_html=True)
 
         k1, k2, k3, k4, k5 = st.columns(5)
         with k1: render_kpi_p("Current BTC Price", btc_p, True)
@@ -184,9 +192,7 @@ with tab1:
 
         # 4. RENDER CHART
         chart_p_opts = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 850 if focus_p else 650}
-        
-        # Semua garis Raw (termasuk BTC) sekarang lineWidth = 1
-        series_p = [{"type": 'Line', "data": get_s(df_p, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 1, "title": 'BTC Price'}}]
+        series_p = [{"type": 'Line', "data": get_s(df_p, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 3, "title": 'BTC Price'}}]
         
         colors_p = {'🔴 STH Cost Basis': ('#ff4d4d', 'STH Cost Basis'), '🔵 LTH Cost Basis': ('#4da6ff', 'LTH Cost Basis'), '⚪ Realized Price': ('#ffffff', 'Realized Price'), '🟣 True Market Mean': ('#cc33ff', 'True Market Mean'), '🟢 CVDD': ('#00cc66', 'CVDD')}
         
@@ -199,30 +205,32 @@ with tab1:
                 if is_sma:
                     series_p.append({"type": 'Line', "data": get_s(df_p, f"{m_name}_SMA"), "options": {"color": m_color, "lineWidth": 1, "lineStyle": 2, "title": f"{m_name} SMA"}})
                 else:
-                    # Semua garis Raw Cost Basis sekarang lineWidth = 1
-                    series_p.append({"type": 'Line', "data": get_s(df_p, m_name), "options": {"color": m_color, "lineWidth": 1, "title": m_name}})
+                    series_p.append({"type": 'Line', "data": get_s(df_p, m_name), "options": {"color": m_color, "lineWidth": 2, "title": m_name}})
                     
         renderLightweightCharts([{"chart": chart_p_opts, "series": series_p}], 'chart_price')
 
 # ------------------------------------------------------------------------------
-# TAB 2: PROFIT & LOSS (DUAL CHARTS)
+# TAB 2: PROFIT & LOSS (DUAL CHARTS WITH INDEPENDENT CONTROLS)
 # ------------------------------------------------------------------------------
 with tab2:
     if not df_mom_raw.empty:
         st.title("Profit & Loss")
         st.markdown("---")
         
+        # Ekstrak data mentah terbaru murni untuk papan skor KPI (tanpa filter/SMA)
         last_m = df_mom_raw.iloc[-1]
         btc_m = last_m.get('BTC Price', 0)
         
+        # LOGIKA KPI PROFIT & LOSS: Hijau jika profit (>= threshold), Merah jika loss. Tidak ada presentase.
         def render_kpi_m(title, value, threshold=1.0, is_money=False):
             if pd.isna(value) or value == 0: color = "#a3a8b8"
             else: color = "#00cc66" if value >= threshold else "#ff4d4d"
             val_str = f"${value:,.2f}" if is_money else f"{value:.4f}"
-            st.markdown(f"<div style='padding-bottom:5px;'><span style='color:{color}; font-size:0.95rem; font-weight:600;'>{title}</span><br><span style='color:{color}; font-size:1.4rem; font-weight:700;'>{val_str}</span></div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='padding-bottom:10px;'><span style='color:{color}; font-size:0.95rem; font-weight:600;'>{title}</span><br><span style='color:{color}; font-size:1.4rem; font-weight:700;'>{val_str}</span></div>", unsafe_allow_html=True)
 
+        # 1. Papan Skor KPI (Global untuk Tab 2)
         k1, k2, k3, k4, k5 = st.columns(5)
-        with k1: st.markdown(f"<div style='padding-bottom:5px;'><span style='color:#a3a8b8; font-size:0.95rem; font-weight:600;'>Current BTC Price</span><br><span style='color:#ffffff; font-size:1.4rem; font-weight:700;'>${btc_m:,.2f}</span></div>", unsafe_allow_html=True)
+        with k1: st.markdown(f"<div style='padding-bottom:10px;'><span style='color:#a3a8b8; font-size:0.95rem; font-weight:600;'>Current BTC Price</span><br><span style='color:#ffffff; font-size:1.4rem; font-weight:700;'>${btc_m:,.2f}</span></div>", unsafe_allow_html=True)
         with k2: render_kpi_m("aSOPR", last_m.get('aSOPR', 0), 1.0)
         with k3: render_kpi_m("LTH SOPR", last_m.get('LTH SOPR', 0), 1.0)
         with k4: render_kpi_m("STH SOPR", last_m.get('STH SOPR', 0), 1.0)
@@ -230,12 +238,14 @@ with tab2:
         st.markdown("---")
 
         # ===========================================
-        # CHART 1: SOPR GROUP (Dengan 3 Skala)
+        # CHART 1: SOPR GROUP
         # ===========================================
         st.subheader("SOPR Oscillators")
         
+        # Menghasilkan dataframe khusus SOPR berdasarkan panel kontrol pertama
         df_ms, w_ms = apply_filters(df_mom_raw, st.session_state.tf_ms, st.session_state.sma_ms, st.session_state.cs_ms, st.session_state.tr_ms, st.session_state.cd_ms, ['aSOPR', 'LTH SOPR', 'STH SOPR'])
 
+        # Kontrol Panel SOPR
         col_fs_ms, col_tf_ms, col_sma_ms, col_sma_cst_ms, col_space_ms, col_radio_ms, col_custom_ms = st.columns([1.2, 1.5, 1.5, 1, 0.5, 5, 1.2], vertical_alignment="bottom")
         with col_fs_ms: focus_ms = st.toggle("Full Screen", key="tg_ms")
         with col_tf_ms: st.session_state.tf_ms = st.selectbox("Timeframe", ["Daily", "3 Days", "Weekly", "Monthly"], index=["Daily", "3 Days", "Weekly", "Monthly"].index(st.session_state.tf_ms), key="tfs_ms")
@@ -248,27 +258,18 @@ with tab2:
         with col_custom_ms:
             if st.session_state.tr_ms == "Custom": st.session_state.cd_ms = st.number_input("Days back", min_value=7, value=st.session_state.cd_ms, label_visibility="collapsed", key="cdin_ms")
         
+        # Selection Metric (Pills) SOPR
         opts_sopr_base = ['🔵 aSOPR', '🔴 STH SOPR', '🟢 LTH SOPR']
         all_opts_sopr = opts_sopr_base.copy()
         if w_ms > 1: all_opts_sopr.extend([f"{m} (SMA {w_ms})" for m in opts_sopr_base])
             
-        try: sel_sopr = st.pills("SOPR Metrics", all_opts_sopr, default=['🔵 aSOPR', '🟢 LTH SOPR'], selection_mode="multi", label_visibility="collapsed")
-        except: sel_sopr = st.multiselect("SOPR Metrics", all_opts_sopr, default=['🔵 aSOPR', '🟢 LTH SOPR'], label_visibility="collapsed")
+        try: sel_sopr = st.pills("SOPR Metrics", all_opts_sopr, default=['🔵 aSOPR'], selection_mode="multi", label_visibility="collapsed")
+        except: sel_sopr = st.multiselect("SOPR Metrics", all_opts_sopr, default=['🔵 aSOPR'], label_visibility="collapsed")
         st.markdown("<br>", unsafe_allow_html=True)
 
-        # Menerapkan konfigurasi 3 Skala (Right: BTC, Left: aSOPR/STH, lth_scale: LTH SOPR)
-        chart_opts_sopr = {
-            "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, 
-            "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, 
-            "crosshair": {"mode": 0}, 
-            "height": 850 if focus_ms else 650, 
-            "rightPriceScale": {"visible": True}, 
-            "leftPriceScale": {"visible": True},
-            "lth_scale": {"visible": True}  # Menambahkan skala ke-3 yang independen dan terlihat
-        }
-        
-        # LineWidth 1 untuk semua
-        series_sopr = [{"type": 'Line', "data": get_s(df_ms, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 1, "priceScaleId": 'right', "title": 'BTC Price'}}]
+        # Render Chart SOPR
+        chart_opts_sopr = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 850 if focus_ms else 650, "rightPriceScale": {"visible": True}, "leftPriceScale": {"visible": True}}
+        series_sopr = [{"type": 'Line', "data": get_s(df_ms, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
         
         df_ms['Neutral_Line'] = 1.0
         series_sopr.append({"type": 'Line', "data": get_s(df_ms, 'Neutral_Line'), "options": {"color": '#ffffff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": 'Neutral (1.0)'}})
@@ -280,14 +281,8 @@ with tab2:
             base_m = m.split(" (SMA")[0]
             if base_m in colors_sopr:
                 c_col, c_name = colors_sopr[base_m]
-                
-                # Pemisahan skala: LTH SOPR dilempar ke 'lth_scale', metrik lain ke 'left'
-                scale_id = 'lth_scale' if base_m == '🟢 LTH SOPR' else 'left'
-                
-                if is_sma: 
-                    series_sopr.append({"type": 'Line', "data": get_s(df_ms, f"{c_name}_SMA"), "options": {"color": c_col, "lineWidth": 1, "lineStyle": 2, "priceScaleId": scale_id, "title": f"{c_name} SMA"}})
-                else: 
-                    series_sopr.append({"type": 'Line', "data": get_s(df_ms, c_name), "options": {"color": c_col, "lineWidth": 1, "priceScaleId": scale_id, "title": c_name}})
+                if is_sma: series_sopr.append({"type": 'Line', "data": get_s(df_ms, f"{c_name}_SMA"), "options": {"color": c_col, "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": f"{c_name} SMA"}})
+                else: series_sopr.append({"type": 'Line', "data": get_s(df_ms, c_name), "options": {"color": c_col, "lineWidth": 2, "priceScaleId": 'left', "title": c_name}})
         
         renderLightweightCharts([{"chart": chart_opts_sopr, "series": series_sopr}], 'chart_sopr')
         st.markdown("<br><hr><br>", unsafe_allow_html=True)
@@ -298,8 +293,10 @@ with tab2:
         # ===========================================
         st.subheader("Realized Profit & Loss")
         
+        # Menghasilkan dataframe khusus P/L berdasarkan panel kontrol kedua
         df_mpl, w_mpl = apply_filters(df_mom_raw, st.session_state.tf_mpl, st.session_state.sma_mpl, st.session_state.cs_mpl, st.session_state.tr_mpl, st.session_state.cd_mpl, ['STH P/L Ratio', 'LTH P/L Ratio', 'Net Realized PL'])
 
+        # Kontrol Panel Realized P/L
         col_fs_mpl, col_tf_mpl, col_sma_mpl, col_sma_cst_mpl, col_space_mpl, col_radio_mpl, col_custom_mpl = st.columns([1.2, 1.5, 1.5, 1, 0.5, 5, 1.2], vertical_alignment="bottom")
         with col_fs_mpl: focus_mpl = st.toggle("Full Screen", key="tg_mpl")
         with col_tf_mpl: st.session_state.tf_mpl = st.selectbox("Timeframe", ["Daily", "3 Days", "Weekly", "Monthly"], index=["Daily", "3 Days", "Weekly", "Monthly"].index(st.session_state.tf_mpl), key="tfs_mpl")
@@ -312,6 +309,7 @@ with tab2:
         with col_custom_mpl:
             if st.session_state.tr_mpl == "Custom": st.session_state.cd_mpl = st.number_input("Days back", min_value=7, value=st.session_state.cd_mpl, label_visibility="collapsed", key="cdin_mpl")
             
+        # Selection Metric (Pills) Realized P/L
         opts_pl_base = ['⚪ Net Realized PL', '🟣 STH P/L Ratio', '🟤 LTH P/L Ratio']
         all_opts_pl = opts_pl_base.copy()
         if w_mpl > 1: all_opts_pl.extend([f"{m} (SMA {w_mpl})" for m in opts_pl_base])
@@ -320,10 +318,9 @@ with tab2:
         except: sel_pl = st.multiselect("P/L Metrics", all_opts_pl, default=['⚪ Net Realized PL'], label_visibility="collapsed")
         st.markdown("<br>", unsafe_allow_html=True)
 
+        # Render Chart Realized P/L
         chart_opts_pl = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 850 if focus_mpl else 650, "rightPriceScale": {"visible": True}, "leftPriceScale": {"visible": True}}
-        
-        # LineWidth 1 untuk BTC di P/L
-        series_pl = [{"type": 'Line', "data": get_s(df_mpl, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 1, "priceScaleId": 'right', "title": 'BTC Price'}}]
+        series_pl = [{"type": 'Line', "data": get_s(df_mpl, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
 
         colors_pl = {'🟣 STH P/L Ratio': ('#cc33ff', 'STH P/L Ratio'), '🟤 LTH P/L Ratio': ('#cc9966', 'LTH P/L Ratio')}
         
@@ -334,14 +331,14 @@ with tab2:
             if base_m in colors_pl:
                 c_col, c_name = colors_pl[base_m]
                 if is_sma: series_pl.append({"type": 'Line', "data": get_s(df_mpl, f"{c_name}_SMA"), "options": {"color": c_col, "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": f"{c_name} SMA"}})
-                # Semua Raw Metrik P/L juga lineWidth = 1
-                else: series_pl.append({"type": 'Line', "data": get_s(df_mpl, c_name), "options": {"color": c_col, "lineWidth": 1, "priceScaleId": 'left', "title": c_name}})
+                else: series_pl.append({"type": 'Line', "data": get_s(df_mpl, c_name), "options": {"color": c_col, "lineWidth": 2, "priceScaleId": 'left', "title": c_name}})
             
             elif base_m == '⚪ Net Realized PL':
                 if is_sma:
                     series_pl.append({"type": 'Line', "data": get_s(df_mpl, 'Net Realized PL_SMA'), "options": {"color": '#ffffff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'right', "title": "Net PL SMA"}})
                 else:
                     net_pl_raw = get_s(df_mpl, 'Net Realized PL')
+                    # Net PL menggunakan histogram, pewarnaan otomatis hijau profit dan merah loss
                     for d in net_pl_raw: d['color'] = '#00cc66' if d['value'] >= 0 else '#ff4d4d'
                     series_pl.append({"type": 'Histogram', "data": net_pl_raw, "options": {"priceScaleId": 'right', "title": 'Net PL Raw'}})
 
