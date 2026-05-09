@@ -21,11 +21,9 @@ st.markdown("""
 section[data-testid="stSidebar"] {
     background-color: #0e1117;
 }
-
 section[data-testid="stSidebar"] div.stRadio > div[role="radiogroup"] {
     gap: 10px; 
 }
-
 section[data-testid="stSidebar"] div.stRadio > div[role="radiogroup"] > label {
     background-color: #1a1d24;
     padding: 12px 16px !important;
@@ -35,23 +33,19 @@ section[data-testid="stSidebar"] div.stRadio > div[role="radiogroup"] > label {
     cursor: pointer;
     transition: all 0.2s ease-in-out;
 }
-
 section[data-testid="stSidebar"] div.stRadio > div[role="radiogroup"] > label:hover {
     background-color: #262a35;
 }
-
 section[data-testid="stSidebar"] div.stRadio > div[role="radiogroup"] > label[data-checked="true"] {
     border-left: 4px solid #a855f7 !important;
     background-color: #2a203b !important;
 }
-
 section[data-testid="stSidebar"] div.stRadio > div[role="radiogroup"] p {
     font-size: 1.15rem !important;
     font-weight: 600 !important;
     margin: 0 !important;
     color: #ffffff !important;
 }
-
 section[data-testid="stSidebar"] div.stRadio > div[role="radiogroup"] > label > div:first-child {
     display: none !important;
 }
@@ -65,40 +59,44 @@ div[data-testid="stToggle"] *,
 div[data-testid="stNumberInput"] * {
     font-size: 0.85rem !important;
 }
-
 div[data-testid="stToggle"] label p {
     font-size: 0.85rem !important;
     margin-top: 2px !important; 
 }
-
 div[data-testid="stSelectbox"] label, 
 div[data-testid="stNumberInput"] label {
     padding-bottom: 2px !important;
     min-height: 0px !important;
 }
 
-/* Memotong Tinggi Selectbox agar tidak boros spasi */
+/* Memotong Tinggi Selectbox & Presisi Tengah Vertikal */
 div[data-baseweb="select"] > div {
     min-height: 32px !important;
     height: 32px !important;
     border-radius: 6px !important;
+    display: flex !important;
+    align-items: center !important;
 }
 div[data-baseweb="select"] > div > div {
     padding-top: 0px !important;
     padding-bottom: 0px !important;
+    display: flex !important;
+    align-items: center !important;
+}
+/* Memastikan Teks di dalam popup (Daily/14d) presisi di tengah */
+div[data-baseweb="select"] span {
+    line-height: normal !important;
+    margin-top: 2px !important; 
 }
 
 /* ======================================================
    C. MERAPIKAN SPASI UTAMA & MENCEGAH TEKS TERPOTONG
    ====================================================== */
-/* Padding top ditingkatkan menjadi 3rem agar aman dari top header Streamlit */
 .block-container { 
     padding-top: 3rem !important; 
     padding-bottom: 1.5rem !important; 
     max-width: 100%; 
 }
-
-/* Ukuran font Metrics Pill */
 div[data-testid="stPill"] button {
     font-size: 0.85rem !important;
     padding: 2px 12px !important;
@@ -213,10 +211,12 @@ if selected_menu == "Price Levels":
                 d = f"<div style='margin-top:4px;'><span style='color:{c}; font-size:0.85rem; background-color:{c}20; padding:2px 6px; border-radius:4px;'>{ar} {abs(dp):.2f}%</span></div>"
             st.markdown(f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:{tc}; font-size:0.95rem; font-weight:600;'>{title}</span><br><span style='color:{c}; font-size:1.4rem; font-weight:700;'>${value:,.2f}</span>{d}</div>", unsafe_allow_html=True)
 
+        # Menggunakan struktur kolom yang persis sama dengan Tab 2
         col_title, k1, k2, k3, k4, k5 = st.columns([1.5, 1, 1, 1, 1, 1], vertical_alignment="center")
         
         with col_title:
-            st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.5rem;'>On-Chain Price Levels</h3></div>", unsafe_allow_html=True)
+            # Trik baris transparent agar tinggi div judul ini 100% identik dengan judul 2 baris di Tab 2
+            st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.4rem;'>On-Chain Price Levels<br><span style='font-size: 1rem; color: transparent;'>.</span></h3></div>", unsafe_allow_html=True)
             
         with k1: render_kpi_p("Current BTC Price", btc_p, True)
         with k2: render_kpi_p("STH Cost Basis", last_p.get('STH Cost Basis', 0))
@@ -274,9 +274,9 @@ elif selected_menu == "Profit & Loss":
             st.markdown(f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:{color}; font-size:0.95rem; font-weight:600;'>{title}</span><br><span style='color:{color}; font-size:1.4rem; font-weight:700;'>{val_str}</span></div>", unsafe_allow_html=True)
 
         # ===========================================
-        # CHART 1: SOPR GROUP (Dengan KPI Sendiri)
+        # CHART 1: SOPR GROUP
         # ===========================================
-        col_title_1, k1_1, k2_1, k3_1, k4_1, spacer_1 = st.columns([1.6, 1, 1, 1, 1, 0.4], vertical_alignment="center")
+        col_title_1, k1_1, k2_1, k3_1, k4_1, k5_1 = st.columns([1.5, 1, 1, 1, 1, 1], vertical_alignment="center")
         
         with col_title_1:
             st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.4rem;'>Profit & Loss<br><span style='font-size: 1rem; color: #d1d4dc;'>SOPR Metric</span></h3></div>", unsafe_allow_html=True)
@@ -340,9 +340,9 @@ elif selected_menu == "Profit & Loss":
         st.markdown("<br><br>", unsafe_allow_html=True)
 
         # ===========================================
-        # CHART 2: REALIZED P/L GROUP (Dengan KPI Sendiri)
+        # CHART 2: REALIZED P/L GROUP
         # ===========================================
-        col_title_2, k1_2, k2_2, k3_2, k4_2, spacer_2 = st.columns([1.6, 1, 1, 1, 1, 0.4], vertical_alignment="center")
+        col_title_2, k1_2, k2_2, k3_2, k4_2, k5_2 = st.columns([1.5, 1, 1, 1, 1, 1], vertical_alignment="center")
         
         with col_title_2:
             st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.4rem;'>Profit & Loss<br><span style='font-size: 1rem; color: #d1d4dc;'>Realized P&L Metric</span></h3></div>", unsafe_allow_html=True)
@@ -375,15 +375,15 @@ elif selected_menu == "Profit & Loss":
         try: sel_pl = st.pills("P/L Metrics", all_opts_pl, default=['⚪ Net Realized PL'], selection_mode="multi", label_visibility="collapsed")
         except: sel_pl = st.multiselect("P/L Metrics", all_opts_pl, default=['⚪ Net Realized PL'], label_visibility="collapsed")
 
-        # 3 SKALA UNTUK REALIZED P&L CHART (BTC Kanan, Ratio Kiri, NetPL Kiri Custom)
+        # 3 SKALA UNTUK REALIZED P&L CHART YANG TERISOLASI
         chart_opts_pl = {
             "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, 
             "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, 
             "crosshair": {"mode": 0}, 
             "height": 850 if focus_mpl else 650, 
-            "rightPriceScale": {"visible": True}, 
-            "leftPriceScale": {"visible": True},
-            "netpl_scale": {"visible": True, "position": "left", "autoScale": True}
+            "rightPriceScale": {"visible": True},            # Skala Kanan (BTC Price)
+            "leftPriceScale": {"visible": True},             # Skala Kiri Utama (Net Realized PL Histogram)
+            "ratio_scale": {"visible": True, "position": "left", "autoScale": True}  # Skala Kiri Tambahan (STH/LTH Ratio)
         }
         
         series_pl = [{"type": 'Line', "data": get_s(df_mpl, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
@@ -396,16 +396,18 @@ elif selected_menu == "Profit & Loss":
             
             if base_m in colors_pl:
                 c_col, c_name = colors_pl[base_m]
-                if is_sma: series_pl.append({"type": 'Line', "data": get_s(df_mpl, f"{c_name}_SMA"), "options": {"color": c_col, "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": f"{c_name} SMA"}})
-                else: series_pl.append({"type": 'Line', "data": get_s(df_mpl, c_name), "options": {"color": c_col, "lineWidth": 1, "priceScaleId": 'left', "title": c_name}})
+                # P/L Ratio dimasukkan ke skala ke-3: 'ratio_scale'
+                if is_sma: series_pl.append({"type": 'Line', "data": get_s(df_mpl, f"{c_name}_SMA"), "options": {"color": c_col, "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'ratio_scale', "title": f"{c_name} SMA"}})
+                else: series_pl.append({"type": 'Line', "data": get_s(df_mpl, c_name), "options": {"color": c_col, "lineWidth": 1, "priceScaleId": 'ratio_scale', "title": c_name}})
             
             elif base_m == '⚪ Net Realized PL':
+                # Net Realized PL dimasukkan ke skala kiri utama: 'left'
                 if is_sma:
-                    series_pl.append({"type": 'Line', "data": get_s(df_mpl, 'Net Realized PL_SMA'), "options": {"color": '#ffffff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'netpl_scale', "title": "Net PL SMA"}})
+                    series_pl.append({"type": 'Line', "data": get_s(df_mpl, 'Net Realized PL_SMA'), "options": {"color": '#ffffff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": "Net PL SMA"}})
                 else:
                     net_pl_raw = get_s(df_mpl, 'Net Realized PL')
                     for d in net_pl_raw: d['color'] = '#00cc66' if d['value'] >= 0 else '#ff4d4d'
-                    series_pl.append({"type": 'Histogram', "data": net_pl_raw, "options": {"priceScaleId": 'netpl_scale', "title": 'Net PL Raw'}})
+                    series_pl.append({"type": 'Histogram', "data": net_pl_raw, "options": {"priceScaleId": 'left', "title": 'Net PL Raw'}})
 
         renderLightweightCharts([{"chart": chart_opts_pl, "series": series_pl}], 'chart_netpl')
 
