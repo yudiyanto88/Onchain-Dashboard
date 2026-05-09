@@ -203,7 +203,6 @@ if selected_menu == "Price Levels":
         last_p = df_p.iloc[-1]
         btc_p = last_p.get('BTC Price', 0)
         
-        # Format HTML disesuaikan dengan line-height dan padding aman agar tidak terpotong
         def render_kpi_p(title, value, is_btc=False):
             if is_btc or pd.isna(value) or value == 0: c, tc, d = "#ffffff", "#a3a8b8", ""
             else:
@@ -214,11 +213,10 @@ if selected_menu == "Price Levels":
                 d = f"<div style='margin-top:4px;'><span style='color:{c}; font-size:0.85rem; background-color:{c}20; padding:2px 6px; border-radius:4px;'>{ar} {abs(dp):.2f}%</span></div>"
             st.markdown(f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:{tc}; font-size:0.95rem; font-weight:600;'>{title}</span><br><span style='color:{c}; font-size:1.4rem; font-weight:700;'>${value:,.2f}</span>{d}</div>", unsafe_allow_html=True)
 
-        # Menyelaraskan konten menggunakan vertical_alignment="center"
         col_title, k1, k2, k3, k4, k5 = st.columns([1.5, 1, 1, 1, 1, 1], vertical_alignment="center")
         
         with col_title:
-            st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700;'>On-Chain Price Levels</h3></div>", unsafe_allow_html=True)
+            st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.5rem;'>On-Chain Price Levels</h3></div>", unsafe_allow_html=True)
             
         with k1: render_kpi_p("Current BTC Price", btc_p, True)
         with k2: render_kpi_p("STH Cost Basis", last_p.get('STH Cost Basis', 0))
@@ -249,7 +247,6 @@ if selected_menu == "Price Levels":
 
         chart_p_opts = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 850 if focus_p else 650}
         
-        # WARNA ASLI BITCOIN (#f7931a) dengan lineWidth 2
         series_p = [{"type": 'Line', "data": get_s(df_p, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "title": 'BTC Price'}}]
         
         colors_p = {'🔴 STH Cost Basis': ('#ff4d4d', 'STH Cost Basis'), '🔵 LTH Cost Basis': ('#4da6ff', 'LTH Cost Basis'), '⚪ Realized Price': ('#ffffff', 'Realized Price'), '🟣 True Market Mean': ('#cc33ff', 'True Market Mean'), '🟢 CVDD': ('#00cc66', 'CVDD')}
@@ -276,23 +273,20 @@ elif selected_menu == "Profit & Loss":
             val_str = f"${value:,.2f}" if is_money else f"{value:.4f}"
             st.markdown(f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:{color}; font-size:0.95rem; font-weight:600;'>{title}</span><br><span style='color:{color}; font-size:1.4rem; font-weight:700;'>{val_str}</span></div>", unsafe_allow_html=True)
 
-        col_title, k1, k2, k3, k4, k5 = st.columns([1.5, 1, 1, 1, 1, 1], vertical_alignment="center")
+        # ===========================================
+        # CHART 1: SOPR GROUP (Dengan KPI Sendiri)
+        # ===========================================
+        col_title_1, k1_1, k2_1, k3_1, k4_1, spacer_1 = st.columns([1.6, 1, 1, 1, 1, 0.4], vertical_alignment="center")
         
-        with col_title:
-            st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700;'>Profit & Loss</h3></div>", unsafe_allow_html=True)
+        with col_title_1:
+            st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.4rem;'>Profit & Loss<br><span style='font-size: 1rem; color: #d1d4dc;'>SOPR Metric</span></h3></div>", unsafe_allow_html=True)
             
-        with k1: st.markdown(f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:#a3a8b8; font-size:0.95rem; font-weight:600;'>Current BTC Price</span><br><span style='color:#ffffff; font-size:1.4rem; font-weight:700;'>${btc_m:,.2f}</span></div>", unsafe_allow_html=True)
-        with k2: render_kpi_m("aSOPR", last_m.get('aSOPR', 0), 1.0)
-        with k3: render_kpi_m("LTH SOPR", last_m.get('LTH SOPR', 0), 1.0)
-        with k4: render_kpi_m("STH SOPR", last_m.get('STH SOPR', 0), 1.0)
-        with k5: render_kpi_m("Net Realized PL", last_m.get('Net Realized PL', 0), 0.0, True)
+        with k1_1: st.markdown(f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:#a3a8b8; font-size:0.95rem; font-weight:600;'>Current BTC Price</span><br><span style='color:#ffffff; font-size:1.4rem; font-weight:700;'>${btc_m:,.2f}</span></div>", unsafe_allow_html=True)
+        with k2_1: render_kpi_m("aSOPR", last_m.get('aSOPR', 0), 1.0)
+        with k3_1: render_kpi_m("LTH SOPR", last_m.get('LTH SOPR', 0), 1.0)
+        with k4_1: render_kpi_m("STH SOPR", last_m.get('STH SOPR', 0), 1.0)
         
         st.markdown("---")
-
-        # ===========================================
-        # CHART 1: SOPR GROUP
-        # ===========================================
-        st.subheader("SOPR Oscillators")
         
         df_ms, w_ms = apply_filters(df_mom_raw, st.session_state.tf_ms, st.session_state.sma_ms, st.session_state.cs_ms, st.session_state.tr_ms, st.session_state.cd_ms, ['aSOPR', 'LTH SOPR', 'STH SOPR'])
 
@@ -325,7 +319,6 @@ elif selected_menu == "Profit & Loss":
             "lth_scale": {"visible": True, "position": "left", "autoScale": True}
         }
         
-        # WARNA ASLI BITCOIN (#f7931a) dengan lineWidth 2
         series_sopr = [{"type": 'Line', "data": get_s(df_ms, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
         
         df_ms['Neutral_Line'] = 1.0
@@ -343,12 +336,23 @@ elif selected_menu == "Profit & Loss":
                 else: series_sopr.append({"type": 'Line', "data": get_s(df_ms, c_name), "options": {"color": c_col, "lineWidth": 1, "priceScaleId": target_scale, "title": c_name}})
         
         renderLightweightCharts([{"chart": chart_opts_sopr, "series": series_sopr}], 'chart_sopr')
-        st.markdown("<br>", unsafe_allow_html=True)
+        
+        st.markdown("<br><br>", unsafe_allow_html=True)
 
         # ===========================================
-        # CHART 2: REALIZED P/L GROUP
+        # CHART 2: REALIZED P/L GROUP (Dengan KPI Sendiri)
         # ===========================================
-        st.subheader("Realized Profit & Loss")
+        col_title_2, k1_2, k2_2, k3_2, k4_2, spacer_2 = st.columns([1.6, 1, 1, 1, 1, 0.4], vertical_alignment="center")
+        
+        with col_title_2:
+            st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.4rem;'>Profit & Loss<br><span style='font-size: 1rem; color: #d1d4dc;'>Realized P&L Metric</span></h3></div>", unsafe_allow_html=True)
+            
+        with k1_2: st.markdown(f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:#a3a8b8; font-size:0.95rem; font-weight:600;'>Current BTC Price</span><br><span style='color:#ffffff; font-size:1.4rem; font-weight:700;'>${btc_m:,.2f}</span></div>", unsafe_allow_html=True)
+        with k2_2: render_kpi_m("Net Realized PL", last_m.get('Net Realized PL', 0), 0.0, True)
+        with k3_2: render_kpi_m("STH P/L Ratio", last_m.get('STH P/L Ratio', 0), 1.0)
+        with k4_2: render_kpi_m("LTH P/L Ratio", last_m.get('LTH P/L Ratio', 0), 1.0)
+        
+        st.markdown("---")
         
         df_mpl, w_mpl = apply_filters(df_mom_raw, st.session_state.tf_mpl, st.session_state.sma_mpl, st.session_state.cs_mpl, st.session_state.tr_mpl, st.session_state.cd_mpl, ['STH P/L Ratio', 'LTH P/L Ratio', 'Net Realized PL'])
 
@@ -371,9 +375,17 @@ elif selected_menu == "Profit & Loss":
         try: sel_pl = st.pills("P/L Metrics", all_opts_pl, default=['⚪ Net Realized PL'], selection_mode="multi", label_visibility="collapsed")
         except: sel_pl = st.multiselect("P/L Metrics", all_opts_pl, default=['⚪ Net Realized PL'], label_visibility="collapsed")
 
-        chart_opts_pl = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 850 if focus_mpl else 650, "rightPriceScale": {"visible": True}, "leftPriceScale": {"visible": True}}
+        # 3 SKALA UNTUK REALIZED P&L CHART (BTC Kanan, Ratio Kiri, NetPL Kiri Custom)
+        chart_opts_pl = {
+            "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, 
+            "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, 
+            "crosshair": {"mode": 0}, 
+            "height": 850 if focus_mpl else 650, 
+            "rightPriceScale": {"visible": True}, 
+            "leftPriceScale": {"visible": True},
+            "netpl_scale": {"visible": True, "position": "left", "autoScale": True}
+        }
         
-        # WARNA ASLI BITCOIN (#f7931a) dengan lineWidth 2
         series_pl = [{"type": 'Line', "data": get_s(df_mpl, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
 
         colors_pl = {'🟣 STH P/L Ratio': ('#cc33ff', 'STH P/L Ratio'), '🟤 LTH P/L Ratio': ('#cc9966', 'LTH P/L Ratio')}
@@ -389,11 +401,11 @@ elif selected_menu == "Profit & Loss":
             
             elif base_m == '⚪ Net Realized PL':
                 if is_sma:
-                    series_pl.append({"type": 'Line', "data": get_s(df_mpl, 'Net Realized PL_SMA'), "options": {"color": '#ffffff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'right', "title": "Net PL SMA"}})
+                    series_pl.append({"type": 'Line', "data": get_s(df_mpl, 'Net Realized PL_SMA'), "options": {"color": '#ffffff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'netpl_scale', "title": "Net PL SMA"}})
                 else:
                     net_pl_raw = get_s(df_mpl, 'Net Realized PL')
                     for d in net_pl_raw: d['color'] = '#00cc66' if d['value'] >= 0 else '#ff4d4d'
-                    series_pl.append({"type": 'Histogram', "data": net_pl_raw, "options": {"priceScaleId": 'right', "title": 'Net PL Raw'}})
+                    series_pl.append({"type": 'Histogram', "data": net_pl_raw, "options": {"priceScaleId": 'netpl_scale', "title": 'Net PL Raw'}})
 
         renderLightweightCharts([{"chart": chart_opts_pl, "series": series_pl}], 'chart_netpl')
 
