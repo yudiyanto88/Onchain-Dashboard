@@ -82,8 +82,12 @@ div[data-baseweb="select"] > div > div {
 }
 div[data-baseweb="select"] span {
     display: inline-block;
-}
 
+}
+/* Menarik teks "Daily" atau "14d" sedikit ke atas agar presisi di tengah popup */
+div[data-baseweb="select"] span {
+    display: inline-block;
+    transform: translateY(-3px) !important;
 /* ======================================================
    C. MERAPIKAN SPASI UTAMA & MENCEGAH TEKS TERPOTONG
    ====================================================== */
@@ -99,7 +103,7 @@ div[data-testid="stPill"] button {
 }
 </style>
 """, unsafe_allow_html=True)
-
+}
 # Inisialisasi Session State 
 for key in ['tr_p', 'tr_ms', 'tr_mpl', 'tr_d']:
     if key not in st.session_state: st.session_state[key] = "All Time"
