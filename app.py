@@ -69,24 +69,20 @@ div[data-testid="stNumberInput"] label {
     min-height: 0px !important;
 }
 
-/* Memotong Tinggi Selectbox & Presisi Tengah Vertikal */
+/* Memotong Tinggi Selectbox & Presisi Tengah Vertikal (Hack TranslateY) */
 div[data-baseweb="select"] > div {
     min-height: 32px !important;
     height: 32px !important;
     border-radius: 6px !important;
-    display: flex !important;
-    align-items: center !important;
 }
 div[data-baseweb="select"] > div > div {
     padding-top: 0px !important;
     padding-bottom: 0px !important;
-    display: flex !important;
-    align-items: center !important;
 }
-/* Memastikan Teks di dalam popup (Daily/14d) presisi di tengah */
+/* Menarik teks "Daily" atau "14d" sedikit ke atas agar presisi di tengah popup */
 div[data-baseweb="select"] span {
-    line-height: normal !important;
-    margin-top: 2px !important; 
+    display: inline-block;
+    transform: translateY(-3px) !important;
 }
 
 /* ======================================================
@@ -105,16 +101,16 @@ div[data-testid="stPill"] button {
 </style>
 """, unsafe_allow_html=True)
 
-# Inisialisasi Session State
-for key in ['tr_p', 'tr_ms', 'tr_mpl']:
+# Inisialisasi Session State (Termasuk untuk tab Derivatives '_d')
+for key in ['tr_p', 'tr_ms', 'tr_mpl', 'tr_d']:
     if key not in st.session_state: st.session_state[key] = "All Time"
-for key in ['cd_p', 'cd_ms', 'cd_mpl']:
+for key in ['cd_p', 'cd_ms', 'cd_mpl', 'cd_d']:
     if key not in st.session_state: st.session_state[key] = 120
-for key in ['tf_p', 'tf_ms', 'tf_mpl']:
+for key in ['tf_p', 'tf_ms', 'tf_mpl', 'tf_d']:
     if key not in st.session_state: st.session_state[key] = "Daily"
-for key in ['sma_p', 'sma_ms', 'sma_mpl']:
+for key in ['sma_p', 'sma_ms', 'sma_mpl', 'sma_d']:
     if key not in st.session_state: st.session_state[key] = "0d"
-for key in ['cs_p', 'cs_ms', 'cs_mpl']:
+for key in ['cs_p', 'cs_ms', 'cs_mpl', 'cs_d']:
     if key not in st.session_state: st.session_state[key] = 50
 
 # ==============================================================================
@@ -138,8 +134,19 @@ def load_data_momentum():
         return df.dropna(subset=['Date']).sort_values('Date')
     except: return pd.DataFrame()
 
+@st.cache_data(ttl=3600)
+def load_data_derivatives():
+    try:
+        df = pd.read_csv("data_derivatives.csv")
+        # Menyesuaikan nama kolom hasil dari auto_update.py
+        df.rename(columns={'date': 'Date', 'btc_price': 'BTC Price', 'total_oi': 'Open Interest', 'funding_rate': 'Funding Rate'}, inplace=True)
+        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        return df.dropna(subset=['Date']).sort_values('Date')
+    except: return pd.DataFrame()
+
 df_price_raw = load_data_price()
 df_mom_raw = load_data_momentum()
+df_deriv_raw = load_data_derivatives()
 
 def apply_filters(df, res_state, smooth_state, custom_smooth, time_state, custom_days, metrics_to_smooth):
     if df.empty: return df, 1
@@ -185,7 +192,7 @@ with st.sidebar:
     
     selected_menu = st.radio(
         "Menu Navigasi",
-        ["Price Levels", "Profit & Loss", "Oscillators (Soon)"],
+        ["Price Levels", "Profit & Loss", "Derivatives"],
         label_visibility="collapsed"
     )
     st.markdown("---")
@@ -194,6 +201,9 @@ with st.sidebar:
 # 4. MAIN DASHBOARD RENDER
 # ==============================================================================
 
+# ------------------------------------------------------------------------------
+# TAB 1: PRICE LEVELS
+# ------------------------------------------------------------------------------
 if selected_menu == "Price Levels":
     if not df_price_raw.empty:
         df_p, w_p = apply_filters(df_price_raw, st.session_state.tf_p, st.session_state.sma_p, st.session_state.cs_p, st.session_state.tr_p, st.session_state.cd_p, ['STH Cost Basis', 'LTH Cost Basis', 'Realized Price', 'True Market Mean', 'CVDD'])
@@ -211,11 +221,9 @@ if selected_menu == "Price Levels":
                 d = f"<div style='margin-top:4px;'><span style='color:{c}; font-size:0.85rem; background-color:{c}20; padding:2px 6px; border-radius:4px;'>{ar} {abs(dp):.2f}%</span></div>"
             st.markdown(f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:{tc}; font-size:0.95rem; font-weight:600;'>{title}</span><br><span style='color:{c}; font-size:1.4rem; font-weight:700;'>${value:,.2f}</span>{d}</div>", unsafe_allow_html=True)
 
-        # Menggunakan struktur kolom yang persis sama dengan Tab 2
         col_title, k1, k2, k3, k4, k5 = st.columns([1.5, 1, 1, 1, 1, 1], vertical_alignment="center")
         
         with col_title:
-            # Trik baris transparent agar tinggi div judul ini 100% identik dengan judul 2 baris di Tab 2
             st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.4rem;'>On-Chain Price Levels<br><span style='font-size: 1rem; color: transparent;'>.</span></h3></div>", unsafe_allow_html=True)
             
         with k1: render_kpi_p("Current BTC Price", btc_p, True)
@@ -262,6 +270,9 @@ if selected_menu == "Price Levels":
                     
         renderLightweightCharts([{"chart": chart_p_opts, "series": series_p}], 'chart_price')
 
+# ------------------------------------------------------------------------------
+# TAB 2: PROFIT & LOSS 
+# ------------------------------------------------------------------------------
 elif selected_menu == "Profit & Loss":
     if not df_mom_raw.empty:
         last_m = df_mom_raw.iloc[-1]
@@ -316,7 +327,7 @@ elif selected_menu == "Profit & Loss":
             "height": 850 if focus_ms else 650, 
             "rightPriceScale": {"visible": True}, 
             "leftPriceScale": {"visible": True},
-            "lth_scale": {"visible": True, "position": "left", "autoScale": True}
+            "scale3": {"visible": True, "position": "left", "autoScale": True}
         }
         
         series_sopr = [{"type": 'Line', "data": get_s(df_ms, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
@@ -331,7 +342,7 @@ elif selected_menu == "Profit & Loss":
             base_m = m.split(" (SMA")[0]
             if base_m in colors_sopr:
                 c_col, c_name = colors_sopr[base_m]
-                target_scale = "lth_scale" if base_m == '🟢 LTH SOPR' else "left"
+                target_scale = "scale3" if base_m == '🟢 LTH SOPR' else "left"
                 if is_sma: series_sopr.append({"type": 'Line', "data": get_s(df_ms, f"{c_name}_SMA"), "options": {"color": c_col, "lineWidth": 1, "lineStyle": 2, "priceScaleId": target_scale, "title": f"{c_name} SMA"}})
                 else: series_sopr.append({"type": 'Line', "data": get_s(df_ms, c_name), "options": {"color": c_col, "lineWidth": 1, "priceScaleId": target_scale, "title": c_name}})
         
@@ -375,15 +386,15 @@ elif selected_menu == "Profit & Loss":
         try: sel_pl = st.pills("P/L Metrics", all_opts_pl, default=['⚪ Net Realized PL'], selection_mode="multi", label_visibility="collapsed")
         except: sel_pl = st.multiselect("P/L Metrics", all_opts_pl, default=['⚪ Net Realized PL'], label_visibility="collapsed")
 
-        # 3 SKALA UNTUK REALIZED P&L CHART YANG TERISOLASI
+        # FIX 3 SKALA: Kanan (BTC), Kiri Default (NetPL Histogram), Kiri Custom 'scale3' (STH/LTH Ratios)
         chart_opts_pl = {
             "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, 
             "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, 
             "crosshair": {"mode": 0}, 
             "height": 850 if focus_mpl else 650, 
-            "rightPriceScale": {"visible": True},            # Skala Kanan (BTC Price)
-            "leftPriceScale": {"visible": True},             # Skala Kiri Utama (Net Realized PL Histogram)
-            "ratio_scale": {"visible": True, "position": "left", "autoScale": True}  # Skala Kiri Tambahan (STH/LTH Ratio)
+            "rightPriceScale": {"visible": True},            
+            "leftPriceScale": {"visible": True},             
+            "scale3": {"visible": True, "position": "left", "autoScale": True}  
         }
         
         series_pl = [{"type": 'Line', "data": get_s(df_mpl, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
@@ -396,12 +407,12 @@ elif selected_menu == "Profit & Loss":
             
             if base_m in colors_pl:
                 c_col, c_name = colors_pl[base_m]
-                # P/L Ratio dimasukkan ke skala ke-3: 'ratio_scale'
-                if is_sma: series_pl.append({"type": 'Line', "data": get_s(df_mpl, f"{c_name}_SMA"), "options": {"color": c_col, "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'ratio_scale', "title": f"{c_name} SMA"}})
-                else: series_pl.append({"type": 'Line', "data": get_s(df_mpl, c_name), "options": {"color": c_col, "lineWidth": 1, "priceScaleId": 'ratio_scale', "title": c_name}})
+                # P/L Ratio WAJIB masuk ke skala terpisah 'scale3' agar tidak gepeng
+                if is_sma: series_pl.append({"type": 'Line', "data": get_s(df_mpl, f"{c_name}_SMA"), "options": {"color": c_col, "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'scale3', "title": f"{c_name} SMA"}})
+                else: series_pl.append({"type": 'Line', "data": get_s(df_mpl, c_name), "options": {"color": c_col, "lineWidth": 1, "priceScaleId": 'scale3', "title": c_name}})
             
             elif base_m == '⚪ Net Realized PL':
-                # Net Realized PL dimasukkan ke skala kiri utama: 'left'
+                # Net Realized PL ke skala kiri utama 'left'
                 if is_sma:
                     series_pl.append({"type": 'Line', "data": get_s(df_mpl, 'Net Realized PL_SMA'), "options": {"color": '#ffffff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": "Net PL SMA"}})
                 else:
@@ -411,5 +422,89 @@ elif selected_menu == "Profit & Loss":
 
         renderLightweightCharts([{"chart": chart_opts_pl, "series": series_pl}], 'chart_netpl')
 
-elif selected_menu == "Oscillators (Soon)":
-    st.info("Oscillators chart is under construction. Coming soon!")
+# ------------------------------------------------------------------------------
+# TAB 3: DERIVATIVES (OPEN INTEREST & FUNDING RATES)
+# ------------------------------------------------------------------------------
+elif selected_menu == "Derivatives":
+    if not df_deriv_raw.empty:
+        last_d = df_deriv_raw.iloc[-1]
+        btc_d = last_d.get('BTC Price', 0)
+        
+        def render_kpi_d(title, value, is_money=False, is_percent=False):
+            if pd.isna(value) or value == 0: color = "#a3a8b8"
+            else: color = "#00cc66" if value >= 0 else "#ff4d4d"
+            if is_money: val_str = f"${value:,.2f}"
+            elif is_percent: val_str = f"{value:.4f}%"
+            else: val_str = f"{value:,.0f}"
+            st.markdown(f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:{color}; font-size:0.95rem; font-weight:600;'>{title}</span><br><span style='color:{color}; font-size:1.4rem; font-weight:700;'>{val_str}</span></div>", unsafe_allow_html=True)
+
+        col_title, k1, k2, k3, k4, k5 = st.columns([1.5, 1, 1, 1, 1, 1], vertical_alignment="center")
+        
+        with col_title:
+            st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.4rem;'>Derivatives<br><span style='font-size: 1rem; color: #d1d4dc;'>OI & Funding Rates</span></h3></div>", unsafe_allow_html=True)
+            
+        with k1: st.markdown(f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:#a3a8b8; font-size:0.95rem; font-weight:600;'>Current BTC Price</span><br><span style='color:#ffffff; font-size:1.4rem; font-weight:700;'>${btc_d:,.2f}</span></div>", unsafe_allow_html=True)
+        with k2: render_kpi_d("Open Interest", last_d.get('Open Interest', 0), is_money=True)
+        with k3: render_kpi_d("Funding Rate", last_d.get('Funding Rate', 0), is_percent=True)
+        # K4 dan K5 dibiarkan kosong agar layout tetap stabil sesuai col rasio
+        
+        st.markdown("---")
+
+        df_d, w_d = apply_filters(df_deriv_raw, st.session_state.tf_d, st.session_state.sma_d, st.session_state.cs_d, st.session_state.tr_d, st.session_state.cd_d, ['Open Interest', 'Funding Rate'])
+
+        col_fs_d, col_tf_d, col_sma_d, col_sma_cst_d, col_radio_d, col_custom_d = st.columns([1, 1.2, 1.2, 1, 6, 1.2], vertical_alignment="bottom", gap="small")
+        with col_fs_d: focus_d = st.toggle("Full Screen", key="tg_d")
+        with col_tf_d: st.session_state.tf_d = st.selectbox("Timeframe", ["Daily", "3 Days", "Weekly", "Monthly"], index=["Daily", "3 Days", "Weekly", "Monthly"].index(st.session_state.tf_d), key="tfs_d")
+        with col_sma_d: st.session_state.sma_d = st.selectbox("SMA", ["0d", "7d", "14d", "30d", "Custom"], index=["0d", "7d", "14d", "30d", "Custom"].index(st.session_state.sma_d), key="smas_d")
+        with col_sma_cst_d:
+            if st.session_state.sma_d == "Custom": st.session_state.cs_d = st.number_input("Days", min_value=1, value=st.session_state.cs_d, label_visibility="collapsed", key="cst_d")
+        with col_radio_d:
+            c_idx_d = t_opts.index(st.session_state.tr_d) if st.session_state.tr_d in t_opts else 5
+            st.session_state.tr_d = st.radio("Range:", t_opts, index=c_idx_d, horizontal=True, label_visibility="collapsed", key="rg_d")
+        with col_custom_d:
+            if st.session_state.tr_d == "Custom": st.session_state.cd_d = st.number_input("Days back", min_value=7, value=st.session_state.cd_d, label_visibility="collapsed", key="cdin_d")
+        
+        opts_d_base = ['🟡 Open Interest', '📊 Funding Rate']
+        all_opts_d = opts_d_base.copy()
+        if w_d > 1: all_opts_d.extend([f"{m} (SMA {w_d})" for m in opts_d_base])
+            
+        try: active_metrics_d = st.pills("Metrics", all_opts_d, default=opts_d_base, selection_mode="multi", label_visibility="collapsed")
+        except: active_metrics_d = st.multiselect("Metrics", all_opts_d, default=opts_d_base, label_visibility="collapsed")
+
+        # SETUP 3 SKALA UNTUK DERIVATIVES: Kanan (BTC), Kiri (OI), Kiri Tambahan 'scale3' (Funding Rate)
+        chart_opts_d = {
+            "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, 
+            "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, 
+            "crosshair": {"mode": 0}, 
+            "height": 850 if focus_d else 650, 
+            "rightPriceScale": {"visible": True}, 
+            "leftPriceScale": {"visible": True},
+            "scale3": {"visible": True, "position": "left", "autoScale": True}
+        }
+        
+        series_d = [{"type": 'Line', "data": get_s(df_d, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
+
+        for m in active_metrics_d:
+            is_sma = "(SMA" in m
+            base_m = m.split(" (SMA")[0]
+            
+            if base_m == '🟡 Open Interest':
+                if is_sma:
+                    series_d.append({"type": 'Line', "data": get_s(df_d, 'Open Interest_SMA'), "options": {"color": '#eab308', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": "OI SMA"}})
+                else:
+                    # Open Interest sebagai garis
+                    series_d.append({"type": 'Line', "data": get_s(df_d, 'Open Interest'), "options": {"color": '#eab308', "lineWidth": 1, "priceScaleId": 'left', "title": 'Open Interest'}})
+            
+            elif base_m == '📊 Funding Rate':
+                if is_sma:
+                    series_d.append({"type": 'Line', "data": get_s(df_d, 'Funding Rate_SMA'), "options": {"color": '#ffffff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'scale3', "title": "Funding SMA"}})
+                else:
+                    # Funding Rate sebagai histogram hijau/merah
+                    funding_raw = get_s(df_d, 'Funding Rate')
+                    for d_val in funding_raw: d_val['color'] = '#00cc66' if d_val['value'] >= 0 else '#ff4d4d'
+                    series_d.append({"type": 'Histogram', "data": funding_raw, "options": {"priceScaleId": 'scale3', "title": 'Funding Rate'}})
+
+        renderLightweightCharts([{"chart": chart_opts_d, "series": series_d}], 'chart_deriv')
+
+    else:
+        st.info("Menunggu data Derivatives. Pastikan script auto_update.py sudah berjalan!")
