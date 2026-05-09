@@ -82,12 +82,8 @@ div[data-baseweb="select"] > div > div {
 }
 div[data-baseweb="select"] span {
     display: inline-block;
-
 }
-/* Menarik teks "Daily" atau "14d" sedikit ke atas agar presisi di tengah popup */
-div[data-baseweb="select"] span {
-    display: inline-block;
-    transform: translateY(-3px) !important;
+
 /* ======================================================
    C. MERAPIKAN SPASI UTAMA & MENCEGAH TEKS TERPOTONG
    ====================================================== */
