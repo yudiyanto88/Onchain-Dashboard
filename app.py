@@ -103,7 +103,7 @@ div[data-testid="stPill"] button {
 }
 </style>
 """, unsafe_allow_html=True)
-}
+
 # Inisialisasi Session State 
 for key in ['tr_p', 'tr_ms', 'tr_mpl', 'tr_d']:
     if key not in st.session_state: st.session_state[key] = "All Time"
