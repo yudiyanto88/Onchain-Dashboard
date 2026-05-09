@@ -260,7 +260,7 @@ if selected_menu == "Price Levels":
 
         chart_p_opts = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 850 if focus_p else 650}
         
-        series_p = [{"type": 'Line', "data": get_s(df_p, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "title": 'BTC Price'}}]
+        series_p = [{"type": 'Line', "data": get_s(df_p, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
         
         colors_p = {'🔴 STH Cost Basis': ('#ff4d4d', 'STH Cost Basis'), '🔵 LTH Cost Basis': ('#4da6ff', 'LTH Cost Basis'), '⚪ Realized Price': ('#ffffff', 'Realized Price'), '🟣 True Market Mean': ('#cc33ff', 'True Market Mean'), '🟢 CVDD': ('#00cc66', 'CVDD')}
         
@@ -270,8 +270,8 @@ if selected_menu == "Price Levels":
             if base_m in colors_p:
                 m_color = colors_p[base_m][0]
                 m_name = colors_p[base_m][1]
-                if is_sma: series_p.append({"type": 'Line', "data": get_s(df_p, f"{m_name}_SMA"), "options": {"color": m_color, "lineWidth": 1, "lineStyle": 2, "title": f"{m_name} SMA"}})
-                else: series_p.append({"type": 'Line', "data": get_s(df_p, m_name), "options": {"color": m_color, "lineWidth": 1, "title": m_name}})
+                if is_sma: series_p.append({"type": 'Line', "data": get_s(df_p, f"{m_name}_SMA"), "options": {"color": m_color, "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": f"{m_name} SMA"}})
+                else: series_p.append({"type": 'Line', "data": get_s(df_p, m_name), "options": {"color": m_color, "lineWidth": 1, "priceScaleId": 'left', "title": m_name}})
                     
         renderLightweightCharts([{"chart": chart_p_opts, "series": series_p}], 'chart_price')
 
@@ -332,7 +332,7 @@ elif selected_menu == "Profit & Loss":
             "height": 850 if focus_ms else 650, 
             "rightPriceScale": {"visible": True}, 
             "leftPriceScale": {"visible": True},
-            "scale3": {"visible": True, "position": "left"} # Skala ke-3 diaktifkan
+            "lth_scale": {"visible": True, "position": "left", "autoScale": True}
         }
         
         series_sopr = [{"type": 'Line', "data": get_s(df_ms, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
@@ -340,16 +340,31 @@ elif selected_menu == "Profit & Loss":
         df_ms['Neutral_Line'] = 1.0
         series_sopr.append({"type": 'Line', "data": get_s(df_ms, 'Neutral_Line'), "options": {"color": '#ffffff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": 'Neutral (1.0)'}})
 
-        colors_sopr = {'🔵 aSOPR': ('#00e6e6', 'aSOPR'), '🔴 STH SOPR': ('#ff4d4d', 'STH SOPR'), '🟢 LTH SOPR': ('#00cc66', 'LTH SOPR')}
-        
+        # Menambahkan opasitas 70% (-30%) khusus pada garis RAW SOPR
         for m in sel_sopr:
             is_sma = "(SMA" in m
             base_m = m.split(" (SMA")[0]
-            if base_m in colors_sopr:
-                c_col, c_name = colors_sopr[base_m]
-                target_scale = "scale3" if base_m == '🟢 LTH SOPR' else "left"
-                if is_sma: series_sopr.append({"type": 'Line', "data": get_s(df_ms, f"{c_name}_SMA"), "options": {"color": c_col, "lineWidth": 1, "lineStyle": 2, "priceScaleId": target_scale, "title": f"{c_name} SMA"}})
-                else: series_sopr.append({"type": 'Line', "data": get_s(df_ms, c_name), "options": {"color": c_col, "lineWidth": 1, "priceScaleId": target_scale, "title": c_name}})
+            
+            target_scale = "lth_scale" if base_m == '🟢 LTH SOPR' else "left"
+            
+            if base_m == '🔵 aSOPR': 
+                c_col = '#00e6e6'
+                c_col_raw = 'rgba(0, 230, 230, 0.7)'
+                c_name = 'aSOPR'
+            elif base_m == '🔴 STH SOPR': 
+                c_col = '#ff4d4d'
+                c_col_raw = 'rgba(255, 77, 77, 0.7)'
+                c_name = 'STH SOPR'
+            elif base_m == '🟢 LTH SOPR': 
+                c_col = '#00cc66'
+                c_col_raw = 'rgba(0, 204, 102, 0.7)'
+                c_name = 'LTH SOPR'
+            else: continue
+            
+            if is_sma: 
+                series_sopr.append({"type": 'Line', "data": get_s(df_ms, f"{c_name}_SMA"), "options": {"color": c_col, "lineWidth": 1, "lineStyle": 2, "priceScaleId": target_scale, "title": f"{c_name} SMA"}})
+            else: 
+                series_sopr.append({"type": 'Line', "data": get_s(df_ms, c_name), "options": {"color": c_col_raw, "lineWidth": 1, "priceScaleId": target_scale, "title": c_name}})
         
         renderLightweightCharts([{"chart": chart_opts_sopr, "series": series_sopr}], 'chart_sopr')
         
@@ -391,7 +406,7 @@ elif selected_menu == "Profit & Loss":
         try: sel_pl = st.pills("P/L Metrics", all_opts_pl, default=['⚪ Net Realized PL'], selection_mode="multi", label_visibility="collapsed")
         except: sel_pl = st.multiselect("P/L Metrics", all_opts_pl, default=['⚪ Net Realized PL'], label_visibility="collapsed")
 
-        # 3 SKALA DIHADIRKAN SEMUA
+        # FIX 3 SKALA UNTUK REALIZED P&L (BTC: Kanan, Net PL: Kiri, P/L Ratio: Kiri ke-2)
         chart_opts_pl = {
             "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, 
             "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, 
@@ -399,30 +414,37 @@ elif selected_menu == "Profit & Loss":
             "height": 850 if focus_mpl else 650, 
             "rightPriceScale": {"visible": True},            
             "leftPriceScale": {"visible": True},             
-            "scale3": {"visible": True, "position": "left"}  # Skala ke-3 diaktifkan
+            "ratio_scale": {"visible": True, "position": "left", "autoScale": True}  
         }
         
         series_pl = [{"type": 'Line', "data": get_s(df_mpl, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
 
-        colors_pl = {'🟣 STH P/L Ratio': ('#cc33ff', 'STH P/L Ratio'), '🟤 LTH P/L Ratio': ('#cc9966', 'LTH P/L Ratio')}
-        
         for m in sel_pl:
             is_sma = "(SMA" in m
             base_m = m.split(" (SMA")[0]
             
-            if base_m in colors_pl:
-                c_col, c_name = colors_pl[base_m]
-                # P/L Ratio dipetakan ke skala 3
-                if is_sma: series_pl.append({"type": 'Line', "data": get_s(df_mpl, f"{c_name}_SMA"), "options": {"color": c_col, "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'scale3', "title": f"{c_name} SMA"}})
-                else: series_pl.append({"type": 'Line', "data": get_s(df_mpl, c_name), "options": {"color": c_col, "lineWidth": 1, "priceScaleId": 'scale3', "title": c_name}})
+            # Pengurangan opasitas -30% (menjadi 70%) untuk Ratio P/L
+            if base_m == '🟣 STH P/L Ratio':
+                c_col = '#cc33ff'
+                c_col_rgba = 'rgba(204, 51, 255, 0.7)'
+                c_name = 'STH P/L Ratio'
+                if is_sma: series_pl.append({"type": 'Line', "data": get_s(df_mpl, f"{c_name}_SMA"), "options": {"color": c_col_rgba, "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'ratio_scale', "title": f"{c_name} SMA"}})
+                else: series_pl.append({"type": 'Line', "data": get_s(df_mpl, c_name), "options": {"color": c_col_rgba, "lineWidth": 1, "priceScaleId": 'ratio_scale', "title": c_name}})
+            
+            elif base_m == '🟤 LTH P/L Ratio':
+                c_col = '#cc9966'
+                c_col_rgba = 'rgba(204, 153, 102, 0.7)'
+                c_name = 'LTH P/L Ratio'
+                if is_sma: series_pl.append({"type": 'Line', "data": get_s(df_mpl, f"{c_name}_SMA"), "options": {"color": c_col_rgba, "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'ratio_scale', "title": f"{c_name} SMA"}})
+                else: series_pl.append({"type": 'Line', "data": get_s(df_mpl, c_name), "options": {"color": c_col_rgba, "lineWidth": 1, "priceScaleId": 'ratio_scale', "title": c_name}})
             
             elif base_m == '⚪ Net Realized PL':
                 if is_sma:
                     series_pl.append({"type": 'Line', "data": get_s(df_mpl, 'Net Realized PL_SMA'), "options": {"color": '#ffffff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": "Net PL SMA"}})
                 else:
                     net_pl_raw = get_s(df_mpl, 'Net Realized PL')
-                    # Opacity dikurangi menjadi 0.35 (35%)
-                    for d in net_pl_raw: d['color'] = 'rgba(0, 204, 102, 0.35)' if d['value'] >= 0 else 'rgba(255, 77, 77, 0.35)'
+                    # Pengurangan opasitas -30% (menjadi 70%) untuk warna hijau dan merah Net PL
+                    for d in net_pl_raw: d['color'] = 'rgba(0, 204, 102, 0.7)' if d['value'] >= 0 else 'rgba(255, 77, 77, 0.7)'
                     series_pl.append({"type": 'Histogram', "data": net_pl_raw, "options": {"priceScaleId": 'left', "title": 'Net PL Raw'}})
 
         renderLightweightCharts([{"chart": chart_opts_pl, "series": series_pl}], 'chart_netpl')
@@ -468,7 +490,6 @@ elif selected_menu == "Derivatives":
         with col_custom_d:
             if st.session_state.tr_d == "Custom": st.session_state.cd_d = st.number_input("Days back", min_value=7, value=st.session_state.cd_d, label_visibility="collapsed", key="cdin_d")
         
-        # Warna dan label Open Interest diubah menjadi Biru Terang
         opts_d_base = ['🔵 Open Interest', '📊 Funding Rate']
         all_opts_d = opts_d_base.copy()
         if w_d > 1: all_opts_d.extend([f"{m} (SMA {w_d})" for m in opts_d_base])
@@ -476,6 +497,7 @@ elif selected_menu == "Derivatives":
         try: active_metrics_d = st.pills("Metrics", all_opts_d, default=opts_d_base, selection_mode="multi", label_visibility="collapsed")
         except: active_metrics_d = st.multiselect("Metrics", all_opts_d, default=opts_d_base, label_visibility="collapsed")
 
+        # FIX 3 SKALA UNTUK DERIVATIVES (BTC: Kanan, OI: Kiri Utama, Funding: Kiri Custom)
         chart_opts_d = {
             "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, 
             "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, 
@@ -483,7 +505,7 @@ elif selected_menu == "Derivatives":
             "height": 850 if focus_d else 650, 
             "rightPriceScale": {"visible": True}, 
             "leftPriceScale": {"visible": True},
-            "scale3": {"visible": True, "position": "left"} # Skala ke-3 diaktifkan
+            "funding_scale": {"visible": True, "position": "left", "autoScale": True} 
         }
         
         series_d = [{"type": 'Line', "data": get_s(df_d, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
@@ -496,17 +518,16 @@ elif selected_menu == "Derivatives":
                 if is_sma:
                     series_d.append({"type": 'Line', "data": get_s(df_d, 'Open Interest_SMA'), "options": {"color": '#4da6ff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": "OI SMA"}})
                 else:
-                    # Warna diubah jadi biru terang (#4da6ff)
                     series_d.append({"type": 'Line', "data": get_s(df_d, 'Open Interest'), "options": {"color": '#4da6ff', "lineWidth": 1, "priceScaleId": 'left', "title": 'Open Interest'}})
             
             elif base_m == '📊 Funding Rate':
                 if is_sma:
-                    series_d.append({"type": 'Line', "data": get_s(df_d, 'Funding Rate_SMA'), "options": {"color": '#ffffff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'scale3', "title": "Funding SMA"}})
+                    series_d.append({"type": 'Line', "data": get_s(df_d, 'Funding Rate_SMA'), "options": {"color": '#ffffff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'funding_scale', "title": "Funding SMA"}})
                 else:
                     funding_raw = get_s(df_d, 'Funding Rate')
-                    # Opacity dikurangi menjadi 0.35 (35%)
-                    for d_val in funding_raw: d_val['color'] = 'rgba(0, 204, 102, 0.35)' if d_val['value'] >= 0 else 'rgba(255, 77, 77, 0.35)'
-                    series_d.append({"type": 'Histogram', "data": funding_raw, "options": {"priceScaleId": 'scale3', "title": 'Funding Rate'}})
+                    # Pengurangan opasitas -30% (menjadi 70%) untuk warna hijau dan merah Funding Rate
+                    for d_val in funding_raw: d_val['color'] = 'rgba(0, 204, 102, 0.7)' if d_val['value'] >= 0 else 'rgba(255, 77, 77, 0.7)'
+                    series_d.append({"type": 'Histogram', "data": funding_raw, "options": {"priceScaleId": 'funding_scale', "title": 'Funding Rate'}})
 
         renderLightweightCharts([{"chart": chart_opts_d, "series": series_d}], 'chart_deriv')
 
