@@ -69,20 +69,12 @@ div[data-testid="stNumberInput"] label {
     min-height: 0px !important;
 }
 
-/* Memotong Tinggi Selectbox & Presisi Tengah Vertikal (Hack TranslateY) */
+/* Memotong Tinggi Selectbox & Presisi Tengah Vertikal */
 div[data-baseweb="select"] > div {
     min-height: 32px !important;
     height: 32px !important;
     border-radius: 6px !important;
-}
-div[data-baseweb="select"] > div > div {
-    padding-top: 0px !important;
-    padding-bottom: 0px !important;
-}
-/* Menarik teks "Daily" atau "14d" sedikit ke atas agar presisi di tengah popup */
-div[data-baseweb="select"] span {
-    display: inline-block;
-    transform: translateY(-3px) !important;
+    padding-bottom: 4px !important; /* CSS HACK: Mengangkat teks sedikit ke tengah */
 }
 
 /* ======================================================
@@ -101,7 +93,7 @@ div[data-testid="stPill"] button {
 </style>
 """, unsafe_allow_html=True)
 
-# Inisialisasi Session State (Termasuk untuk tab Derivatives '_d')
+# Inisialisasi Session State
 for key in ['tr_p', 'tr_ms', 'tr_mpl', 'tr_d']:
     if key not in st.session_state: st.session_state[key] = "All Time"
 for key in ['cd_p', 'cd_ms', 'cd_mpl', 'cd_d']:
@@ -138,7 +130,6 @@ def load_data_momentum():
 def load_data_derivatives():
     try:
         df = pd.read_csv("data_derivatives.csv")
-        # Menyesuaikan nama kolom hasil dari auto_update.py
         df.rename(columns={'date': 'Date', 'btc_price': 'BTC Price', 'total_oi': 'Open Interest', 'funding_rate': 'Funding Rate'}, inplace=True)
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
         return df.dropna(subset=['Date']).sort_values('Date')
@@ -151,21 +142,28 @@ df_deriv_raw = load_data_derivatives()
 def apply_filters(df, res_state, smooth_state, custom_smooth, time_state, custom_days, metrics_to_smooth):
     if df.empty: return df, 1
     dff = df.copy()
-    if res_state != "Daily":
-        dff.set_index('Date', inplace=True)
-        if res_state == "3 Days": dff = dff.resample('3D').last()
-        elif res_state == "Weekly": dff = dff.resample('W').last()
-        elif res_state == "Monthly": dff = dff.resample('ME').last()
-        dff.reset_index(inplace=True)
+    
+    # PERBAIKAN FATAL: Memastikan data tanggal unik (Menghindari chart nge-blank akibat intraday)
+    dff.set_index('Date', inplace=True)
+    if res_state == "Daily": dff = dff.resample('D').last()
+    elif res_state == "3 Days": dff = dff.resample('3D').last()
+    elif res_state == "Weekly": dff = dff.resample('W-MON').last()
+    elif res_state == "Monthly": dff = dff.resample('ME').last()
+    
+    dff.dropna(how='all', inplace=True)
+    dff.reset_index(inplace=True)
+    
     w = 1
     if smooth_state == "7d": w = 7
     elif smooth_state == "14d": w = 14
     elif smooth_state == "30d": w = 30
     elif smooth_state == "Custom": w = custom_smooth
+    
     if w > 1:
         for c in metrics_to_smooth:
             if c in dff.columns:
                 dff[f"{c}_SMA"] = dff[c].rolling(w, min_periods=1).mean()
+                
     t_max = dff['Date'].max()
     if time_state == "1 Month": t_min = t_max - timedelta(days=30)
     elif time_state == "3 Months": t_min = t_max - timedelta(days=90)
@@ -174,6 +172,7 @@ def apply_filters(df, res_state, smooth_state, custom_smooth, time_state, custom
     elif time_state == "4 Years (Cycle)": t_min = t_max - timedelta(days=365 * 4)
     elif time_state == "Custom": t_min = t_max - timedelta(days=custom_days)
     else: t_min = dff['Date'].min()
+    
     dff = dff[dff['Date'] >= t_min].copy()
     dff['Date_str'] = dff['Date'].dt.strftime('%Y-%m-%d')
     return dff, w
@@ -201,9 +200,6 @@ with st.sidebar:
 # 4. MAIN DASHBOARD RENDER
 # ==============================================================================
 
-# ------------------------------------------------------------------------------
-# TAB 1: PRICE LEVELS
-# ------------------------------------------------------------------------------
 if selected_menu == "Price Levels":
     if not df_price_raw.empty:
         df_p, w_p = apply_filters(df_price_raw, st.session_state.tf_p, st.session_state.sma_p, st.session_state.cs_p, st.session_state.tr_p, st.session_state.cd_p, ['STH Cost Basis', 'LTH Cost Basis', 'Realized Price', 'True Market Mean', 'CVDD'])
@@ -270,9 +266,6 @@ if selected_menu == "Price Levels":
                     
         renderLightweightCharts([{"chart": chart_p_opts, "series": series_p}], 'chart_price')
 
-# ------------------------------------------------------------------------------
-# TAB 2: PROFIT & LOSS 
-# ------------------------------------------------------------------------------
 elif selected_menu == "Profit & Loss":
     if not df_mom_raw.empty:
         last_m = df_mom_raw.iloc[-1]
@@ -386,7 +379,6 @@ elif selected_menu == "Profit & Loss":
         try: sel_pl = st.pills("P/L Metrics", all_opts_pl, default=['⚪ Net Realized PL'], selection_mode="multi", label_visibility="collapsed")
         except: sel_pl = st.multiselect("P/L Metrics", all_opts_pl, default=['⚪ Net Realized PL'], label_visibility="collapsed")
 
-        # FIX 3 SKALA: Kanan (BTC), Kiri Default (NetPL Histogram), Kiri Custom 'scale3' (STH/LTH Ratios)
         chart_opts_pl = {
             "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, 
             "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, 
@@ -407,12 +399,10 @@ elif selected_menu == "Profit & Loss":
             
             if base_m in colors_pl:
                 c_col, c_name = colors_pl[base_m]
-                # P/L Ratio WAJIB masuk ke skala terpisah 'scale3' agar tidak gepeng
                 if is_sma: series_pl.append({"type": 'Line', "data": get_s(df_mpl, f"{c_name}_SMA"), "options": {"color": c_col, "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'scale3', "title": f"{c_name} SMA"}})
                 else: series_pl.append({"type": 'Line', "data": get_s(df_mpl, c_name), "options": {"color": c_col, "lineWidth": 1, "priceScaleId": 'scale3', "title": c_name}})
             
             elif base_m == '⚪ Net Realized PL':
-                # Net Realized PL ke skala kiri utama 'left'
                 if is_sma:
                     series_pl.append({"type": 'Line', "data": get_s(df_mpl, 'Net Realized PL_SMA'), "options": {"color": '#ffffff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": "Net PL SMA"}})
                 else:
@@ -446,7 +436,6 @@ elif selected_menu == "Derivatives":
         with k1: st.markdown(f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:#a3a8b8; font-size:0.95rem; font-weight:600;'>Current BTC Price</span><br><span style='color:#ffffff; font-size:1.4rem; font-weight:700;'>${btc_d:,.2f}</span></div>", unsafe_allow_html=True)
         with k2: render_kpi_d("Open Interest", last_d.get('Open Interest', 0), is_money=True)
         with k3: render_kpi_d("Funding Rate", last_d.get('Funding Rate', 0), is_percent=True)
-        # K4 dan K5 dibiarkan kosong agar layout tetap stabil sesuai col rasio
         
         st.markdown("---")
 
@@ -471,7 +460,6 @@ elif selected_menu == "Derivatives":
         try: active_metrics_d = st.pills("Metrics", all_opts_d, default=opts_d_base, selection_mode="multi", label_visibility="collapsed")
         except: active_metrics_d = st.multiselect("Metrics", all_opts_d, default=opts_d_base, label_visibility="collapsed")
 
-        # SETUP 3 SKALA UNTUK DERIVATIVES: Kanan (BTC), Kiri (OI), Kiri Tambahan 'scale3' (Funding Rate)
         chart_opts_d = {
             "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, 
             "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, 
@@ -492,14 +480,12 @@ elif selected_menu == "Derivatives":
                 if is_sma:
                     series_d.append({"type": 'Line', "data": get_s(df_d, 'Open Interest_SMA'), "options": {"color": '#eab308', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": "OI SMA"}})
                 else:
-                    # Open Interest sebagai garis
                     series_d.append({"type": 'Line', "data": get_s(df_d, 'Open Interest'), "options": {"color": '#eab308', "lineWidth": 1, "priceScaleId": 'left', "title": 'Open Interest'}})
             
             elif base_m == '📊 Funding Rate':
                 if is_sma:
                     series_d.append({"type": 'Line', "data": get_s(df_d, 'Funding Rate_SMA'), "options": {"color": '#ffffff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'scale3', "title": "Funding SMA"}})
                 else:
-                    # Funding Rate sebagai histogram hijau/merah
                     funding_raw = get_s(df_d, 'Funding Rate')
                     for d_val in funding_raw: d_val['color'] = '#00cc66' if d_val['value'] >= 0 else '#ff4d4d'
                     series_d.append({"type": 'Histogram', "data": funding_raw, "options": {"priceScaleId": 'scale3', "title": 'Funding Rate'}})
@@ -507,4 +493,4 @@ elif selected_menu == "Derivatives":
         renderLightweightCharts([{"chart": chart_opts_d, "series": series_d}], 'chart_deriv')
 
     else:
-        st.info("Menunggu data Derivatives. Pastikan script auto_update.py sudah berjalan!")
+        st.info("Menunggu data Derivatives. Pastikan script auto_update.py sudah berjalan dan membuat data_derivatives.csv!")
