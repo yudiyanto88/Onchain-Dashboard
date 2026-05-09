@@ -41,7 +41,6 @@ df_net_pl = fetch_data("https://chartinspect.com/api/onchain/net-realized-pl?tim
 df_age = fetch_data("https://chartinspect.com/api/onchain/realized-profit-by-age?timeframe=all&isProUser=false")
 
 if not df_age.empty:
-    # Mengkalkulasi STH (Bands 0-4) dan LTH (Bands 5-11) P/L Ratio
     sth_prof = df_age[[f'band_{i}_profit_usd' for i in range(5)]].sum(axis=1)
     sth_loss = df_age[[f'band_{i}_loss_usd' for i in range(5)]].sum(axis=1)
     df_age['sth_pl_ratio'] = np.where(sth_loss == 0, np.nan, sth_prof / sth_loss)
@@ -54,7 +53,6 @@ if not df_age.empty:
 else:
     df_age_clean = pd.DataFrame(columns=['date', 'sth_pl_ratio', 'lth_pl_ratio'])
 
-# Menjahit semua data Momentum
 dfs = [df_sopr, df_lth_sopr, df_sth_sopr, df_net_pl, df_age_clean]
 df_master_mom = dfs[0]
 for d in dfs[1:]:
@@ -65,5 +63,20 @@ if not df_master_mom.empty:
     df_master_mom['date'] = pd.to_datetime(df_master_mom['date'])
     df_master_mom.sort_values('date').to_csv("data_momentum.csv", index=False)
     print("✅ data_momentum.csv berhasil diperbarui.")
+
+# ==========================================
+# 3. PIPELINE: DERIVATIVES
+# ==========================================
+print("Menarik data Derivatives...")
+df_funding = fetch_data("https://chartinspect.com/api/charts/derivatives/futures-funding-rates?timeframe=all", ['date', 'btc_price', 'funding_rate'])
+df_oi = fetch_data("https://chartinspect.com/api/charts/derivatives/futures-open-interest?timeframe=all", ['date', 'total_oi'])
+
+if not df_funding.empty and not df_oi.empty:
+    # Memisahkan btc_price agar tidak berbenturan saat merge
+    df_oi_clean = df_oi[['date', 'total_oi']]
+    df_master_deriv = pd.merge(df_funding, df_oi_clean, on='date', how='outer')
+    df_master_deriv['date'] = pd.to_datetime(df_master_deriv['date'])
+    df_master_deriv.sort_values('date').to_csv("data_derivatives.csv", index=False)
+    print("✅ data_derivatives.csv berhasil diperbarui.")
 
 print("Semua proses selesai!")
