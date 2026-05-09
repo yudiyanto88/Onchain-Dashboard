@@ -74,7 +74,7 @@ div[data-baseweb="select"] > div {
     min-height: 32px !important;
     height: 32px !important;
     border-radius: 6px !important;
-    padding-bottom: 2px !important; /* Menaikkan kotak sedikit agar teks di tengah */
+    padding-bottom: 2px !important;
 }
 div[data-baseweb="select"] > div > div {
     padding-top: 0px !important;
@@ -332,7 +332,7 @@ elif selected_menu == "Profit & Loss":
             "height": 850 if focus_ms else 650, 
             "rightPriceScale": {"visible": True}, 
             "leftPriceScale": {"visible": True},
-            "scale3": {"visible": False} 
+            "scale3": {"visible": True, "position": "left"} # Skala ke-3 diaktifkan
         }
         
         series_sopr = [{"type": 'Line', "data": get_s(df_ms, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
@@ -391,6 +391,7 @@ elif selected_menu == "Profit & Loss":
         try: sel_pl = st.pills("P/L Metrics", all_opts_pl, default=['⚪ Net Realized PL'], selection_mode="multi", label_visibility="collapsed")
         except: sel_pl = st.multiselect("P/L Metrics", all_opts_pl, default=['⚪ Net Realized PL'], label_visibility="collapsed")
 
+        # 3 SKALA DIHADIRKAN SEMUA
         chart_opts_pl = {
             "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, 
             "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, 
@@ -398,7 +399,7 @@ elif selected_menu == "Profit & Loss":
             "height": 850 if focus_mpl else 650, 
             "rightPriceScale": {"visible": True},            
             "leftPriceScale": {"visible": True},             
-            "scale3": {"visible": False}  
+            "scale3": {"visible": True, "position": "left"}  # Skala ke-3 diaktifkan
         }
         
         series_pl = [{"type": 'Line', "data": get_s(df_mpl, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
@@ -411,6 +412,7 @@ elif selected_menu == "Profit & Loss":
             
             if base_m in colors_pl:
                 c_col, c_name = colors_pl[base_m]
+                # P/L Ratio dipetakan ke skala 3
                 if is_sma: series_pl.append({"type": 'Line', "data": get_s(df_mpl, f"{c_name}_SMA"), "options": {"color": c_col, "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'scale3', "title": f"{c_name} SMA"}})
                 else: series_pl.append({"type": 'Line', "data": get_s(df_mpl, c_name), "options": {"color": c_col, "lineWidth": 1, "priceScaleId": 'scale3', "title": c_name}})
             
@@ -419,7 +421,8 @@ elif selected_menu == "Profit & Loss":
                     series_pl.append({"type": 'Line', "data": get_s(df_mpl, 'Net Realized PL_SMA'), "options": {"color": '#ffffff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": "Net PL SMA"}})
                 else:
                     net_pl_raw = get_s(df_mpl, 'Net Realized PL')
-                    for d in net_pl_raw: d['color'] = '#00cc66' if d['value'] >= 0 else '#ff4d4d'
+                    # Opacity dikurangi menjadi 0.35 (35%)
+                    for d in net_pl_raw: d['color'] = 'rgba(0, 204, 102, 0.35)' if d['value'] >= 0 else 'rgba(255, 77, 77, 0.35)'
                     series_pl.append({"type": 'Histogram', "data": net_pl_raw, "options": {"priceScaleId": 'left', "title": 'Net PL Raw'}})
 
         renderLightweightCharts([{"chart": chart_opts_pl, "series": series_pl}], 'chart_netpl')
@@ -465,6 +468,7 @@ elif selected_menu == "Derivatives":
         with col_custom_d:
             if st.session_state.tr_d == "Custom": st.session_state.cd_d = st.number_input("Days back", min_value=7, value=st.session_state.cd_d, label_visibility="collapsed", key="cdin_d")
         
+        # Warna dan label Open Interest diubah menjadi Biru Terang
         opts_d_base = ['🔵 Open Interest', '📊 Funding Rate']
         all_opts_d = opts_d_base.copy()
         if w_d > 1: all_opts_d.extend([f"{m} (SMA {w_d})" for m in opts_d_base])
@@ -479,7 +483,7 @@ elif selected_menu == "Derivatives":
             "height": 850 if focus_d else 650, 
             "rightPriceScale": {"visible": True}, 
             "leftPriceScale": {"visible": True},
-            "scale3": {"visible": False} 
+            "scale3": {"visible": True, "position": "left"} # Skala ke-3 diaktifkan
         }
         
         series_d = [{"type": 'Line', "data": get_s(df_d, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
@@ -492,6 +496,7 @@ elif selected_menu == "Derivatives":
                 if is_sma:
                     series_d.append({"type": 'Line', "data": get_s(df_d, 'Open Interest_SMA'), "options": {"color": '#4da6ff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": "OI SMA"}})
                 else:
+                    # Warna diubah jadi biru terang (#4da6ff)
                     series_d.append({"type": 'Line', "data": get_s(df_d, 'Open Interest'), "options": {"color": '#4da6ff', "lineWidth": 1, "priceScaleId": 'left', "title": 'Open Interest'}})
             
             elif base_m == '📊 Funding Rate':
@@ -499,7 +504,8 @@ elif selected_menu == "Derivatives":
                     series_d.append({"type": 'Line', "data": get_s(df_d, 'Funding Rate_SMA'), "options": {"color": '#ffffff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'scale3', "title": "Funding SMA"}})
                 else:
                     funding_raw = get_s(df_d, 'Funding Rate')
-                    for d_val in funding_raw: d_val['color'] = '#00cc66' if d_val['value'] >= 0 else '#ff4d4d'
+                    # Opacity dikurangi menjadi 0.35 (35%)
+                    for d_val in funding_raw: d_val['color'] = 'rgba(0, 204, 102, 0.35)' if d_val['value'] >= 0 else 'rgba(255, 77, 77, 0.35)'
                     series_d.append({"type": 'Histogram', "data": funding_raw, "options": {"priceScaleId": 'scale3', "title": 'Funding Rate'}})
 
         renderLightweightCharts([{"chart": chart_opts_d, "series": series_d}], 'chart_deriv')
