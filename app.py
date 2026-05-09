@@ -143,8 +143,7 @@ def load_data_derivatives():
         df.rename(columns={'date': 'Date', 'btc_price': 'BTC Price', 'total_oi': 'Open Interest', 'funding_rate': 'Funding Rate'}, inplace=True)
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
         df = df.dropna(subset=['Date']).sort_values('Date')
-        # INI KUNCI UTAMA FIX CHART BLANK: Membuang duplikat jam dari ChartInspect
-        return df.drop_duplicates(subset=['Date'], keep='last') 
+        return df.drop_duplicates(subset=['Date'], keep='last') # Kunci agar chart tidak blank
     except: return pd.DataFrame()
 
 df_price_raw = load_data_price()
@@ -182,7 +181,6 @@ def apply_filters(df, res_state, smooth_state, custom_smooth, time_state, custom
     return dff, w
 
 def get_s(df, col): 
-    # Pastikan data yang dikirim ke chart bebas dari baris yang isinya NaN agar tidak crash
     if col not in df.columns: return []
     clean_df = df[['Date_str', col]].dropna()
     return clean_df.rename(columns={'Date_str':'time', col:'value'}).to_dict('records')
@@ -219,7 +217,10 @@ if selected_menu == "Price Levels":
         btc_p = last_p.get('BTC Price', 0)
         
         def render_kpi_p(title, value, is_btc=False):
-            if is_btc or pd.isna(value) or value == 0: c, tc, d = "#ffffff", "#a3a8b8", ""
+            if is_btc: 
+                c, tc, d = "#f7931a", "#a3a8b8", ""  # UPDATE: Warna Current BTC Price di KPI menjadi warna Bitcoin Asli
+            elif pd.isna(value) or value == 0: 
+                c, tc, d = "#ffffff", "#a3a8b8", ""
             else:
                 dp = ((btc_p - value) / btc_p) * 100
                 ip = dp >= 0
@@ -262,7 +263,7 @@ if selected_menu == "Price Levels":
 
         chart_p_opts = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 850 if focus_p else 650}
         
-        series_p = [{"type": 'Line', "data": get_s(df_p, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "title": 'BTC Price'}}]
+        series_p = [{"type": 'Line', "data": get_s(df_p, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
         
         colors_p = {'🔴 STH Cost Basis': ('#ff4d4d', 'STH Cost Basis'), '🔵 LTH Cost Basis': ('#4da6ff', 'LTH Cost Basis'), '⚪ Realized Price': ('#ffffff', 'Realized Price'), '🟣 True Market Mean': ('#cc33ff', 'True Market Mean'), '🟢 CVDD': ('#00cc66', 'CVDD')}
         
@@ -299,7 +300,7 @@ elif selected_menu == "Profit & Loss":
         with col_title_1:
             st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.4rem;'>Profit & Loss<br><span style='font-size: 1rem; color: #d1d4dc;'>SOPR Metric</span></h3></div>", unsafe_allow_html=True)
             
-        with k1_1: st.markdown(f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:#a3a8b8; font-size:0.95rem; font-weight:600;'>Current BTC Price</span><br><span style='color:#ffffff; font-size:1.4rem; font-weight:700;'>${btc_m:,.2f}</span></div>", unsafe_allow_html=True)
+        with k1_1: st.markdown(f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:#a3a8b8; font-size:0.95rem; font-weight:600;'>Current BTC Price</span><br><span style='color:#f7931a; font-size:1.4rem; font-weight:700;'>${btc_m:,.2f}</span></div>", unsafe_allow_html=True)  # UPDATE: Warna BTC #f7931a
         with k2_1: render_kpi_m("aSOPR", last_m.get('aSOPR', 0), 1.0)
         with k3_1: render_kpi_m("LTH SOPR", last_m.get('LTH SOPR', 0), 1.0)
         with k4_1: render_kpi_m("STH SOPR", last_m.get('STH SOPR', 0), 1.0)
@@ -327,7 +328,6 @@ elif selected_menu == "Profit & Loss":
         try: sel_sopr = st.pills("SOPR Metrics", all_opts_sopr, default=['🔵 aSOPR', '🟢 LTH SOPR'], selection_mode="multi", label_visibility="collapsed")
         except: sel_sopr = st.multiselect("SOPR Metrics", all_opts_sopr, default=['🔵 aSOPR', '🟢 LTH SOPR'], label_visibility="collapsed")
 
-        # Mengamankan skala ke-3 agar tidak tumpang tindih
         chart_opts_sopr = {
             "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, 
             "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, 
@@ -366,7 +366,7 @@ elif selected_menu == "Profit & Loss":
         with col_title_2:
             st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.4rem;'>Profit & Loss<br><span style='font-size: 1rem; color: #d1d4dc;'>Realized P&L Metric</span></h3></div>", unsafe_allow_html=True)
             
-        with k1_2: st.markdown(f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:#a3a8b8; font-size:0.95rem; font-weight:600;'>Current BTC Price</span><br><span style='color:#ffffff; font-size:1.4rem; font-weight:700;'>${btc_m:,.2f}</span></div>", unsafe_allow_html=True)
+        with k1_2: st.markdown(f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:#a3a8b8; font-size:0.95rem; font-weight:600;'>Current BTC Price</span><br><span style='color:#f7931a; font-size:1.4rem; font-weight:700;'>${btc_m:,.2f}</span></div>", unsafe_allow_html=True) # UPDATE: Warna BTC #f7931a
         with k2_2: render_kpi_m("Net Realized PL", last_m.get('Net Realized PL', 0), 0.0, True)
         with k3_2: render_kpi_m("STH P/L Ratio", last_m.get('STH P/L Ratio', 0), 1.0)
         with k4_2: render_kpi_m("LTH P/L Ratio", last_m.get('LTH P/L Ratio', 0), 1.0)
@@ -394,16 +394,7 @@ elif selected_menu == "Profit & Loss":
         try: sel_pl = st.pills("P/L Metrics", all_opts_pl, default=['⚪ Net Realized PL'], selection_mode="multi", label_visibility="collapsed")
         except: sel_pl = st.multiselect("P/L Metrics", all_opts_pl, default=['⚪ Net Realized PL'], label_visibility="collapsed")
 
-        # 3 SKALA UNTUK REALIZED P&L CHART (Scale 3 disembunyikan labelnya agar UI rapi)
-        chart_opts_pl = {
-            "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, 
-            "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, 
-            "crosshair": {"mode": 0}, 
-            "height": 850 if focus_mpl else 650, 
-            "rightPriceScale": {"visible": True},            
-            "leftPriceScale": {"visible": True},             
-            "scale3": {"visible": False}  
-        }
+        chart_opts_pl = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 850 if focus_mpl else 650, "rightPriceScale": {"visible": True}, "leftPriceScale": {"visible": True}, "scale3": {"visible": False}}
         
         series_pl = [{"type": 'Line', "data": get_s(df_mpl, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
 
@@ -415,12 +406,10 @@ elif selected_menu == "Profit & Loss":
             
             if base_m in colors_pl:
                 c_col, c_name = colors_pl[base_m]
-                # P/L Ratio dipetakan ke skala internal
                 if is_sma: series_pl.append({"type": 'Line', "data": get_s(df_mpl, f"{c_name}_SMA"), "options": {"color": c_col, "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'scale3', "title": f"{c_name} SMA"}})
                 else: series_pl.append({"type": 'Line', "data": get_s(df_mpl, c_name), "options": {"color": c_col, "lineWidth": 1, "priceScaleId": 'scale3', "title": c_name}})
             
             elif base_m == '⚪ Net Realized PL':
-                # Net Realized PL dipetakan ke skala kiri utama
                 if is_sma:
                     series_pl.append({"type": 'Line', "data": get_s(df_mpl, 'Net Realized PL_SMA'), "options": {"color": '#ffffff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": "Net PL SMA"}})
                 else:
@@ -449,9 +438,10 @@ elif selected_menu == "Derivatives":
         col_title, k1, k2, k3, k4, k5 = st.columns([1.5, 1, 1, 1, 1, 1], vertical_alignment="center")
         
         with col_title:
-            st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.4rem;'>Derivatives<br><span style='font-size: 1rem; color: #d1d4dc;'>OI & Funding Rates</span></h3></div>", unsafe_allow_html=True)
+            # UPDATE: Mengubah sub-judul menjadi "Open Interest & Funding Rates"
+            st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.4rem;'>Derivatives<br><span style='font-size: 1rem; color: #d1d4dc;'>Open Interest & Funding Rates</span></h3></div>", unsafe_allow_html=True)
             
-        with k1: st.markdown(f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:#a3a8b8; font-size:0.95rem; font-weight:600;'>Current BTC Price</span><br><span style='color:#ffffff; font-size:1.4rem; font-weight:700;'>${btc_d:,.2f}</span></div>", unsafe_allow_html=True)
+        with k1: st.markdown(f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:#a3a8b8; font-size:0.95rem; font-weight:600;'>Current BTC Price</span><br><span style='color:#f7931a; font-size:1.4rem; font-weight:700;'>${btc_d:,.2f}</span></div>", unsafe_allow_html=True) # UPDATE: Warna BTC #f7931a
         with k2: render_kpi_d("Open Interest", last_d.get('Open Interest', 0), is_money=True)
         with k3: render_kpi_d("Funding Rate", last_d.get('Funding Rate', 0), is_percent=True)
         
@@ -471,7 +461,8 @@ elif selected_menu == "Derivatives":
         with col_custom_d:
             if st.session_state.tr_d == "Custom": st.session_state.cd_d = st.number_input("Days back", min_value=7, value=st.session_state.cd_d, label_visibility="collapsed", key="cdin_d")
         
-        opts_d_base = ['🟡 Open Interest', '📊 Funding Rate']
+        # UPDATE: Mengubah Emoji dan Ikon Warna Open Interest menjadi Biru (#4da6ff) agar kontras dari BTC Price
+        opts_d_base = ['🔵 Open Interest', '📊 Funding Rate']
         all_opts_d = opts_d_base.copy()
         if w_d > 1: all_opts_d.extend([f"{m} (SMA {w_d})" for m in opts_d_base])
             
@@ -494,11 +485,12 @@ elif selected_menu == "Derivatives":
             is_sma = "(SMA" in m
             base_m = m.split(" (SMA")[0]
             
-            if base_m == '🟡 Open Interest':
+            if base_m == '🔵 Open Interest':
                 if is_sma:
-                    series_d.append({"type": 'Line', "data": get_s(df_d, 'Open Interest_SMA'), "options": {"color": '#eab308', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": "OI SMA"}})
+                    # UPDATE: Warna Garis OI -> #4da6ff
+                    series_d.append({"type": 'Line', "data": get_s(df_d, 'Open Interest_SMA'), "options": {"color": '#4da6ff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": "OI SMA"}})
                 else:
-                    series_d.append({"type": 'Line', "data": get_s(df_d, 'Open Interest'), "options": {"color": '#eab308', "lineWidth": 1, "priceScaleId": 'left', "title": 'Open Interest'}})
+                    series_d.append({"type": 'Line', "data": get_s(df_d, 'Open Interest'), "options": {"color": '#4da6ff', "lineWidth": 1, "priceScaleId": 'left', "title": 'Open Interest'}})
             
             elif base_m == '📊 Funding Rate':
                 if is_sma:
