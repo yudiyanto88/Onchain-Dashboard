@@ -31,15 +31,16 @@ if not df_price.empty and not df_tmm.empty:
     print("✅ data_price_level.csv berhasil diperbarui.")
 
 # ==========================================
-# 2. PIPELINE: MOMENTUM
+# 2. PIPELINE: MOMENTUM & PROFIT/LOSS
 # ==========================================
-print("Menarik data Momentum...")
+print("Menarik data Momentum & P/L...")
 df_sopr = fetch_data("https://chartinspect.com/api/onchain/sopr?timeframe=all&isProUser=false", ['date', 'btc_price', 'asopr'])
 df_lth_sopr = fetch_data("https://chartinspect.com/api/onchain/lth-sopr?timeframe=all&isProUser=false", ['date', 'lth_sopr'])
 df_sth_sopr = fetch_data("https://chartinspect.com/api/onchain/sth-sopr?timeframe=all&isProUser=false", ['date', 'sth_sopr'])
 df_net_pl = fetch_data("https://chartinspect.com/api/onchain/net-realized-pl?timeframe=all&isProUser=false", ['date', 'net_realized_pl_usd'])
-df_nupl = fetch_data("https://chartinspect.com/api/onchain/nupl?timeframe=all&isProUser=false", ['date', 'nupl', 'sth_nupl', 'lth_nupl']) # <- BARU: Tarik NUPL
 df_age = fetch_data("https://chartinspect.com/api/onchain/realized-profit-by-age?timeframe=all&isProUser=false")
+# INJEKSI NUPL (Global, STH, LTH dalam 1 API)
+df_nupl = fetch_data("https://chartinspect.com/api/onchain/nupl?timeframe=all&isProUser=false", ['date', 'nupl', 'sth_nupl', 'lth_nupl'])
 
 if not df_age.empty:
     sth_prof = df_age[[f'band_{i}_profit_usd' for i in range(5)]].sum(axis=1)
@@ -54,7 +55,6 @@ if not df_age.empty:
 else:
     df_age_clean = pd.DataFrame(columns=['date', 'sth_pl_ratio', 'lth_pl_ratio'])
 
-# Masukkan df_nupl ke dalam list untuk di-merge
 dfs = [df_sopr, df_lth_sopr, df_sth_sopr, df_net_pl, df_age_clean, df_nupl]
 df_master_mom = dfs[0]
 for d in dfs[1:]:
@@ -64,7 +64,7 @@ for d in dfs[1:]:
 if not df_master_mom.empty:
     df_master_mom['date'] = pd.to_datetime(df_master_mom['date'])
     df_master_mom.sort_values('date').to_csv("data_momentum.csv", index=False)
-    print("✅ data_momentum.csv berhasil diperbarui.")
+    print("✅ data_momentum.csv berhasil diperbarui (termasuk NUPL).")
 
 # ==========================================
 # 3. PIPELINE: DERIVATIVES
@@ -74,7 +74,6 @@ df_funding = fetch_data("https://chartinspect.com/api/charts/derivatives/futures
 df_oi = fetch_data("https://chartinspect.com/api/charts/derivatives/futures-open-interest?timeframe=all", ['date', 'total_oi'])
 
 if not df_funding.empty and not df_oi.empty:
-    # Memisahkan btc_price agar tidak berbenturan saat merge
     df_oi_clean = df_oi[['date', 'total_oi']]
     df_master_deriv = pd.merge(df_funding, df_oi_clean, on='date', how='outer')
     df_master_deriv['date'] = pd.to_datetime(df_master_deriv['date'])
@@ -85,16 +84,14 @@ if not df_funding.empty and not df_oi.empty:
 # 4. PIPELINE: SOCIAL SENTIMENT
 # ==========================================
 print("Menarik data Social Sentiment...")
-# Mengambil Top 7 Google Trends
 df_gtrend = fetch_data("https://chartinspect.com/api/charts/onchain/google-trends?timeframe=all&isProUser=false", 
                        ['date', 'btc_price', 'trend_bitcoin', 'trend_crypto', 'trend_ethereum', 'trend_nft', 'trend_binance', 'trend_solana', 'trend_dogecoin'])
 
-# Mengambil Top 7 Wikipedia Pageviews
 df_wiki = fetch_data("https://chartinspect.com/api/charts/onchain/wikipedia-pageviews?timeframe=all&isProUser=false", 
                      ['date', 'wiki_bitcoin', 'wiki_cryptocurrency', 'wiki_ethereum', 'wiki_satoshi_nakamoto', 'wiki_blockchain', 'wiki_nft', 'wiki_dogecoin'])
 
 if not df_gtrend.empty and not df_wiki.empty:
-    df_wiki_clean = df_wiki.drop(columns=['btc_price'], errors='ignore') # Hindari duplikat btc_price
+    df_wiki_clean = df_wiki.drop(columns=['btc_price'], errors='ignore')
     df_master_sentiment = pd.merge(df_gtrend, df_wiki_clean, on='date', how='outer')
     df_master_sentiment['date'] = pd.to_datetime(df_master_sentiment['date'])
     df_master_sentiment.sort_values('date').to_csv("data_sentiment.csv", index=False)
@@ -135,7 +132,6 @@ if not df_mvrv.empty:
 print("Menarik data Fear & Greed...")
 df_fg = fetch_data("https://chartinspect.com/api/charts/crypto/fear-greed-index?timeframe=all&isProUser=false")
 if not df_fg.empty:
-    # Mengubah format timestamp menjadi tanggal YYYY-MM-DD
     df_fg['date'] = pd.to_datetime(df_fg['timestamp'], unit='s').dt.strftime('%Y-%m-%d')
     df_fg.rename(columns={'value': 'Fear & Greed'}, inplace=True)
     df_fg_clean = df_fg[['date', 'Fear & Greed']]
