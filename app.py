@@ -110,7 +110,7 @@ for key in ['tf_p', 'tf_ms', 'tf_mpl', 'tf_d', 'tf_ss']:
 for key in ['sma_p', 'sma_ms', 'sma_mpl', 'sma_d']:
     if key not in st.session_state: st.session_state[key] = "0d"
 
-# Default SMA untuk Social Sentiment adalah 30d
+# Secara khusus mensetting default SMA untuk Social Sentiment adalah 30d
 if 'sma_ss' not in st.session_state: st.session_state['sma_ss'] = "30d"
 
 for key in ['cs_p', 'cs_ms', 'cs_mpl', 'cs_d', 'cs_ss']:
@@ -153,6 +153,7 @@ def load_data_derivatives():
 def load_data_sentiment():
     try:
         df = pd.read_csv("data_sentiment.csv")
+        # Menyelaraskan nama kolom dengan API response
         df.rename(columns={'date': 'Date', 'btc_price': 'BTC Price', 'trend_bitcoin': 'Google Trend (BTC)', 'trend_crypto': 'Google Trend (Crypto)', 'wiki_bitcoin': 'Wiki (BTC)', 'wiki_cryptocurrency': 'Wiki (Crypto)'}, inplace=True)
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
         df = df.dropna(subset=['Date']).sort_values('Date')
@@ -231,19 +232,18 @@ if selected_menu == "Price Levels":
         prev_p = df_p.iloc[-2] if len(df_p) > 1 else last_p
         
         btc_p = last_p.get('BTC Price', 0)
-        btc_prev = prev_p.get('BTC Price', 0)
+        btc_prev_p = prev_p.get('BTC Price', 0)
         
         def render_kpi_p(title, value, is_btc=False):
             if is_btc: 
                 c, tc = "#f7931a", "#f7931a"
-                if btc_prev > 0:
-                    dp = ((btc_p - btc_prev) / btc_prev) * 100
+                if btc_prev_p > 0:
+                    dp = ((btc_p - btc_prev_p) / btc_prev_p) * 100
                     ip = dp >= 0
                     dc = "#00cc66" if ip else "#ff4d4d"
                     ar = "↑" if ip else "↓"
                     d = f"<div style='margin-top:4px;'><span style='color:{dc}; font-size:0.85rem; background-color:{dc}20; padding:2px 6px; border-radius:4px;'>{ar} {abs(dp):.2f}%</span></div>"
-                else:
-                    d = ""
+                else: d = ""
             elif pd.isna(value) or value == 0: 
                 c, tc, d = "#ffffff", "#a3a8b8", ""
             else:
@@ -324,10 +324,8 @@ elif selected_menu == "Profit & Loss":
                 ip = diff >= 0
                 dc = "#00cc66" if ip else "#ff4d4d"
                 ar = "↑" if ip else "↓"
-                
                 if is_money: diff_str = f"${abs(diff):,.2f}"
                 else: diff_str = f"{abs(diff):.4f}"
-                
                 d = f"<div style='margin-top:4px;'><span style='color:{dc}; font-size:0.85rem; background-color:{dc}20; padding:2px 6px; border-radius:4px;'>{ar} {diff_str}</span></div>"
                 
             val_str = f"${value:,.2f}" if is_money else f"{value:.4f}"
@@ -515,11 +513,9 @@ elif selected_menu == "Derivatives":
                 ip = diff >= 0
                 dc = "#00cc66" if ip else "#ff4d4d"
                 ar = "↑" if ip else "↓"
-                
                 if is_money: diff_str = f"${abs(diff):,.2f}"
                 elif is_percent: diff_str = f"{abs(diff):.4f}%"
                 else: diff_str = f"{abs(diff):,.0f}"
-                
                 d = f"<div style='margin-top:4px;'><span style='color:{dc}; font-size:0.85rem; background-color:{dc}20; padding:2px 6px; border-radius:4px;'>{ar} {diff_str}</span></div>"
 
             if is_money: val_str = f"${value:,.2f}"
@@ -594,7 +590,6 @@ elif selected_menu == "Derivatives":
                     series_d.append({"type": 'Line', "data": get_s(df_d, 'Funding Rate_SMA'), "options": {"color": '#ffffff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'funding_scale', "title": "Funding SMA"}})
                 else:
                     funding_raw = get_s(df_d, 'Funding Rate')
-                    # Pengurangan opasitas -30% (menjadi 70%) untuk warna hijau dan merah Funding Rate
                     for d_val in funding_raw: d_val['color'] = 'rgba(0, 204, 102, 0.7)' if d_val['value'] >= 0 else 'rgba(255, 77, 77, 0.7)'
                     series_d.append({"type": 'Histogram', "data": funding_raw, "options": {"priceScaleId": 'funding_scale', "title": 'Funding Rate'}})
 
@@ -616,7 +611,7 @@ elif selected_menu == "Social Sentiment":
                 color = "#a3a8b8"
                 d = ""
             else: 
-                color = "#4da6ff" 
+                color = "#4da6ff" # Biru netral untuk metrik sosial agar tidak disalahpahami sebagai "Profit/Loss"
                 diff = value - prev_val
                 ip = diff >= 0
                 dc = "#00cc66" if ip else "#ff4d4d"
@@ -666,8 +661,13 @@ elif selected_menu == "Social Sentiment":
         all_opts_ss = opts_ss_base.copy()
         if w_ss > 1: all_opts_ss.extend([f"{m} (SMA {w_ss})" for m in opts_ss_base])
             
-        try: sel_ss = st.pills("Trend Metrics", all_opts_ss, default=['🔵 Google Trend (BTC)'], selection_mode="multi", label_visibility="collapsed", key="pills_gtrend")
-        except: sel_ss = st.multiselect("Trend Metrics", all_opts_ss, default=['🔵 Google Trend (BTC)'], label_visibility="collapsed", key="ms_gtrend")
+        # Menambahkan Pilihan Chart Mode (Line vs Stacked) di samping metrik
+        col_pills_ss, col_style_ss = st.columns([8, 2], vertical_alignment="center")
+        with col_pills_ss:
+            try: sel_ss = st.pills("Trend Metrics", all_opts_ss, default=['🔵 Google Trend (BTC)', '🟣 Google Trend (Crypto)'], selection_mode="multi", label_visibility="collapsed", key="pills_gtrend")
+            except: sel_ss = st.multiselect("Trend Metrics", all_opts_ss, default=['🔵 Google Trend (BTC)', '🟣 Google Trend (Crypto)'], label_visibility="collapsed", key="ms_gtrend")
+        with col_style_ss:
+            mode_ss = st.radio("Style", ["Line", "Stacked Area"], horizontal=True, label_visibility="collapsed", key="mode_gtrend_rad")
 
         chart_opts_ss = {
             "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, 
@@ -680,24 +680,60 @@ elif selected_menu == "Social Sentiment":
         
         series_ss = [{"type": 'Line', "data": get_s(df_ss, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
 
-        for m in sel_ss:
-            is_sma = "(SMA" in m
-            base_m = m.split(" (SMA")[0]
+        # Helper warna 
+        def get_color_configs(name):
+            configs = {
+                'Google Trend (BTC)': {'hex': '#4da6ff', 'top': 'rgba(77, 166, 255, 0.6)', 'bot': 'rgba(77, 166, 255, 0.0)'},
+                'Google Trend (Crypto)': {'hex': '#cc33ff', 'top': 'rgba(204, 51, 255, 0.6)', 'bot': 'rgba(204, 51, 255, 0.0)'},
+                'Wiki (BTC)': {'hex': '#ffffff', 'top': 'rgba(255, 255, 255, 0.6)', 'bot': 'rgba(255, 255, 255, 0.0)'},
+                'Wiki (Crypto)': {'hex': '#00cc66', 'top': 'rgba(0, 204, 102, 0.6)', 'bot': 'rgba(0, 204, 102, 0.0)'}
+            }
+            return configs.get(name, {'hex': '#888888', 'top': 'rgba(136,136,136,0.6)', 'bot': 'rgba(136,136,136,0.0)'})
+
+        if mode_ss == "Stacked Area":
+            cum_series = []
+            current_sum = pd.Series(0.0, index=df_ss.index)
+            for m in sel_ss:
+                is_sma = "(SMA" in m
+                base_m = m.split(" (SMA")[0].split(' ', 1)[1] # Ambil nama asli dari '🔵 Google Trend (BTC)'
+                col_target = f"{base_m}_SMA" if is_sma else base_m
+                
+                if col_target in df_ss.columns:
+                    current_sum = current_sum + df_ss[col_target].fillna(0)
+                    temp_col = f"{col_target}_stacked"
+                    df_ss[temp_col] = current_sum
+                    c_conf = get_color_configs(base_m)
+                    
+                    area_opts = {
+                        "lineColor": c_conf['hex'],
+                        "topColor": c_conf['top'],
+                        "bottomColor": c_conf['bot'],
+                        "lineWidth": 1,
+                        "priceScaleId": 'left',
+                        "title": col_target
+                    }
+                    cum_series.append({"type": 'Area', "data": get_s(df_ss, temp_col), "options": area_opts})
             
-            if base_m == '🔵 Google Trend (BTC)':
-                c_col = '#4da6ff'
-                c_name = 'Google Trend (BTC)'
-            elif base_m == '🟣 Google Trend (Crypto)':
-                c_col = '#cc33ff'
-                c_name = 'Google Trend (Crypto)'
-            else: continue
-            
-            if is_sma:
-                series_ss.append({"type": 'Line', "data": get_s(df_ss, f"{c_name}_SMA"), "options": {"color": c_col, "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": f"{c_name} SMA"}})
-            else:
-                series_ss.append({"type": 'Line', "data": get_s(df_ss, c_name), "options": {"color": c_col, "lineWidth": 1, "priceScaleId": 'left', "title": c_name}})
+            # Stacked series dibalik urutannya agar area yg besar di belakang, kecil di depan
+            series_ss.extend(cum_series[::-1])
+        else:
+            for m in sel_ss:
+                is_sma = "(SMA" in m
+                base_m = m.split(" (SMA")[0].split(' ', 1)[1]
+                col_target = f"{base_m}_SMA" if is_sma else base_m
+                if col_target in df_ss.columns:
+                    c_conf = get_color_configs(base_m)
+                    series_ss.append({"type": 'Line', "data": get_s(df_ss, col_target), "options": {"color": c_conf['hex'], "lineWidth": 1, "lineStyle": 2 if is_sma else 1, "priceScaleId": 'left', "title": col_target}})
 
         renderLightweightCharts([{"chart": chart_opts_ss, "series": series_ss}], 'chart_gtrend')
+        
+        with st.expander("ℹ️ About Google Trends (Crypto Search Interest)"):
+            st.markdown("""
+            **What this shows:** This chart plots worldwide Google search interest for major crypto keywords alongside Bitcoin price. Values are relative (0 to 100), where 100 is the all-time peak for the most-searched term in the series (Bitcoin).
+
+            **How to read it:** * Bitcoin searches tend to spike near cycle tops (late 2013, Dec 2017, Nov 2021).  
+            * Altcoin-specific terms tend to lag Bitcoin and reflect retail speculation phases.
+            """)
 
         st.markdown("<br><br>", unsafe_allow_html=True)
         
@@ -714,16 +750,17 @@ elif selected_menu == "Social Sentiment":
         with k3_2: render_kpi_ss("Wiki (Crypto)", last_ss.get('Wiki (Crypto)', 0), prev_ss.get('Wiki (Crypto)', 0))
         
         st.markdown("---")
-
-        # Kontrol independen untuk Chart Wikipedia ditiadakan untuk efisiensi baris kode, 
-        # kita menggunakan nilai filter yang sama (df_ss, w_ss) dari panel Google Trends di atasnya.
         
         opts_ss_wiki = ['⚪ Wiki (BTC)', '🟢 Wiki (Crypto)']
         all_opts_ss_wiki = opts_ss_wiki.copy()
         if w_ss > 1: all_opts_ss_wiki.extend([f"{m} (SMA {w_ss})" for m in opts_ss_wiki])
             
-        try: sel_ss_wiki = st.pills("Wiki Metrics", all_opts_ss_wiki, default=['⚪ Wiki (BTC)'], selection_mode="multi", label_visibility="collapsed", key="pills_wiki")
-        except: sel_ss_wiki = st.multiselect("Wiki Metrics", all_opts_ss_wiki, default=['⚪ Wiki (BTC)'], label_visibility="collapsed", key="ms_wiki")
+        col_pills_wiki, col_style_wiki = st.columns([8, 2], vertical_alignment="center")
+        with col_pills_wiki:
+            try: sel_ss_wiki = st.pills("Wiki Metrics", all_opts_ss_wiki, default=['⚪ Wiki (BTC)', '🟢 Wiki (Crypto)'], selection_mode="multi", label_visibility="collapsed", key="pills_wiki")
+            except: sel_ss_wiki = st.multiselect("Wiki Metrics", all_opts_ss_wiki, default=['⚪ Wiki (BTC)', '🟢 Wiki (Crypto)'], label_visibility="collapsed", key="ms_wiki")
+        with col_style_wiki:
+            mode_ss_wiki = st.radio("Style", ["Line", "Stacked Area"], horizontal=True, label_visibility="collapsed", key="mode_wiki_rad")
 
         chart_opts_ss_wiki = {
             "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, 
@@ -736,24 +773,51 @@ elif selected_menu == "Social Sentiment":
         
         series_ss_wiki = [{"type": 'Line', "data": get_s(df_ss, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
 
-        for m in sel_ss_wiki:
-            is_sma = "(SMA" in m
-            base_m = m.split(" (SMA")[0]
+        if mode_ss_wiki == "Stacked Area":
+            cum_series_wiki = []
+            current_sum_wiki = pd.Series(0.0, index=df_ss.index)
+            for m in sel_ss_wiki:
+                is_sma = "(SMA" in m
+                base_m = m.split(" (SMA")[0].split(' ', 1)[1]
+                col_target = f"{base_m}_SMA" if is_sma else base_m
+                
+                if col_target in df_ss.columns:
+                    current_sum_wiki = current_sum_wiki + df_ss[col_target].fillna(0)
+                    temp_col = f"{col_target}_stacked_wiki"
+                    df_ss[temp_col] = current_sum_wiki
+                    c_conf = get_color_configs(base_m)
+                    
+                    area_opts = {
+                        "lineColor": c_conf['hex'],
+                        "topColor": c_conf['top'],
+                        "bottomColor": c_conf['bot'],
+                        "lineWidth": 1,
+                        "priceScaleId": 'left',
+                        "title": col_target
+                    }
+                    cum_series_wiki.append({"type": 'Area', "data": get_s(df_ss, temp_col), "options": area_opts})
             
-            if base_m == '⚪ Wiki (BTC)':
-                c_col = '#ffffff'
-                c_name = 'Wiki (BTC)'
-            elif base_m == '🟢 Wiki (Crypto)':
-                c_col = '#00cc66'
-                c_name = 'Wiki (Crypto)'
-            else: continue
-            
-            if is_sma:
-                series_ss_wiki.append({"type": 'Line', "data": get_s(df_ss, f"{c_name}_SMA"), "options": {"color": c_col, "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": f"{c_name} SMA"}})
-            else:
-                series_ss_wiki.append({"type": 'Line', "data": get_s(df_ss, c_name), "options": {"color": c_col, "lineWidth": 1, "priceScaleId": 'left', "title": c_name}})
+            series_ss_wiki.extend(cum_series_wiki[::-1])
+        else:
+            for m in sel_ss_wiki:
+                is_sma = "(SMA" in m
+                base_m = m.split(" (SMA")[0].split(' ', 1)[1]
+                col_target = f"{base_m}_SMA" if is_sma else base_m
+                if col_target in df_ss.columns:
+                    c_conf = get_color_configs(base_m)
+                    series_ss_wiki.append({"type": 'Line', "data": get_s(df_ss, col_target), "options": {"color": c_conf['hex'], "lineWidth": 1, "lineStyle": 2 if is_sma else 1, "priceScaleId": 'left', "title": col_target}})
 
         renderLightweightCharts([{"chart": chart_opts_ss_wiki, "series": series_ss_wiki}], 'chart_wiki')
+
+        with st.expander("ℹ️ About Wikipedia Pageviews (Crypto Attention)"):
+            st.markdown("""
+            **What this shows:** This chart plots daily Wikipedia pageviews for major crypto-related articles alongside Bitcoin price. Values are absolute view counts from the English Wikipedia (bots excluded).
+
+            **Why Wikipedia?** When retail interest in crypto spikes, so do visits to foundational Wikipedia articles. Unlike Google Trends, pageview counts are absolute, so you can compare attention directly across articles and eras.
+
+            **How to read it:** * Bitcoin pageviews spike near cycle tops.  
+            * Newer chain articles only appear once the chain gains mainstream attention.
+            """)
 
     else:
         st.info("Menunggu data Social Sentiment. Pastikan script auto_update.py sudah menarik data terbaru!")
