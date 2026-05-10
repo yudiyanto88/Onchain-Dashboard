@@ -12,106 +12,56 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# --- CSS SUPER CUSTOM UNTUK SIDEBAR TABS, SELECTBOX, DAN MENCEGAH CLIPPING ---
 st.markdown("""
 <style>
-/* ======================================================
-   A. STYLING SIDEBAR MENU MENJADI BENTUK "TAB" BESAR
-   ====================================================== */
-section[data-testid="stSidebar"] {
-    background-color: #171b26 !important; /* Warna beda dari main dashboard */
-    border-right: 1px solid #2a2e39 !important; /* Garis pembatas sidebar */
-}
-section[data-testid="stSidebar"] div.stRadio > div[role="radiogroup"] {
-    gap: 10px; 
-}
+/* Sidebar Tabs dengan Warna Background Baru (#151924) */
+section[data-testid="stSidebar"] { background-color: #151924; }
+section[data-testid="stSidebar"] div.stRadio > div[role="radiogroup"] { gap: 10px; }
 section[data-testid="stSidebar"] div.stRadio > div[role="radiogroup"] > label {
-    background-color: #1a1d24;
-    padding: 12px 16px !important;
-    border-radius: 8px !important;
-    border-left: 4px solid transparent;
-    margin: 0 !important;
-    cursor: pointer;
-    transition: all 0.2s ease-in-out;
+    background-color: #1a1d24; padding: 12px 16px !important; border-radius: 8px !important;
+    border-left: 4px solid transparent; margin: 0 !important; cursor: pointer; transition: all 0.2s ease-in-out;
 }
-section[data-testid="stSidebar"] div.stRadio > div[role="radiogroup"] > label:hover {
-    background-color: #262a35;
-}
+section[data-testid="stSidebar"] div.stRadio > div[role="radiogroup"] > label:hover { background-color: #262a35; }
 section[data-testid="stSidebar"] div.stRadio > div[role="radiogroup"] > label[data-checked="true"] {
-    border-left: 4px solid #a855f7 !important;
-    background-color: #2a203b !important;
+    border-left: 4px solid #a855f7 !important; background-color: #2a203b !important;
 }
 section[data-testid="stSidebar"] div.stRadio > div[role="radiogroup"] p {
-    font-size: 1.15rem !important;
-    font-weight: 600 !important;
-    margin: 0 !important;
-    color: #ffffff !important;
+    font-size: 1.15rem !important; font-weight: 600 !important; margin: 0 !important; color: #ffffff !important;
 }
-section[data-testid="stSidebar"] div.stRadio > div[role="radiogroup"] > label > div:first-child {
-    display: none !important;
-}
+section[data-testid="stSidebar"] div.stRadio > div[role="radiogroup"] > label > div:first-child { display: none !important; }
 
-/* ======================================================
-   B. MENGECILKAN SELECTBOX, TOGGLE, DAN MENYAMAKAN FONT
-   ====================================================== */
-div[data-testid="stSelectbox"] *, 
-div[data-testid="stRadio"] *, 
-div[data-testid="stToggle"] *,
-div[data-testid="stNumberInput"] * {
+/* Control Panel Inputs */
+div[data-testid="stSelectbox"] *, div[data-testid="stRadio"] *, div[data-testid="stToggle"] *, div[data-testid="stNumberInput"] * {
     font-size: 0.85rem !important;
 }
-div[data-testid="stToggle"] label p {
-    font-size: 0.85rem !important;
-    margin-top: 2px !important; 
-}
-div[data-testid="stSelectbox"] label, 
-div[data-testid="stNumberInput"] label {
-    padding-bottom: 2px !important;
-    min-height: 0px !important;
-}
+div[data-testid="stToggle"] label p { font-size: 0.85rem !important; margin-top: 2px !important; }
+div[data-testid="stSelectbox"] label, div[data-testid="stNumberInput"] label { padding-bottom: 2px !important; min-height: 0px !important; }
 
-/* Memotong Tinggi Selectbox & Presisi Tengah Vertikal */
+/* Presisi Tengah Kotak Background Selectbox */
 div[data-baseweb="select"] > div {
-    min-height: 32px !important;
-    height: 32px !important;
-    border-radius: 6px !important;
-    padding-bottom: 2px !important;
+    min-height: 32px !important; height: 32px !important; border-radius: 6px !important; padding-bottom: 2px !important;
 }
-div[data-baseweb="select"] > div > div {
-    padding-top: 0px !important;
-    padding-bottom: 0px !important;
-}
-div[data-baseweb="select"] span {
-    display: inline-block;
-}
+div[data-baseweb="select"] > div > div { padding-top: 0px !important; padding-bottom: 0px !important; }
+div[data-baseweb="select"] span { display: inline-block; }
 
-/* ======================================================
-   C. MERAPIKAN SPASI UTAMA & MENCEGAH TEKS TERPOTONG
-   ====================================================== */
-.block-container { 
-    padding-top: 3rem !important; 
-    padding-bottom: 1.5rem !important; 
-    max-width: 100%; 
-}
-div[data-testid="stPill"] button {
-    font-size: 0.85rem !important;
-    padding: 2px 12px !important;
-    min-height: 28px !important;
-}
+/* Spasi & Pills */
+.block-container { padding-top: 3rem !important; padding-bottom: 1.5rem !important; max-width: 100%; }
+div[data-testid="stPill"] button { font-size: 0.85rem !important; padding: 2px 12px !important; min-height: 28px !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# Inisialisasi Session State 
-for key in ['tr_p', 'tr_ms', 'tr_mpl', 'tr_d', 'tr_ss']:
+# Inisialisasi Session State (Termasuk Tab 5 '_sd' untuk Supply Dynamics)
+for key in ['tr_p', 'tr_ms', 'tr_mpl', 'tr_d', 'tr_gt', 'tr_wk', 'tr_sd']:
     if key not in st.session_state: st.session_state[key] = "All Time"
-for key in ['cd_p', 'cd_ms', 'cd_mpl', 'cd_d', 'cd_ss']:
+for key in ['cd_p', 'cd_ms', 'cd_mpl', 'cd_d', 'cd_gt', 'cd_wk', 'cd_sd']:
     if key not in st.session_state: st.session_state[key] = 120
-for key in ['tf_p', 'tf_ms', 'tf_mpl', 'tf_d', 'tf_ss']:
+for key in ['tf_p', 'tf_ms', 'tf_mpl', 'tf_d', 'tf_gt', 'tf_wk', 'tf_sd']:
     if key not in st.session_state: st.session_state[key] = "Daily"
-for key in ['sma_p', 'sma_ms', 'sma_mpl', 'sma_d']:
+for key in ['sma_p', 'sma_ms', 'sma_mpl', 'sma_d', 'sma_sd']:
     if key not in st.session_state: st.session_state[key] = "0d"
-if 'sma_ss' not in st.session_state: st.session_state['sma_ss'] = "30d"  
-for key in ['cs_p', 'cs_ms', 'cs_mpl', 'cs_d', 'cs_ss']:
+for key in ['sma_gt', 'sma_wk']:
+    if key not in st.session_state: st.session_state[key] = "30d"  
+for key in ['cs_p', 'cs_ms', 'cs_mpl', 'cs_d', 'cs_gt', 'cs_wk', 'cs_sd']:
     if key not in st.session_state: st.session_state[key] = 50
 for key in ['mode_gt', 'mode_wk']:
     if key not in st.session_state: st.session_state[key] = "Line"
@@ -125,8 +75,7 @@ def load_data_price():
         df = pd.read_csv("data_price_level.csv")
         df.rename(columns={'date': 'Date', 'btc_price': 'BTC Price', 'sth_cost_basis': 'STH Cost Basis', 'lth_cost_basis': 'LTH Cost Basis', 'realized_price': 'Realized Price', 'cvdd': 'CVDD', 'true_market_mean_price': 'True Market Mean'}, inplace=True)
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-        df = df.dropna(subset=['Date']).sort_values('Date')
-        return df.drop_duplicates(subset=['Date'], keep='last') 
+        return df.dropna(subset=['Date']).sort_values('Date').drop_duplicates(subset=['Date'], keep='last')
     except: return pd.DataFrame()
 
 @st.cache_data(ttl=3600)
@@ -135,8 +84,7 @@ def load_data_momentum():
         df = pd.read_csv("data_momentum.csv")
         df.rename(columns={'date': 'Date', 'btc_price': 'BTC Price', 'asopr': 'aSOPR', 'lth_sopr': 'LTH SOPR', 'sth_sopr': 'STH SOPR', 'net_realized_pl_usd': 'Net Realized PL', 'sth_pl_ratio': 'STH P/L Ratio', 'lth_pl_ratio': 'LTH P/L Ratio'}, inplace=True)
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-        df = df.dropna(subset=['Date']).sort_values('Date')
-        return df.drop_duplicates(subset=['Date'], keep='last') 
+        return df.dropna(subset=['Date']).sort_values('Date').drop_duplicates(subset=['Date'], keep='last')
     except: return pd.DataFrame()
 
 @st.cache_data(ttl=3600)
@@ -145,8 +93,7 @@ def load_data_derivatives():
         df = pd.read_csv("data_derivatives.csv")
         df.rename(columns={'date': 'Date', 'btc_price': 'BTC Price', 'total_oi': 'Open Interest', 'funding_rate': 'Funding Rate'}, inplace=True)
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-        df = df.dropna(subset=['Date']).sort_values('Date')
-        return df.drop_duplicates(subset=['Date'], keep='last') 
+        return df.dropna(subset=['Date']).sort_values('Date').drop_duplicates(subset=['Date'], keep='last')
     except: return pd.DataFrame()
 
 @st.cache_data(ttl=3600)
@@ -161,14 +108,27 @@ def load_data_sentiment():
             'wiki_satoshi_nakamoto': 'Wiki Satoshi', 'wiki_blockchain': 'Wiki Blockchain', 'wiki_nft': 'Wiki NFT', 'wiki_dogecoin': 'Wiki DOGE'
         }, inplace=True)
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-        df = df.dropna(subset=['Date']).sort_values('Date')
-        return df.drop_duplicates(subset=['Date'], keep='last') 
+        return df.dropna(subset=['Date']).sort_values('Date').drop_duplicates(subset=['Date'], keep='last')
+    except: return pd.DataFrame()
+
+@st.cache_data(ttl=3600)
+def load_data_supply():
+    try:
+        df = pd.read_csv("data_supply.csv")
+        df.rename(columns={
+            'date': 'Date', 'btc_price': 'BTC Price',
+            'lth_supply_btc': 'LTH Supply', 'sth_supply_btc': 'STH Supply', 
+            'pct_lth_in_profit': 'LTH % Profit', 'pct_sth_in_profit': 'STH % Profit'
+        }, inplace=True)
+        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        return df.dropna(subset=['Date']).sort_values('Date').drop_duplicates(subset=['Date'], keep='last')
     except: return pd.DataFrame()
 
 df_price_raw = load_data_price()
 df_mom_raw = load_data_momentum()
 df_deriv_raw = load_data_derivatives()
 df_sentiment_raw = load_data_sentiment()
+df_supply_raw = load_data_supply()
 
 def apply_filters(df, res_state, smooth_state, custom_smooth, time_state, custom_days, metrics_to_smooth):
     if df.empty: return df, 1
@@ -217,7 +177,7 @@ with st.sidebar:
     
     selected_menu = st.radio(
         "Menu Navigasi",
-        ["Price Levels", "Profit & Loss", "Derivatives", "Social Sentiment"],
+        ["Price Levels", "Profit & Loss", "Derivatives", "Social Sentiment", "Supply Dynamics"],
         label_visibility="collapsed"
     )
     st.markdown("---")
@@ -258,9 +218,7 @@ if selected_menu == "Price Levels":
             st.markdown(f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:{tc}; font-size:0.95rem; font-weight:600;'>{title}</span><br><span style='color:{c}; font-size:1.4rem; font-weight:700;'>${value:,.2f}</span>{d}</div>", unsafe_allow_html=True)
 
         col_title, k1, k2, k3, k4, k5 = st.columns([1.5, 1, 1, 1, 1, 1], vertical_alignment="center")
-        
-        with col_title:
-            st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.4rem;'>On-Chain Price Levels<br><span style='font-size: 1rem; color: transparent;'>.</span></h3></div>", unsafe_allow_html=True)
+        with col_title: st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.4rem;'>On-Chain Price Levels<br><span style='font-size: 1rem; color: transparent;'>.</span></h3></div>", unsafe_allow_html=True)
             
         with k1: render_kpi_p("Current BTC Price", btc_p, True)
         with k2: render_kpi_p("STH Cost Basis", last_p.get('STH Cost Basis', 0))
@@ -331,6 +289,7 @@ elif selected_menu == "Profit & Loss":
             val_str = f"${value:,.2f}" if is_money else f"{value:.4f}"
             st.markdown(f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:{color}; font-size:0.95rem; font-weight:600;'>{title}</span><br><span style='color:{color}; font-size:1.4rem; font-weight:700;'>{val_str}</span>{d}</div>", unsafe_allow_html=True)
 
+        # BTC KPI tetap pake Persentase
         dp_btc_m = ((btc_m - btc_prev_m) / btc_prev_m * 100) if btc_prev_m else 0
         ip_btc_m = dp_btc_m >= 0
         dc_btc_m = "#00cc66" if ip_btc_m else "#ff4d4d"
@@ -572,9 +531,7 @@ elif selected_menu == "Social Sentiment":
         d_btc_ss = f"<div style='margin-top:4px;'><span style='color:{dc_btc_ss}; font-size:0.85rem; background-color:{dc_btc_ss}20; padding:2px 6px; border-radius:4px;'>{ar_btc_ss} {abs(dp_btc_ss):.2f}%</span></div>"
         btc_html_ss = f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:#f7931a; font-size:0.95rem; font-weight:600;'>Current BTC Price</span><br><span style='color:#f7931a; font-size:1.4rem; font-weight:700;'>${btc_ss:,.2f}</span>{d_btc_ss}</div>"
 
-        # ===========================================
         # CHART 1: GOOGLE TRENDS
-        # ===========================================
         col_title_gt, k1_gt, k2_gt, k3_gt, k4_gt, k5_gt = st.columns([1.5, 1, 1, 1, 1, 1], vertical_alignment="center")
         with col_title_gt: st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.4rem;'>Social Sentiment<br><span style='font-size: 1rem; color: #d1d4dc;'>Google Trends (Global)</span></h3></div>", unsafe_allow_html=True)
         with k1_gt: st.markdown(btc_html_ss, unsafe_allow_html=True)
@@ -632,9 +589,7 @@ elif selected_menu == "Social Sentiment":
         renderLightweightCharts([{"chart": chart_opts_gt, "series": series_gt}], 'chart_gtrend')
         st.markdown("<br><br>", unsafe_allow_html=True)
         
-        # ===========================================
         # CHART 2: WIKIPEDIA PAGEVIEWS
-        # ===========================================
         col_title_wk, k1_wk, k2_wk, k3_wk, k4_wk, k5_wk = st.columns([1.5, 1, 1, 1, 1, 1], vertical_alignment="center")
         with col_title_wk: st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.4rem;'>Social Sentiment<br><span style='font-size: 1rem; color: #d1d4dc;'>Wikipedia Pageviews</span></h3></div>", unsafe_allow_html=True)
         with k1_wk: st.markdown(btc_html_ss, unsafe_allow_html=True)
@@ -691,3 +646,115 @@ elif selected_menu == "Social Sentiment":
                 series_wk.append({"type": 'Line', "data": get_s(df_wk, actual_col), "options": {"color": c_col, "lineWidth": 1, "priceScaleId": 'left', "title": actual_col}})
 
         renderLightweightCharts([{"chart": chart_opts_wk, "series": series_wk}], 'chart_wiki')
+
+# ------------------------------------------------------------------------------
+# TAB 5: SUPPLY DYNAMICS (NEW TAB)
+# ------------------------------------------------------------------------------
+elif selected_menu == "Supply Dynamics":
+    if not df_supply_raw.empty:
+        last_sd = df_supply_raw.iloc[-1]
+        prev_sd = df_supply_raw.iloc[-2] if len(df_supply_raw) > 1 else last_sd
+        
+        btc_sd = last_sd.get('BTC Price', 0)
+        btc_prev_sd = prev_sd.get('BTC Price', 0)
+        
+        def render_kpi_sd(title, value, prev_val, is_percent=False):
+            if pd.isna(value) or value == 0: 
+                color = "#a3a8b8"
+                d = ""
+            else: 
+                color = "#4da6ff" if "LTH" in title else "#ff4d4d"
+                diff = value - prev_val
+                ip = diff >= 0
+                dc = "#00cc66" if ip else "#ff4d4d"
+                ar = "↑" if ip else "↓"
+                diff_str = f"{abs(diff):.2f}%" if is_percent else f"{abs(diff):,.0f}"
+                d = f"<div style='margin-top:4px;'><span style='color:{dc}; font-size:0.85rem; background-color:{dc}20; padding:2px 6px; border-radius:4px;'>{ar} {diff_str}</span></div>"
+
+            val_str = f"{value:.2f}%" if is_percent else f"{value:,.0f}"
+            st.markdown(f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:{color}; font-size:0.95rem; font-weight:600;'>{title}</span><br><span style='color:{color}; font-size:1.4rem; font-weight:700;'>{val_str}</span>{d}</div>", unsafe_allow_html=True)
+
+        dp_btc_sd = ((btc_sd - btc_prev_sd) / btc_prev_sd * 100) if btc_prev_sd else 0
+        ip_btc_sd = dp_btc_sd >= 0
+        dc_btc_sd = "#00cc66" if ip_btc_sd else "#ff4d4d"
+        ar_btc_sd = "↑" if ip_btc_sd else "↓"
+        d_btc_sd = f"<div style='margin-top:4px;'><span style='color:{dc_btc_sd}; font-size:0.85rem; background-color:{dc_btc_sd}20; padding:2px 6px; border-radius:4px;'>{ar_btc_sd} {abs(dp_btc_sd):.2f}%</span></div>"
+        btc_html_sd = f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:#f7931a; font-size:0.95rem; font-weight:600;'>Current BTC Price</span><br><span style='color:#f7931a; font-size:1.4rem; font-weight:700;'>${btc_sd:,.2f}</span>{d_btc_sd}</div>"
+
+        # CHART 1: STH & LTH SUPPLY
+        col_title_sd, k1_sd, k2_sd, k3_sd, k4_sd, k5_sd = st.columns([1.5, 1, 1, 1, 1, 1], vertical_alignment="center")
+        with col_title_sd: st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.4rem;'>Supply Dynamics<br><span style='font-size: 1rem; color: #d1d4dc;'>STH & LTH Supply</span></h3></div>", unsafe_allow_html=True)
+        with k1_sd: st.markdown(btc_html_sd, unsafe_allow_html=True)
+        with k2_sd: render_kpi_sd("LTH Supply", last_sd.get('LTH Supply', 0), prev_sd.get('LTH Supply', 0), False)
+        with k3_sd: render_kpi_sd("STH Supply", last_sd.get('STH Supply', 0), prev_sd.get('STH Supply', 0), False)
+        st.markdown("---")
+
+        df_sd, w_sd = apply_filters(df_supply_raw, st.session_state.tf_sd, st.session_state.sma_sd, st.session_state.cs_sd, st.session_state.tr_sd, st.session_state.cd_sd, ['LTH Supply', 'STH Supply', 'LTH % Profit', 'STH % Profit'])
+
+        col_fs_sd, col_tf_sd, col_sma_sd, col_sma_cst_sd, col_radio_sd, col_custom_sd = st.columns([1, 1.2, 1.2, 1, 6, 1.2], vertical_alignment="bottom", gap="small")
+        with col_fs_sd: focus_sd = st.toggle("Full Screen", key="tg_sd")
+        with col_tf_sd: st.session_state.tf_sd = st.selectbox("Timeframe", ["Daily", "3 Days", "Weekly", "Monthly"], index=["Daily", "3 Days", "Weekly", "Monthly"].index(st.session_state.tf_sd), key="tfs_sd")
+        with col_sma_sd: st.session_state.sma_sd = st.selectbox("SMA", ["0d", "7d", "14d", "30d", "Custom"], index=["0d", "7d", "14d", "30d", "Custom"].index(st.session_state.sma_sd), key="smas_sd")
+        with col_sma_cst_sd:
+            if st.session_state.sma_sd == "Custom": st.session_state.cs_sd = st.number_input("Days", min_value=1, value=st.session_state.cs_sd, label_visibility="collapsed", key="cst_sd")
+        with col_radio_sd:
+            c_idx_sd = t_opts.index(st.session_state.tr_sd) if st.session_state.tr_sd in t_opts else 5
+            st.session_state.tr_sd = st.radio("Range:", t_opts, index=c_idx_sd, horizontal=True, label_visibility="collapsed", key="rg_sd")
+        with col_custom_sd:
+            if st.session_state.tr_sd == "Custom": st.session_state.cd_sd = st.number_input("Days back", min_value=7, value=st.session_state.cd_sd, label_visibility="collapsed", key="cdin_sd")
+        
+        opts_sd_sup = ['🔵 LTH Supply', '🔴 STH Supply']
+        all_opts_sd_sup = opts_sd_sup.copy()
+        if w_sd > 1: all_opts_sd_sup.extend([f"{m} (SMA {w_sd})" for m in opts_sd_sup])
+            
+        try: sel_sd_sup = st.pills("Supply Metrics", all_opts_sd_sup, default=opts_sd_sup, selection_mode="multi", label_visibility="collapsed", key="pills_sup")
+        except: sel_sd_sup = st.multiselect("Supply Metrics", all_opts_sd_sup, default=opts_sd_sup, label_visibility="collapsed", key="ms_sup")
+
+        chart_opts_sd = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 850 if focus_sd else 650, "rightPriceScale": {"visible": True}, "leftPriceScale": {"visible": True}}
+        series_sd = [{"type": 'Line', "data": get_s(df_sd, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
+
+        for m in sel_sd_sup:
+            is_sma = "(SMA" in m
+            base_m = m.split(" (SMA")[0]
+            if base_m == '🔵 LTH Supply': c_col, c_name = '#4da6ff', 'LTH Supply'
+            elif base_m == '🔴 STH Supply': c_col, c_name = '#ff4d4d', 'STH Supply'
+            else: continue
+            
+            if is_sma: series_sd.append({"type": 'Line', "data": get_s(df_sd, f"{c_name}_SMA"), "options": {"color": c_col, "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": f"{c_name} SMA"}})
+            else: series_sd.append({"type": 'Line', "data": get_s(df_sd, c_name), "options": {"color": c_col, "lineWidth": 1, "priceScaleId": 'left', "title": c_name}})
+
+        renderLightweightCharts([{"chart": chart_opts_sd, "series": series_sd}], 'chart_supply')
+        st.markdown("<br><br>", unsafe_allow_html=True)
+        
+        # CHART 2: STH & LTH % IN PROFIT
+        col_title_sd2, k1_sd2, k2_sd2, k3_sd2, k4_sd2, k5_sd2 = st.columns([1.5, 1, 1, 1, 1, 1], vertical_alignment="center")
+        with col_title_sd2: st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.4rem;'>Supply Dynamics<br><span style='font-size: 1rem; color: #d1d4dc;'>% Supply in Profit</span></h3></div>", unsafe_allow_html=True)
+        with k1_sd2: st.markdown(btc_html_sd, unsafe_allow_html=True)
+        with k2_sd2: render_kpi_sd("LTH % Profit", last_sd.get('LTH % Profit', 0), prev_sd.get('LTH % Profit', 0), True)
+        with k3_sd2: render_kpi_sd("STH % Profit", last_sd.get('STH % Profit', 0), prev_sd.get('STH % Profit', 0), True)
+        st.markdown("---")
+
+        opts_sd_pct = ['🔵 LTH % Profit', '🔴 STH % Profit']
+        all_opts_sd_pct = opts_sd_pct.copy()
+        if w_sd > 1: all_opts_sd_pct.extend([f"{m} (SMA {w_sd})" for m in opts_sd_pct])
+            
+        try: sel_sd_pct = st.pills("Profit Metrics", all_opts_sd_pct, default=opts_sd_pct, selection_mode="multi", label_visibility="collapsed", key="pills_pct")
+        except: sel_sd_pct = st.multiselect("Profit Metrics", all_opts_sd_pct, default=opts_sd_pct, label_visibility="collapsed", key="ms_pct")
+
+        chart_opts_sd2 = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 850 if focus_sd else 650, "rightPriceScale": {"visible": True}, "leftPriceScale": {"visible": True}}
+        series_sd2 = [{"type": 'Line', "data": get_s(df_sd, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
+
+        for m in sel_sd_pct:
+            is_sma = "(SMA" in m
+            base_m = m.split(" (SMA")[0]
+            if base_m == '🔵 LTH % Profit': c_col, c_name = '#4da6ff', 'LTH % Profit'
+            elif base_m == '🔴 STH % Profit': c_col, c_name = '#ff4d4d', 'STH % Profit'
+            else: continue
+            
+            if is_sma: series_sd2.append({"type": 'Line', "data": get_s(df_sd, f"{c_name}_SMA"), "options": {"color": c_col, "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": f"{c_name} SMA"}})
+            else: series_sd2.append({"type": 'Line', "data": get_s(df_sd, c_name), "options": {"color": c_col, "lineWidth": 1, "priceScaleId": 'left', "title": c_name}})
+
+        renderLightweightCharts([{"chart": chart_opts_sd2, "series": series_sd2}], 'chart_profitpct')
+
+    else:
+        st.info("Menunggu data Supply Dynamics. Pastikan script auto_update.py sudah menarik data terbaru!")
