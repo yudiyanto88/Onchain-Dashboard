@@ -79,4 +79,18 @@ if not df_funding.empty and not df_oi.empty:
     df_master_deriv.sort_values('date').to_csv("data_derivatives.csv", index=False)
     print("✅ data_derivatives.csv berhasil diperbarui.")
 
+# ==========================================
+# 4. PIPELINE: SOCIAL SENTIMENT
+# ==========================================
+print("Menarik data Social Sentiment...")
+df_gtrend = fetch_data("https://chartinspect.com/api/charts/onchain/google-trends?timeframe=all&isProUser=false", ['date', 'btc_price', 'trend_bitcoin', 'trend_crypto'])
+df_wiki = fetch_data("https://chartinspect.com/api/charts/onchain/wikipedia-pageviews?timeframe=all&isProUser=false", ['date', 'wiki_bitcoin', 'wiki_cryptocurrency'])
+
+if not df_gtrend.empty and not df_wiki.empty:
+    df_wiki_clean = df_wiki[['date', 'wiki_bitcoin', 'wiki_cryptocurrency']]
+    df_master_sentiment = pd.merge(df_gtrend, df_wiki_clean, on='date', how='outer')
+    df_master_sentiment['date'] = pd.to_datetime(df_master_sentiment['date'])
+    df_master_sentiment.sort_values('date').to_csv("data_sentiment.csv", index=False)
+    print("✅ data_sentiment.csv berhasil diperbarui.")
+
 print("Semua proses selesai!")
