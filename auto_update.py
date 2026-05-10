@@ -98,4 +98,16 @@ if not df_gtrend.empty and not df_wiki.empty:
     df_master_sentiment.sort_values('date').to_csv("data_sentiment.csv", index=False)
     print("✅ data_sentiment.csv berhasil diperbarui.")
 
+# ==========================================
+# 5. PIPELINE: SUPPLY DYNAMICS
+# ==========================================
+print("Menarik data Supply Dynamics...")
+df_supply = fetch_data("https://chartinspect.com/api/onchain/sth-lth?timeframe=all&isProUser=false", 
+                       ['date', 'btc_price', 'lth_supply_btc', 'sth_supply_btc', 'pct_lth_in_profit', 'pct_sth_in_profit'])
+
+if not df_supply.empty:
+    df_supply['date'] = pd.to_datetime(df_supply['date'])
+    df_supply.sort_values('date').to_csv("data_supply.csv", index=False)
+    print("✅ data_supply.csv berhasil diperbarui.")
+
 print("Semua proses selesai!")
