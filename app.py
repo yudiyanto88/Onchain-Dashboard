@@ -64,18 +64,18 @@ div[data-testid="stPill"] button { font-size: 0.85rem !important; padding: 2px 1
 </style>
 """, unsafe_allow_html=True)
 
-# Inisialisasi Session State
-for key in ['tr_p', 'tr_mv', 'tr_ms', 'tr_mpl', 'tr_d', 'tr_gt', 'tr_wk', 'tr_sd', 'tr_fg']:
+# Inisialisasi Session State (Termasuk nupl)
+for key in ['tr_p', 'tr_mv', 'tr_ms', 'tr_mpl', 'tr_nupl', 'tr_d', 'tr_gt', 'tr_wk', 'tr_sd', 'tr_fg']:
     if key not in st.session_state: st.session_state[key] = "All Time"
-for key in ['cd_p', 'cd_mv', 'cd_ms', 'cd_mpl', 'cd_d', 'cd_gt', 'cd_wk', 'cd_sd', 'cd_fg']:
+for key in ['cd_p', 'cd_mv', 'cd_ms', 'cd_mpl', 'cd_nupl', 'cd_d', 'cd_gt', 'cd_wk', 'cd_sd', 'cd_fg']:
     if key not in st.session_state: st.session_state[key] = 120
-for key in ['tf_p', 'tf_mv', 'tf_ms', 'tf_mpl', 'tf_d', 'tf_gt', 'tf_wk', 'tf_sd', 'tf_fg']:
+for key in ['tf_p', 'tf_mv', 'tf_ms', 'tf_mpl', 'tf_nupl', 'tf_d', 'tf_gt', 'tf_wk', 'tf_sd', 'tf_fg']:
     if key not in st.session_state: st.session_state[key] = "Daily"
-for key in ['sma_p', 'sma_mv', 'sma_ms', 'sma_mpl', 'sma_d', 'sma_sd', 'sma_fg']:
+for key in ['sma_p', 'sma_mv', 'sma_ms', 'sma_mpl', 'sma_nupl', 'sma_d', 'sma_sd', 'sma_fg']:
     if key not in st.session_state: st.session_state[key] = "0d"
 for key in ['sma_gt', 'sma_wk']:
     if key not in st.session_state: st.session_state[key] = "30d"  
-for key in ['cs_p', 'cs_mv', 'cs_ms', 'cs_mpl', 'cs_d', 'cs_gt', 'cs_wk', 'cs_sd', 'cs_fg']:
+for key in ['cs_p', 'cs_mv', 'cs_ms', 'cs_mpl', 'cs_nupl', 'cs_d', 'cs_gt', 'cs_wk', 'cs_sd', 'cs_fg']:
     if key not in st.session_state: st.session_state[key] = 50
 for key in ['mode_gt', 'mode_wk']:
     if key not in st.session_state: st.session_state[key] = "Line"
@@ -105,7 +105,11 @@ def load_data_mvrv():
 def load_data_momentum():
     try:
         df = pd.read_csv("data_momentum.csv")
-        df.rename(columns={'date': 'Date', 'btc_price': 'BTC Price', 'asopr': 'aSOPR', 'lth_sopr': 'LTH SOPR', 'sth_sopr': 'STH SOPR', 'net_realized_pl_usd': 'Net Realized PL', 'sth_pl_ratio': 'STH P/L Ratio', 'lth_pl_ratio': 'LTH P/L Ratio'}, inplace=True)
+        df.rename(columns={
+            'date': 'Date', 'btc_price': 'BTC Price', 'asopr': 'aSOPR', 'lth_sopr': 'LTH SOPR', 'sth_sopr': 'STH SOPR', 
+            'net_realized_pl_usd': 'Net Realized PL', 'sth_pl_ratio': 'STH P/L Ratio', 'lth_pl_ratio': 'LTH P/L Ratio',
+            'nupl': 'Global NUPL', 'sth_nupl': 'STH NUPL', 'lth_nupl': 'LTH NUPL'
+        }, inplace=True)
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
         return df.dropna(subset=['Date']).sort_values('Date').drop_duplicates(subset=['Date'], keep='last')
     except: return pd.DataFrame()
@@ -537,6 +541,60 @@ elif selected_menu == "Profit & Loss":
                     series_pl.append({"type": 'Histogram', "data": net_pl_raw, "options": {"priceScaleId": 'left', "title": 'Net PL Raw'}})
 
         renderLightweightCharts([{"chart": chart_opts_pl, "series": series_pl}], 'chart_netpl')
+        st.markdown("<br><br>", unsafe_allow_html=True)
+        
+        # CHART 3: NUPL GROUP (NEW)
+        col_title_3, k1_3, k2_3, k3_3, k4_3, k5_3 = st.columns([1.5, 1, 1, 1, 1, 1], vertical_alignment="center")
+        with col_title_3: st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.4rem;'>Profit & Loss<br><span style='font-size: 1rem; color: #d1d4dc;'>NUPL Metric</span></h3></div>", unsafe_allow_html=True)
+        with k1_3: st.markdown(btc_html_m, unsafe_allow_html=True)
+        with k2_3: render_kpi_m("Global NUPL", last_m.get('Global NUPL', 0), prev_m.get('Global NUPL', 0), 0.0)
+        with k3_3: render_kpi_m("STH NUPL", last_m.get('STH NUPL', 0), prev_m.get('STH NUPL', 0), 0.0)
+        with k4_3: render_kpi_m("LTH NUPL", last_m.get('LTH NUPL', 0), prev_m.get('LTH NUPL', 0), 0.0)
+        st.markdown("---")
+        
+        df_nupl, w_nupl = apply_filters(df_mom_raw, st.session_state.tf_nupl, st.session_state.sma_nupl, st.session_state.cs_nupl, st.session_state.tr_nupl, st.session_state.cd_nupl, ['Global NUPL', 'STH NUPL', 'LTH NUPL'])
+        col_fs_nupl, col_tf_nupl, col_sma_nupl, col_sma_cst_nupl, col_radio_nupl, col_custom_nupl = st.columns([1, 1.2, 1.2, 1, 6, 1.2], vertical_alignment="bottom", gap="small")
+        with col_fs_nupl: focus_nupl = st.toggle("Full Screen", key="tg_nupl")
+        with col_tf_nupl: st.session_state.tf_nupl = st.selectbox("Timeframe", ["Daily", "3 Days", "Weekly", "Monthly"], index=["Daily", "3 Days", "Weekly", "Monthly"].index(st.session_state.tf_nupl), key="tfs_nupl")
+        with col_sma_nupl: st.session_state.sma_nupl = st.selectbox("SMA", ["0d", "7d", "14d", "30d", "Custom"], index=["0d", "7d", "14d", "30d", "Custom"].index(st.session_state.sma_nupl), key="smas_nupl")
+        with col_sma_cst_nupl:
+            if st.session_state.sma_nupl == "Custom": st.session_state.cs_nupl = st.number_input("Days", min_value=1, value=st.session_state.cs_nupl, label_visibility="collapsed", key="cst_nupl")
+        with col_radio_nupl:
+            c_idx_nupl = t_opts.index(st.session_state.tr_nupl) if st.session_state.tr_nupl in t_opts else 5
+            st.session_state.tr_nupl = st.radio("Range:", t_opts, index=c_idx_nupl, horizontal=True, label_visibility="collapsed", key="rg_nupl")
+        with col_custom_nupl:
+            if st.session_state.tr_nupl == "Custom": st.session_state.cd_nupl = st.number_input("Days back", min_value=7, value=st.session_state.cd_nupl, label_visibility="collapsed", key="cdin_nupl")
+            
+        opts_nupl_base = ['🔵 Global NUPL', '🔴 STH NUPL', '🟢 LTH NUPL']
+        all_opts_nupl = opts_nupl_base.copy()
+        if w_nupl > 1: all_opts_nupl.extend([f"{m} (SMA {w_nupl})" for m in opts_nupl_base])
+
+        try: sel_nupl = st.pills("NUPL Metrics", all_opts_nupl, default=['🔵 Global NUPL', '🟢 LTH NUPL'], selection_mode="multi", label_visibility="collapsed")
+        except: sel_nupl = st.multiselect("NUPL Metrics", all_opts_nupl, default=['🔵 Global NUPL', '🟢 LTH NUPL'], label_visibility="collapsed")
+
+        chart_opts_nupl = {
+            "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, 
+            "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, 
+            "crosshair": {"mode": 0}, "height": 850 if focus_nupl else 650, 
+            "rightPriceScale": {"visible": True}, "leftPriceScale": {"visible": True} 
+        }
+        series_nupl = [{"type": 'Line', "data": get_s(df_nupl, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
+        df_nupl['NUPL_Zero'] = 0.0
+        series_nupl.append({"type": 'Line', "data": get_s(df_nupl, 'NUPL_Zero'), "options": {"color": '#ffffff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": 'Neutral (0.0)'}})
+
+        for m in sel_nupl:
+            is_sma = "(SMA" in m
+            base_m = m.split(" (SMA")[0]
+            
+            if base_m == '🔵 Global NUPL': c_col, c_name = '#4da6ff', 'Global NUPL'
+            elif base_m == '🔴 STH NUPL': c_col, c_name = '#ff4d4d', 'STH NUPL'
+            elif base_m == '🟢 LTH NUPL': c_col, c_name = '#00cc66', 'LTH NUPL'
+            else: continue
+            
+            if is_sma: series_nupl.append({"type": 'Line', "data": get_s(df_nupl, f"{c_name}_SMA"), "options": {"color": c_col, "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": f"{c_name} SMA"}})
+            else: series_nupl.append({"type": 'Line', "data": get_s(df_nupl, c_name), "options": {"color": c_col, "lineWidth": 1, "priceScaleId": 'left', "title": c_name}})
+
+        renderLightweightCharts([{"chart": chart_opts_nupl, "series": series_nupl}], 'chart_nupl')
 
 # ------------------------------------------------------------------------------
 # TAB 4: SUPPLY DYNAMICS 
@@ -909,7 +967,7 @@ elif selected_menu == "Social Sentiment":
         renderLightweightCharts([{"chart": chart_opts_wk, "series": series_wk}], 'chart_wiki')
         st.markdown("<br><br>", unsafe_allow_html=True)
 
-        # CHART 3: FEAR & GREED INDEX
+        # CHART 3: FEAR & GREED INDEX (INJEKSI MARKERS & GARIS PUTIH)
         if not df_fg_raw.empty:
             last_fg = df_fg_raw.iloc[-1]
             prev_fg = df_fg_raw.iloc[-2] if len(df_fg_raw) > 1 else last_fg
@@ -937,25 +995,52 @@ elif selected_menu == "Social Sentiment":
             with col_custom_fg:
                 if st.session_state.tr_fg == "Custom": st.session_state.cd_fg = st.number_input("Days back", min_value=7, value=st.session_state.cd_fg, label_visibility="collapsed", key="cdin_fg")
             
-            opts_fg_base = ['📊 Fear & Greed']
+            opts_fg_base = ['📊 Fear & Greed Dots']
             all_opts_fg = opts_fg_base.copy()
                 
-            try: sel_fg = st.pills("F&G Metrics", all_opts_fg, default=['📊 Fear & Greed'], selection_mode="multi", label_visibility="collapsed", key="pills_fg")
-            except: sel_fg = st.multiselect("F&G Metrics", all_opts_fg, default=['📊 Fear & Greed'], label_visibility="collapsed", key="ms_fg")
+            try: sel_fg = st.pills("F&G Metrics", all_opts_fg, default=['📊 Fear & Greed Dots'], selection_mode="multi", label_visibility="collapsed", key="pills_fg")
+            except: sel_fg = st.multiselect("F&G Metrics", all_opts_fg, default=['📊 Fear & Greed Dots'], label_visibility="collapsed", key="ms_fg")
 
             chart_opts_fg = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 850 if focus_fg else 650, "rightPriceScale": {"visible": True}, "leftPriceScale": {"visible": True}}
-            series_fg = [{"type": 'Line', "data": get_s(df_fg, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
+            
+            # Garis BTC khusus berwarna PUTIH
+            btc_series_options = {"color": '#ffffff', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}
+            series_fg = [{"type": 'Line', "data": get_s(df_fg, 'BTC Price'), "options": btc_series_options}]
 
             for m in sel_fg:
                 fg_raw = get_s(df_fg, 'Fear & Greed')
+                markers = []
+                
+                # Injeksi logic markers (titik) F&G ke Garis Harga BTC
                 for d in fg_raw: 
                     v = d['value']
-                    if v < 25: d['color'] = '#ff4d4d'
-                    elif v < 45: d['color'] = '#ff9933'
-                    elif v <= 55: d['color'] = '#eab308'
-                    elif v <= 75: d['color'] = '#00cc66'
-                    else: d['color'] = '#006600'
-                series_fg.append({"type": 'Histogram', "data": fg_raw, "options": {"priceScaleId": 'left', "title": 'Fear & Greed'}})
+                    if v < 25: marker_col = '#ff4d4d'
+                    elif v < 45: marker_col = '#ff9933'
+                    elif v <= 55: marker_col = '#eab308'
+                    elif v <= 75: marker_col = '#00cc66'
+                    else: marker_col = '#006600'
+                    
+                    markers.append({
+                        "time": d['time'],
+                        "position": 'inBar',
+                        "color": marker_col,
+                        "shape": 'circle',
+                        "size": 1
+                    })
+                    
+                    # Berikan opasitas transparan pada histogram bawah agar dot di harga lebih menonjol
+                    d['color'] = marker_col.replace('#', 'rgba(') # Dummy logic untuk warna transparan
+                    if v < 25: d['color'] = 'rgba(255, 77, 77, 0.3)'
+                    elif v < 45: d['color'] = 'rgba(255, 153, 51, 0.3)'
+                    elif v <= 55: d['color'] = 'rgba(234, 179, 8, 0.3)'
+                    elif v <= 75: d['color'] = 'rgba(0, 204, 102, 0.3)'
+                    else: d['color'] = 'rgba(0, 102, 0, 0.3)'
+                
+                # Tambahkan list markers ke dalam dict options dari series BTC
+                series_fg[0]['markers'] = markers
+                
+                # Render F&G Value di bawah dengan opasitas sangat rendah agar crosshair tetap bisa membaca nilainya
+                series_fg.append({"type": 'Histogram', "data": fg_raw, "options": {"priceScaleId": 'left', "title": 'F&G Index'}})
 
             renderLightweightCharts([{"chart": chart_opts_fg, "series": series_fg}], 'chart_fg')
 
