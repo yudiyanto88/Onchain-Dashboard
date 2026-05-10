@@ -102,10 +102,15 @@ if not df_gtrend.empty and not df_wiki.empty:
 # 5. PIPELINE: SUPPLY DYNAMICS
 # ==========================================
 print("Menarik data Supply Dynamics...")
-df_supply = fetch_data("https://chartinspect.com/api/onchain/sth-lth?timeframe=all&isProUser=false", 
-                       ['date', 'btc_price', 'lth_supply_btc', 'sth_supply_btc', 'pct_lth_in_profit', 'pct_sth_in_profit'])
+df_sth_lth = fetch_data("https://chartinspect.com/api/onchain/sth-lth?timeframe=all&isProUser=false", 
+                       ['date', 'btc_price', 'lth_supply_btc', 'sth_supply_btc', 'pct_lth_in_profit', 'pct_sth_in_profit', 'pct_lth_in_loss', 'pct_sth_in_loss'])
 
-if not df_supply.empty:
+df_profit_loss = fetch_data("https://chartinspect.com/api/onchain/profit-loss?timeframe=all&isProUser=false", 
+                            ['date', 'percent_btc_in_profit', 'percent_btc_in_loss'])
+
+if not df_sth_lth.empty and not df_profit_loss.empty:
+    df_profit_loss_clean = df_profit_loss[['date', 'percent_btc_in_profit', 'percent_btc_in_loss']]
+    df_supply = pd.merge(df_sth_lth, df_profit_loss_clean, on='date', how='outer')
     df_supply['date'] = pd.to_datetime(df_supply['date'])
     df_supply.sort_values('date').to_csv("data_supply.csv", index=False)
     print("✅ data_supply.csv berhasil diperbarui.")
