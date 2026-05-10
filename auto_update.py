@@ -115,4 +115,16 @@ if not df_sth_lth.empty and not df_profit_loss.empty:
     df_supply.sort_values('date').to_csv("data_supply.csv", index=False)
     print("✅ data_supply.csv berhasil diperbarui.")
 
+# ==========================================
+# 6. PIPELINE: MARKET VALUATION
+# ==========================================
+print("Menarik data Market Valuation...")
+df_mvrv = fetch_data("https://chartinspect.com/api/onchain/mvrv?timeframe=all&isProUser=false", 
+                     ['date', 'btc_price', 'mvrv', 'sth_mvrv', 'lth_mvrv'])
+
+if not df_mvrv.empty:
+    df_mvrv['date'] = pd.to_datetime(df_mvrv['date'])
+    df_mvrv.sort_values('date').to_csv("data_mvrv.csv", index=False)
+    print("✅ data_mvrv.csv berhasil diperbarui.")
+
 print("Semua proses selesai!")
