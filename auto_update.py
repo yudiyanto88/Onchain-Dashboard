@@ -38,6 +38,7 @@ df_sopr = fetch_data("https://chartinspect.com/api/onchain/sopr?timeframe=all&is
 df_lth_sopr = fetch_data("https://chartinspect.com/api/onchain/lth-sopr?timeframe=all&isProUser=false", ['date', 'lth_sopr'])
 df_sth_sopr = fetch_data("https://chartinspect.com/api/onchain/sth-sopr?timeframe=all&isProUser=false", ['date', 'sth_sopr'])
 df_net_pl = fetch_data("https://chartinspect.com/api/onchain/net-realized-pl?timeframe=all&isProUser=false", ['date', 'net_realized_pl_usd'])
+df_nupl = fetch_data("https://chartinspect.com/api/onchain/nupl?timeframe=all&isProUser=false", ['date', 'nupl', 'sth_nupl', 'lth_nupl']) # <- BARU: Tarik NUPL
 df_age = fetch_data("https://chartinspect.com/api/onchain/realized-profit-by-age?timeframe=all&isProUser=false")
 
 if not df_age.empty:
@@ -53,7 +54,8 @@ if not df_age.empty:
 else:
     df_age_clean = pd.DataFrame(columns=['date', 'sth_pl_ratio', 'lth_pl_ratio'])
 
-dfs = [df_sopr, df_lth_sopr, df_sth_sopr, df_net_pl, df_age_clean]
+# Masukkan df_nupl ke dalam list untuk di-merge
+dfs = [df_sopr, df_lth_sopr, df_sth_sopr, df_net_pl, df_age_clean, df_nupl]
 df_master_mom = dfs[0]
 for d in dfs[1:]:
     if not d.empty:
