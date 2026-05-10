@@ -34,12 +34,26 @@ section[data-testid="stSidebar"] div.stRadio > div[role="radiogroup"] > label > 
 div[data-testid="stSelectbox"] *, div[data-testid="stRadio"] *, div[data-testid="stToggle"] *, div[data-testid="stNumberInput"] * {
     font-size: 0.85rem !important;
 }
-div[data-testid="stRadio"] label p { font-size: 0.85rem !important; margin-top: 3px !important; }
-div[data-testid="stToggle"] label p { font-size: 0.85rem !important; margin-top: 3px !important; }
+
+/* MENURUNKAN POSISI TEKS RADIO ("1 Month", "All Time", dll) */
+div[data-testid="stRadio"] label p { 
+    font-size: 0.85rem !important; 
+    margin-top: 3px !important; 
+}
+
+/* MENURUNKAN POSISI TEKS TOGGLE ("Full Screen") */
+div[data-testid="stToggle"] label p { 
+    font-size: 0.85rem !important; 
+    margin-top: 3px !important; 
+}
+
 div[data-testid="stSelectbox"] label, div[data-testid="stNumberInput"] label { padding-bottom: 2px !important; min-height: 0px !important; }
+
+/* MENURUNKAN POSISI TEKS SELECTBOX ("Daily", "0d") */
 div[data-baseweb="select"] > div {
     min-height: 32px !important; height: 32px !important; border-radius: 6px !important; 
-    padding-top: 4px !important; padding-bottom: 0px !important;
+    padding-top: 4px !important; 
+    padding-bottom: 0px !important;
 }
 div[data-baseweb="select"] > div > div { padding-top: 0px !important; padding-bottom: 0px !important; }
 div[data-baseweb="select"] span { display: inline-block; }
@@ -150,7 +164,6 @@ df_deriv_raw = load_data_derivatives()
 df_sentiment_raw = load_data_sentiment()
 df_supply_raw = load_data_supply()
 
-# Khusus F&G, gabungkan dengan btc_price dari tabel price agar bisa ditampilkan bersamaan
 df_fg_base = load_data_fg()
 if not df_fg_base.empty and not df_price_raw.empty:
     df_fg_raw = pd.merge(df_price_raw[['Date', 'BTC Price']], df_fg_base, on='Date', how='inner')
@@ -636,7 +649,6 @@ elif selected_menu == "Supply Dynamics":
         all_opts_sd_pct = opts_sd_pct.copy()
         if w_sd2 > 1: all_opts_sd_pct.extend([f"{m} (SMA {w_sd2})" for m in opts_sd_pct])
             
-        # Default yang menyala hanya khusus 'in Profit'
         try: sel_sd_pct = st.pills("Profit Metrics", all_opts_sd_pct, default=['⚪ Total % Profit', '🔵 LTH % Profit', '🔴 STH % Profit'], selection_mode="multi", label_visibility="collapsed", key="pills_pct")
         except: sel_sd_pct = st.multiselect("Profit Metrics", all_opts_sd_pct, default=['⚪ Total % Profit', '🔵 LTH % Profit', '🔴 STH % Profit'], label_visibility="collapsed", key="ms_pct")
 
@@ -747,7 +759,7 @@ elif selected_menu == "Derivatives":
         renderLightweightCharts([{"chart": chart_opts_d, "series": series_d}], 'chart_deriv')
 
 # ------------------------------------------------------------------------------
-# TAB 6: SOCIAL SENTIMENT (DITAMBAH FEAR & GREED)
+# TAB 6: SOCIAL SENTIMENT
 # ------------------------------------------------------------------------------
 elif selected_menu == "Social Sentiment":
     if not df_sentiment_raw.empty:
@@ -915,14 +927,10 @@ elif selected_menu == "Social Sentiment":
             with k2_fg: st.markdown(f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:{fg_color}; font-size:0.95rem; font-weight:600;'>Index Value</span><br><span style='color:{fg_color}; font-size:1.4rem; font-weight:700;'>{fg_val:,.0f}</span><div style='margin-top:4px;'><span style='color:{fg_color}; font-size:0.85rem; background-color:{fg_color}20; padding:2px 6px; border-radius:4px;'>{fg_status}</span></div></div>", unsafe_allow_html=True)
             st.markdown("---")
 
-            df_fg, w_fg = apply_filters(df_fg_raw, st.session_state.tf_fg, st.session_state.sma_fg, st.session_state.cs_fg, st.session_state.tr_fg, st.session_state.cd_fg, ['Fear & Greed'])
+            df_fg, w_fg = apply_filters(df_fg_raw, "Daily", "0d", 0, st.session_state.tr_fg, st.session_state.cd_fg, ['Fear & Greed'])
 
-            col_fs_fg, col_tf_fg, col_sma_fg, col_mode_fg, col_radio_fg, col_custom_fg = st.columns([1, 1.2, 1.2, 1.2, 5.5, 1.2], vertical_alignment="bottom", gap="small")
+            col_fs_fg, col_empty1, col_empty2, col_empty3, col_radio_fg, col_custom_fg = st.columns([1, 1.2, 1.2, 1.2, 5.5, 1.2], vertical_alignment="bottom", gap="small")
             with col_fs_fg: focus_fg = st.toggle("Full Screen", key="tg_fg")
-            with col_tf_fg: st.session_state.tf_fg = st.selectbox("Timeframe", ["Daily", "3 Days", "Weekly", "Monthly"], index=["Daily", "3 Days", "Weekly", "Monthly"].index(st.session_state.tf_fg), key="tfs_fg")
-            with col_sma_fg: st.session_state.sma_fg = st.selectbox("SMA", ["0d", "7d", "14d", "30d", "Custom"], index=["0d", "7d", "14d", "30d", "Custom"].index(st.session_state.sma_fg), key="smas_fg")
-            with col_sma_cst_fg:
-                if st.session_state.sma_fg == "Custom": st.session_state.cs_fg = st.number_input("Days", min_value=1, value=st.session_state.cs_fg, label_visibility="collapsed", key="cst_fg")
             with col_radio_fg:
                 c_idx_fg = t_opts.index(st.session_state.tr_fg) if st.session_state.tr_fg in t_opts else 5
                 st.session_state.tr_fg = st.radio("Range:", t_opts, index=c_idx_fg, horizontal=True, label_visibility="collapsed", key="rg_fg")
@@ -931,7 +939,6 @@ elif selected_menu == "Social Sentiment":
             
             opts_fg_base = ['📊 Fear & Greed']
             all_opts_fg = opts_fg_base.copy()
-            if w_fg > 1: all_opts_fg.extend([f"{m} (SMA {w_fg})" for m in opts_fg_base])
                 
             try: sel_fg = st.pills("F&G Metrics", all_opts_fg, default=['📊 Fear & Greed'], selection_mode="multi", label_visibility="collapsed", key="pills_fg")
             except: sel_fg = st.multiselect("F&G Metrics", all_opts_fg, default=['📊 Fear & Greed'], label_visibility="collapsed", key="ms_fg")
@@ -940,19 +947,15 @@ elif selected_menu == "Social Sentiment":
             series_fg = [{"type": 'Line', "data": get_s(df_fg, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
 
             for m in sel_fg:
-                is_sma = "(SMA" in m
-                if is_sma: 
-                    series_fg.append({"type": 'Line', "data": get_s(df_fg, 'Fear & Greed_SMA'), "options": {"color": '#ffffff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": "F&G SMA"}})
-                else:
-                    fg_raw = get_s(df_fg, 'Fear & Greed')
-                    for d in fg_raw: 
-                        v = d['value']
-                        if v < 25: d['color'] = '#ff4d4d'
-                        elif v < 45: d['color'] = '#ff9933'
-                        elif v <= 55: d['color'] = '#eab308'
-                        elif v <= 75: d['color'] = '#00cc66'
-                        else: d['color'] = '#006600'
-                    series_fg.append({"type": 'Histogram', "data": fg_raw, "options": {"priceScaleId": 'left', "title": 'Fear & Greed'}})
+                fg_raw = get_s(df_fg, 'Fear & Greed')
+                for d in fg_raw: 
+                    v = d['value']
+                    if v < 25: d['color'] = '#ff4d4d'
+                    elif v < 45: d['color'] = '#ff9933'
+                    elif v <= 55: d['color'] = '#eab308'
+                    elif v <= 75: d['color'] = '#00cc66'
+                    else: d['color'] = '#006600'
+                series_fg.append({"type": 'Histogram', "data": fg_raw, "options": {"priceScaleId": 'left', "title": 'Fear & Greed'}})
 
             renderLightweightCharts([{"chart": chart_opts_fg, "series": series_fg}], 'chart_fg')
 
