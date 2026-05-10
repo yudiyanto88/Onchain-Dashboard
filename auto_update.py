@@ -83,11 +83,14 @@ if not df_funding.empty and not df_oi.empty:
 # 4. PIPELINE: SOCIAL SENTIMENT
 # ==========================================
 print("Menarik data Social Sentiment...")
-df_gtrend = fetch_data("https://chartinspect.com/api/charts/onchain/google-trends?timeframe=all&isProUser=false", ['date', 'btc_price', 'trend_bitcoin', 'trend_crypto'])
-df_wiki = fetch_data("https://chartinspect.com/api/charts/onchain/wikipedia-pageviews?timeframe=all&isProUser=false", ['date', 'wiki_bitcoin', 'wiki_cryptocurrency'])
+# Mengambil 7 Metrik Terbesar untuk Google Trends
+df_gtrend = fetch_data("https://chartinspect.com/api/charts/onchain/google-trends?timeframe=all&isProUser=false", ['date', 'btc_price', 'trend_bitcoin', 'trend_crypto', 'trend_ethereum', 'trend_nft', 'trend_defi', 'trend_solana', 'trend_dogecoin'])
+
+# Mengambil 7 Metrik Terbesar untuk Wikipedia
+df_wiki = fetch_data("https://chartinspect.com/api/charts/onchain/wikipedia-pageviews?timeframe=all&isProUser=false", ['date', 'wiki_bitcoin', 'wiki_cryptocurrency', 'wiki_ethereum', 'wiki_satoshi_nakamoto', 'wiki_blockchain', 'wiki_nft', 'wiki_dogecoin'])
 
 if not df_gtrend.empty and not df_wiki.empty:
-    df_wiki_clean = df_wiki[['date', 'wiki_bitcoin', 'wiki_cryptocurrency']]
+    df_wiki_clean = df_wiki.drop(columns=['btc_price'], errors='ignore')
     df_master_sentiment = pd.merge(df_gtrend, df_wiki_clean, on='date', how='outer')
     df_master_sentiment['date'] = pd.to_datetime(df_master_sentiment['date'])
     df_master_sentiment.sort_values('date').to_csv("data_sentiment.csv", index=False)
