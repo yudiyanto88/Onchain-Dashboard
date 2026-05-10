@@ -101,15 +101,19 @@ div[data-testid="stPill"] button {
 """, unsafe_allow_html=True)
 
 # Inisialisasi Session State 
-for key in ['tr_p', 'tr_ms', 'tr_mpl', 'tr_d']:
+for key in ['tr_p', 'tr_ms', 'tr_mpl', 'tr_d', 'tr_ss']:
     if key not in st.session_state: st.session_state[key] = "All Time"
-for key in ['cd_p', 'cd_ms', 'cd_mpl', 'cd_d']:
+for key in ['cd_p', 'cd_ms', 'cd_mpl', 'cd_d', 'cd_ss']:
     if key not in st.session_state: st.session_state[key] = 120
-for key in ['tf_p', 'tf_ms', 'tf_mpl', 'tf_d']:
+for key in ['tf_p', 'tf_ms', 'tf_mpl', 'tf_d', 'tf_ss']:
     if key not in st.session_state: st.session_state[key] = "Daily"
 for key in ['sma_p', 'sma_ms', 'sma_mpl', 'sma_d']:
     if key not in st.session_state: st.session_state[key] = "0d"
-for key in ['cs_p', 'cs_ms', 'cs_mpl', 'cs_d']:
+
+# Default SMA untuk Social Sentiment adalah 30d
+if 'sma_ss' not in st.session_state: st.session_state['sma_ss'] = "30d"
+
+for key in ['cs_p', 'cs_ms', 'cs_mpl', 'cs_d', 'cs_ss']:
     if key not in st.session_state: st.session_state[key] = 50
 
 # ==============================================================================
@@ -145,9 +149,20 @@ def load_data_derivatives():
         return df.drop_duplicates(subset=['Date'], keep='last') 
     except: return pd.DataFrame()
 
+@st.cache_data(ttl=3600)
+def load_data_sentiment():
+    try:
+        df = pd.read_csv("data_sentiment.csv")
+        df.rename(columns={'date': 'Date', 'btc_price': 'BTC Price', 'trend_bitcoin': 'Google Trend (BTC)', 'trend_crypto': 'Google Trend (Crypto)', 'wiki_bitcoin': 'Wiki (BTC)', 'wiki_cryptocurrency': 'Wiki (Crypto)'}, inplace=True)
+        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        df = df.dropna(subset=['Date']).sort_values('Date')
+        return df.drop_duplicates(subset=['Date'], keep='last') 
+    except: return pd.DataFrame()
+
 df_price_raw = load_data_price()
 df_mom_raw = load_data_momentum()
 df_deriv_raw = load_data_derivatives()
+df_sentiment_raw = load_data_sentiment()
 
 def apply_filters(df, res_state, smooth_state, custom_smooth, time_state, custom_days, metrics_to_smooth):
     if df.empty: return df, 1
@@ -196,7 +211,7 @@ with st.sidebar:
     
     selected_menu = st.radio(
         "Menu Navigasi",
-        ["Price Levels", "Profit & Loss", "Derivatives"],
+        ["Price Levels", "Profit & Loss", "Derivatives", "Social Sentiment"],
         label_visibility="collapsed"
     )
     st.markdown("---")
@@ -213,11 +228,24 @@ if selected_menu == "Price Levels":
         df_p, w_p = apply_filters(df_price_raw, st.session_state.tf_p, st.session_state.sma_p, st.session_state.cs_p, st.session_state.tr_p, st.session_state.cd_p, ['STH Cost Basis', 'LTH Cost Basis', 'Realized Price', 'True Market Mean', 'CVDD'])
 
         last_p = df_p.iloc[-1]
+        prev_p = df_p.iloc[-2] if len(df_p) > 1 else last_p
+        
         btc_p = last_p.get('BTC Price', 0)
+        btc_prev = prev_p.get('BTC Price', 0)
         
         def render_kpi_p(title, value, is_btc=False):
-            if is_btc: c, tc, d = "#f7931a", "#f7931a", ""
-            elif pd.isna(value) or value == 0: c, tc, d = "#ffffff", "#a3a8b8", ""
+            if is_btc: 
+                c, tc = "#f7931a", "#f7931a"
+                if btc_prev > 0:
+                    dp = ((btc_p - btc_prev) / btc_prev) * 100
+                    ip = dp >= 0
+                    dc = "#00cc66" if ip else "#ff4d4d"
+                    ar = "↑" if ip else "↓"
+                    d = f"<div style='margin-top:4px;'><span style='color:{dc}; font-size:0.85rem; background-color:{dc}20; padding:2px 6px; border-radius:4px;'>{ar} {abs(dp):.2f}%</span></div>"
+                else:
+                    d = ""
+            elif pd.isna(value) or value == 0: 
+                c, tc, d = "#ffffff", "#a3a8b8", ""
             else:
                 dp = ((btc_p - value) / btc_p) * 100
                 ip = dp >= 0
@@ -260,7 +288,7 @@ if selected_menu == "Price Levels":
 
         chart_p_opts = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 850 if focus_p else 650}
         
-        series_p = [{"type": 'Line', "data": get_s(df_p, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "title": 'BTC Price'}}]
+        series_p = [{"type": 'Line', "data": get_s(df_p, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
         
         colors_p = {'🔴 STH Cost Basis': ('#ff4d4d', 'STH Cost Basis'), '🔵 LTH Cost Basis': ('#4da6ff', 'LTH Cost Basis'), '⚪ Realized Price': ('#ffffff', 'Realized Price'), '🟣 True Market Mean': ('#cc33ff', 'True Market Mean'), '🟢 CVDD': ('#00cc66', 'CVDD')}
         
@@ -281,34 +309,36 @@ if selected_menu == "Price Levels":
 elif selected_menu == "Profit & Loss":
     if not df_mom_raw.empty:
         last_m = df_mom_raw.iloc[-1]
-        prev_m = df_mom_raw.iloc[-2] if len(df_mom_raw) > 1 else last_m # Ambil data H-1
+        prev_m = df_mom_raw.iloc[-2] if len(df_mom_raw) > 1 else last_m
         
         btc_m = last_m.get('BTC Price', 0)
-        prev_btc_m = prev_m.get('BTC Price', 0)
+        btc_prev_m = prev_m.get('BTC Price', 0)
         
-        # Kalkulasi % BTC Price Change
-        btc_pct = ((btc_m - prev_btc_m) / prev_btc_m) * 100 if prev_btc_m else 0
-        btc_c = "#00cc66" if btc_pct >= 0 else "#ff4d4d"
-        btc_ar = "↑" if btc_pct >= 0 else "↓"
-        btc_diff_html = f"<div style='margin-top:4px;'><span style='color:{btc_c}; font-size:0.85rem; background-color:{btc_c}20; padding:2px 6px; border-radius:4px;'>{btc_ar} {abs(btc_pct):.2f}%</span></div>"
-
-        def render_kpi_m(title, value, prev_value, threshold=1.0, is_money=False):
+        def render_kpi_m(title, value, prev_val, threshold=1.0, is_money=False):
             if pd.isna(value) or value == 0: 
                 color = "#a3a8b8"
-                diff_html = ""
+                d = ""
             else: 
                 color = "#00cc66" if value >= threshold else "#ff4d4d"
-                # Menghitung Persentase Perubahan (Day over Day)
-                if pd.isna(prev_value) or prev_value == 0:
-                    diff_html = ""
-                else:
-                    pct_change = ((value - prev_value) / abs(prev_value)) * 100
-                    diff_color = "#00cc66" if pct_change >= 0 else "#ff4d4d"
-                    arrow = "↑" if pct_change >= 0 else "↓"
-                    diff_html = f"<div style='margin-top:4px;'><span style='color:{diff_color}; font-size:0.85rem; background-color:{diff_color}20; padding:2px 6px; border-radius:4px;'>{arrow} {abs(pct_change):.2f}%</span></div>"
-                    
+                diff = value - prev_val
+                ip = diff >= 0
+                dc = "#00cc66" if ip else "#ff4d4d"
+                ar = "↑" if ip else "↓"
+                
+                if is_money: diff_str = f"${abs(diff):,.2f}"
+                else: diff_str = f"{abs(diff):.4f}"
+                
+                d = f"<div style='margin-top:4px;'><span style='color:{dc}; font-size:0.85rem; background-color:{dc}20; padding:2px 6px; border-radius:4px;'>{ar} {diff_str}</span></div>"
+                
             val_str = f"${value:,.2f}" if is_money else f"{value:.4f}"
-            st.markdown(f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:{color}; font-size:0.95rem; font-weight:600;'>{title}</span><br><span style='color:{color}; font-size:1.4rem; font-weight:700;'>{val_str}</span>{diff_html}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:{color}; font-size:0.95rem; font-weight:600;'>{title}</span><br><span style='color:{color}; font-size:1.4rem; font-weight:700;'>{val_str}</span>{d}</div>", unsafe_allow_html=True)
+
+        dp_btc_m = ((btc_m - btc_prev_m) / btc_prev_m * 100) if btc_prev_m else 0
+        ip_btc_m = dp_btc_m >= 0
+        dc_btc_m = "#00cc66" if ip_btc_m else "#ff4d4d"
+        ar_btc_m = "↑" if ip_btc_m else "↓"
+        d_btc_m = f"<div style='margin-top:4px;'><span style='color:{dc_btc_m}; font-size:0.85rem; background-color:{dc_btc_m}20; padding:2px 6px; border-radius:4px;'>{ar_btc_m} {abs(dp_btc_m):.2f}%</span></div>"
+        btc_html_m = f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:#f7931a; font-size:0.95rem; font-weight:600;'>Current BTC Price</span><br><span style='color:#f7931a; font-size:1.4rem; font-weight:700;'>${btc_m:,.2f}</span>{d_btc_m}</div>"
 
         # ===========================================
         # CHART 1: SOPR GROUP
@@ -318,7 +348,7 @@ elif selected_menu == "Profit & Loss":
         with col_title_1:
             st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.4rem;'>Profit & Loss<br><span style='font-size: 1rem; color: #d1d4dc;'>SOPR Metric</span></h3></div>", unsafe_allow_html=True)
             
-        with k1_1: st.markdown(f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:#f7931a; font-size:0.95rem; font-weight:600;'>Current BTC Price</span><br><span style='color:#f7931a; font-size:1.4rem; font-weight:700;'>${btc_m:,.2f}</span>{btc_diff_html}</div>", unsafe_allow_html=True)
+        with k1_1: st.markdown(btc_html_m, unsafe_allow_html=True)
         with k2_1: render_kpi_m("aSOPR", last_m.get('aSOPR', 0), prev_m.get('aSOPR', 0), 1.0)
         with k3_1: render_kpi_m("LTH SOPR", last_m.get('LTH SOPR', 0), prev_m.get('LTH SOPR', 0), 1.0)
         with k4_1: render_kpi_m("STH SOPR", last_m.get('STH SOPR', 0), prev_m.get('STH SOPR', 0), 1.0)
@@ -398,7 +428,7 @@ elif selected_menu == "Profit & Loss":
         with col_title_2:
             st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.4rem;'>Profit & Loss<br><span style='font-size: 1rem; color: #d1d4dc;'>Realized P&L Metric</span></h3></div>", unsafe_allow_html=True)
             
-        with k1_2: st.markdown(f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:#f7931a; font-size:0.95rem; font-weight:600;'>Current BTC Price</span><br><span style='color:#f7931a; font-size:1.4rem; font-weight:700;'>${btc_m:,.2f}</span>{btc_diff_html}</div>", unsafe_allow_html=True)
+        with k1_2: st.markdown(btc_html_m, unsafe_allow_html=True)
         with k2_2: render_kpi_m("Net Realized PL", last_m.get('Net Realized PL', 0), prev_m.get('Net Realized PL', 0), 0.0, True)
         with k3_2: render_kpi_m("STH P/L Ratio", last_m.get('STH P/L Ratio', 0), prev_m.get('STH P/L Ratio', 0), 1.0)
         with k4_2: render_kpi_m("LTH P/L Ratio", last_m.get('LTH P/L Ratio', 0), prev_m.get('LTH P/L Ratio', 0), 1.0)
@@ -470,50 +500,47 @@ elif selected_menu == "Profit & Loss":
 elif selected_menu == "Derivatives":
     if not df_deriv_raw.empty:
         last_d = df_deriv_raw.iloc[-1]
-        prev_d = df_deriv_raw.iloc[-2] if len(df_deriv_raw) > 1 else last_d # Ambil data H-1
+        prev_d = df_deriv_raw.iloc[-2] if len(df_deriv_raw) > 1 else last_d
         
         btc_d = last_d.get('BTC Price', 0)
-        prev_btc_d = prev_d.get('BTC Price', 0)
+        btc_prev_d = prev_d.get('BTC Price', 0)
         
-        # Kalkulasi % BTC Price Change
-        btc_pct_d = ((btc_d - prev_btc_d) / prev_btc_d) * 100 if prev_btc_d else 0
-        btc_c_d = "#00cc66" if btc_pct_d >= 0 else "#ff4d4d"
-        btc_ar_d = "↑" if btc_pct_d >= 0 else "↓"
-        btc_diff_html_d = f"<div style='margin-top:4px;'><span style='color:{btc_c_d}; font-size:0.85rem; background-color:{btc_c_d}20; padding:2px 6px; border-radius:4px;'>{btc_ar_d} {abs(btc_pct_d):.2f}%</span></div>"
-
-        def render_kpi_d(title, value, prev_value, is_money=False, is_percent=False):
+        def render_kpi_d(title, value, prev_val, is_money=False, is_percent=False):
             if pd.isna(value) or value == 0: 
                 color = "#a3a8b8"
-                diff_html = ""
+                d = ""
             else: 
                 color = "#00cc66" if value >= 0 else "#ff4d4d"
-                # Kalkulasi perbedaan (Absolute vs Persentase)
-                if pd.isna(prev_value):
-                    diff_html = ""
-                else:
-                    if is_percent: # Khusus Funding Rate: Selisih Murni
-                        diff = value - prev_value
-                        diff_color = "#00cc66" if diff >= 0 else "#ff4d4d"
-                        arrow = "↑" if diff >= 0 else "↓"
-                        diff_html = f"<div style='margin-top:4px;'><span style='color:{diff_color}; font-size:0.85rem; background-color:{diff_color}20; padding:2px 6px; border-radius:4px;'>{arrow} {abs(diff):.4f}%</span></div>"
-                    else: # Khusus OI: % Change
-                        pct_change = ((value - prev_value) / abs(prev_value)) * 100 if prev_value else 0
-                        diff_color = "#00cc66" if pct_change >= 0 else "#ff4d4d"
-                        arrow = "↑" if pct_change >= 0 else "↓"
-                        diff_html = f"<div style='margin-top:4px;'><span style='color:{diff_color}; font-size:0.85rem; background-color:{diff_color}20; padding:2px 6px; border-radius:4px;'>{arrow} {abs(pct_change):.2f}%</span></div>"
-                        
+                diff = value - prev_val
+                ip = diff >= 0
+                dc = "#00cc66" if ip else "#ff4d4d"
+                ar = "↑" if ip else "↓"
+                
+                if is_money: diff_str = f"${abs(diff):,.2f}"
+                elif is_percent: diff_str = f"{abs(diff):.4f}%"
+                else: diff_str = f"{abs(diff):,.0f}"
+                
+                d = f"<div style='margin-top:4px;'><span style='color:{dc}; font-size:0.85rem; background-color:{dc}20; padding:2px 6px; border-radius:4px;'>{ar} {diff_str}</span></div>"
+
             if is_money: val_str = f"${value:,.2f}"
             elif is_percent: val_str = f"{value:.4f}%"
             else: val_str = f"{value:,.0f}"
             
-            st.markdown(f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:{color}; font-size:0.95rem; font-weight:600;'>{title}</span><br><span style='color:{color}; font-size:1.4rem; font-weight:700;'>{val_str}</span>{diff_html}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:{color}; font-size:0.95rem; font-weight:600;'>{title}</span><br><span style='color:{color}; font-size:1.4rem; font-weight:700;'>{val_str}</span>{d}</div>", unsafe_allow_html=True)
+
+        dp_btc_d = ((btc_d - btc_prev_d) / btc_prev_d * 100) if btc_prev_d else 0
+        ip_btc_d = dp_btc_d >= 0
+        dc_btc_d = "#00cc66" if ip_btc_d else "#ff4d4d"
+        ar_btc_d = "↑" if ip_btc_d else "↓"
+        d_btc_d = f"<div style='margin-top:4px;'><span style='color:{dc_btc_d}; font-size:0.85rem; background-color:{dc_btc_d}20; padding:2px 6px; border-radius:4px;'>{ar_btc_d} {abs(dp_btc_d):.2f}%</span></div>"
+        btc_html_d = f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:#f7931a; font-size:0.95rem; font-weight:600;'>Current BTC Price</span><br><span style='color:#f7931a; font-size:1.4rem; font-weight:700;'>${btc_d:,.2f}</span>{d_btc_d}</div>"
 
         col_title, k1, k2, k3, k4, k5 = st.columns([1.5, 1, 1, 1, 1, 1], vertical_alignment="center")
         
         with col_title:
             st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.4rem;'>Derivatives<br><span style='font-size: 1rem; color: #d1d4dc;'>Open Interest & Funding Rates</span></h3></div>", unsafe_allow_html=True)
             
-        with k1: st.markdown(f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:#f7931a; font-size:0.95rem; font-weight:600;'>Current BTC Price</span><br><span style='color:#f7931a; font-size:1.4rem; font-weight:700;'>${btc_d:,.2f}</span>{btc_diff_html_d}</div>", unsafe_allow_html=True)
+        with k1: st.markdown(btc_html_d, unsafe_allow_html=True)
         with k2: render_kpi_d("Open Interest", last_d.get('Open Interest', 0), prev_d.get('Open Interest', 0), is_money=True)
         with k3: render_kpi_d("Funding Rate", last_d.get('Funding Rate', 0), prev_d.get('Funding Rate', 0), is_percent=True)
         
@@ -573,5 +600,160 @@ elif selected_menu == "Derivatives":
 
         renderLightweightCharts([{"chart": chart_opts_d, "series": series_d}], 'chart_deriv')
 
+# ------------------------------------------------------------------------------
+# TAB 4: SOCIAL SENTIMENT (NEW TAB)
+# ------------------------------------------------------------------------------
+elif selected_menu == "Social Sentiment":
+    if not df_sentiment_raw.empty:
+        last_ss = df_sentiment_raw.iloc[-1]
+        prev_ss = df_sentiment_raw.iloc[-2] if len(df_sentiment_raw) > 1 else last_ss
+        
+        btc_ss = last_ss.get('BTC Price', 0)
+        btc_prev_ss = prev_ss.get('BTC Price', 0)
+        
+        def render_kpi_ss(title, value, prev_val):
+            if pd.isna(value) or value == 0: 
+                color = "#a3a8b8"
+                d = ""
+            else: 
+                color = "#4da6ff" 
+                diff = value - prev_val
+                ip = diff >= 0
+                dc = "#00cc66" if ip else "#ff4d4d"
+                ar = "↑" if ip else "↓"
+                diff_str = f"{abs(diff):,.0f}"
+                d = f"<div style='margin-top:4px;'><span style='color:{dc}; font-size:0.85rem; background-color:{dc}20; padding:2px 6px; border-radius:4px;'>{ar} {diff_str}</span></div>"
+
+            val_str = f"{value:,.0f}"
+            st.markdown(f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:{color}; font-size:0.95rem; font-weight:600;'>{title}</span><br><span style='color:{color}; font-size:1.4rem; font-weight:700;'>{val_str}</span>{d}</div>", unsafe_allow_html=True)
+
+        dp_btc_ss = ((btc_ss - btc_prev_ss) / btc_prev_ss * 100) if btc_prev_ss else 0
+        ip_btc_ss = dp_btc_ss >= 0
+        dc_btc_ss = "#00cc66" if ip_btc_ss else "#ff4d4d"
+        ar_btc_ss = "↑" if ip_btc_ss else "↓"
+        d_btc_ss = f"<div style='margin-top:4px;'><span style='color:{dc_btc_ss}; font-size:0.85rem; background-color:{dc_btc_ss}20; padding:2px 6px; border-radius:4px;'>{ar_btc_ss} {abs(dp_btc_ss):.2f}%</span></div>"
+        btc_html_ss = f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:#f7931a; font-size:0.95rem; font-weight:600;'>Current BTC Price</span><br><span style='color:#f7931a; font-size:1.4rem; font-weight:700;'>${btc_ss:,.2f}</span>{d_btc_ss}</div>"
+
+        # ===========================================
+        # CHART 1: GOOGLE TRENDS
+        # ===========================================
+        col_title_1, k1_1, k2_1, k3_1, k4_1, k5_1 = st.columns([1.5, 1, 1, 1, 1, 1], vertical_alignment="center")
+        
+        with col_title_1:
+            st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.4rem;'>Social Sentiment<br><span style='font-size: 1rem; color: #d1d4dc;'>Google Trends</span></h3></div>", unsafe_allow_html=True)
+            
+        with k1_1: st.markdown(btc_html_ss, unsafe_allow_html=True)
+        with k2_1: render_kpi_ss("Google Trend (BTC)", last_ss.get('Google Trend (BTC)', 0), prev_ss.get('Google Trend (BTC)', 0))
+        with k3_1: render_kpi_ss("Google Trend (Crypto)", last_ss.get('Google Trend (Crypto)', 0), prev_ss.get('Google Trend (Crypto)', 0))
+        
+        st.markdown("---")
+
+        df_ss, w_ss = apply_filters(df_sentiment_raw, st.session_state.tf_ss, st.session_state.sma_ss, st.session_state.cs_ss, st.session_state.tr_ss, st.session_state.cd_ss, ['Google Trend (BTC)', 'Google Trend (Crypto)', 'Wiki (BTC)', 'Wiki (Crypto)'])
+
+        col_fs_ss, col_tf_ss, col_sma_ss, col_sma_cst_ss, col_radio_ss, col_custom_ss = st.columns([1, 1.2, 1.2, 1, 6, 1.2], vertical_alignment="bottom", gap="small")
+        with col_fs_ss: focus_ss = st.toggle("Full Screen", key="tg_ss")
+        with col_tf_ss: st.session_state.tf_ss = st.selectbox("Timeframe", ["Daily", "3 Days", "Weekly", "Monthly"], index=["Daily", "3 Days", "Weekly", "Monthly"].index(st.session_state.tf_ss), key="tfs_ss")
+        with col_sma_ss: st.session_state.sma_ss = st.selectbox("SMA", ["0d", "7d", "14d", "30d", "Custom"], index=["0d", "7d", "14d", "30d", "Custom"].index(st.session_state.sma_ss), key="smas_ss")
+        with col_sma_cst_ss:
+            if st.session_state.sma_ss == "Custom": st.session_state.cs_ss = st.number_input("Days", min_value=1, value=st.session_state.cs_ss, label_visibility="collapsed", key="cst_ss")
+        with col_radio_ss:
+            c_idx_ss = t_opts.index(st.session_state.tr_ss) if st.session_state.tr_ss in t_opts else 5
+            st.session_state.tr_ss = st.radio("Range:", t_opts, index=c_idx_ss, horizontal=True, label_visibility="collapsed", key="rg_ss")
+        with col_custom_ss:
+            if st.session_state.tr_ss == "Custom": st.session_state.cd_ss = st.number_input("Days back", min_value=7, value=st.session_state.cd_ss, label_visibility="collapsed", key="cdin_ss")
+        
+        opts_ss_base = ['🔵 Google Trend (BTC)', '🟣 Google Trend (Crypto)']
+        all_opts_ss = opts_ss_base.copy()
+        if w_ss > 1: all_opts_ss.extend([f"{m} (SMA {w_ss})" for m in opts_ss_base])
+            
+        try: sel_ss = st.pills("Trend Metrics", all_opts_ss, default=['🔵 Google Trend (BTC)'], selection_mode="multi", label_visibility="collapsed", key="pills_gtrend")
+        except: sel_ss = st.multiselect("Trend Metrics", all_opts_ss, default=['🔵 Google Trend (BTC)'], label_visibility="collapsed", key="ms_gtrend")
+
+        chart_opts_ss = {
+            "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, 
+            "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, 
+            "crosshair": {"mode": 0}, 
+            "height": 850 if focus_ss else 650, 
+            "rightPriceScale": {"visible": True}, 
+            "leftPriceScale": {"visible": True}
+        }
+        
+        series_ss = [{"type": 'Line', "data": get_s(df_ss, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
+
+        for m in sel_ss:
+            is_sma = "(SMA" in m
+            base_m = m.split(" (SMA")[0]
+            
+            if base_m == '🔵 Google Trend (BTC)':
+                c_col = '#4da6ff'
+                c_name = 'Google Trend (BTC)'
+            elif base_m == '🟣 Google Trend (Crypto)':
+                c_col = '#cc33ff'
+                c_name = 'Google Trend (Crypto)'
+            else: continue
+            
+            if is_sma:
+                series_ss.append({"type": 'Line', "data": get_s(df_ss, f"{c_name}_SMA"), "options": {"color": c_col, "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": f"{c_name} SMA"}})
+            else:
+                series_ss.append({"type": 'Line', "data": get_s(df_ss, c_name), "options": {"color": c_col, "lineWidth": 1, "priceScaleId": 'left', "title": c_name}})
+
+        renderLightweightCharts([{"chart": chart_opts_ss, "series": series_ss}], 'chart_gtrend')
+
+        st.markdown("<br><br>", unsafe_allow_html=True)
+        
+        # ===========================================
+        # CHART 2: WIKIPEDIA PAGEVIEWS
+        # ===========================================
+        col_title_2, k1_2, k2_2, k3_2, k4_2, k5_2 = st.columns([1.5, 1, 1, 1, 1, 1], vertical_alignment="center")
+        
+        with col_title_2:
+            st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.4rem;'>Social Sentiment<br><span style='font-size: 1rem; color: #d1d4dc;'>Wikipedia Pageviews</span></h3></div>", unsafe_allow_html=True)
+            
+        with k1_2: st.markdown(btc_html_ss, unsafe_allow_html=True)
+        with k2_2: render_kpi_ss("Wiki (BTC)", last_ss.get('Wiki (BTC)', 0), prev_ss.get('Wiki (BTC)', 0))
+        with k3_2: render_kpi_ss("Wiki (Crypto)", last_ss.get('Wiki (Crypto)', 0), prev_ss.get('Wiki (Crypto)', 0))
+        
+        st.markdown("---")
+
+        # Kontrol independen untuk Chart Wikipedia ditiadakan untuk efisiensi baris kode, 
+        # kita menggunakan nilai filter yang sama (df_ss, w_ss) dari panel Google Trends di atasnya.
+        
+        opts_ss_wiki = ['⚪ Wiki (BTC)', '🟢 Wiki (Crypto)']
+        all_opts_ss_wiki = opts_ss_wiki.copy()
+        if w_ss > 1: all_opts_ss_wiki.extend([f"{m} (SMA {w_ss})" for m in opts_ss_wiki])
+            
+        try: sel_ss_wiki = st.pills("Wiki Metrics", all_opts_ss_wiki, default=['⚪ Wiki (BTC)'], selection_mode="multi", label_visibility="collapsed", key="pills_wiki")
+        except: sel_ss_wiki = st.multiselect("Wiki Metrics", all_opts_ss_wiki, default=['⚪ Wiki (BTC)'], label_visibility="collapsed", key="ms_wiki")
+
+        chart_opts_ss_wiki = {
+            "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, 
+            "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, 
+            "crosshair": {"mode": 0}, 
+            "height": 850 if focus_ss else 650, 
+            "rightPriceScale": {"visible": True}, 
+            "leftPriceScale": {"visible": True}
+        }
+        
+        series_ss_wiki = [{"type": 'Line', "data": get_s(df_ss, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
+
+        for m in sel_ss_wiki:
+            is_sma = "(SMA" in m
+            base_m = m.split(" (SMA")[0]
+            
+            if base_m == '⚪ Wiki (BTC)':
+                c_col = '#ffffff'
+                c_name = 'Wiki (BTC)'
+            elif base_m == '🟢 Wiki (Crypto)':
+                c_col = '#00cc66'
+                c_name = 'Wiki (Crypto)'
+            else: continue
+            
+            if is_sma:
+                series_ss_wiki.append({"type": 'Line', "data": get_s(df_ss, f"{c_name}_SMA"), "options": {"color": c_col, "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": f"{c_name} SMA"}})
+            else:
+                series_ss_wiki.append({"type": 'Line', "data": get_s(df_ss, c_name), "options": {"color": c_col, "lineWidth": 1, "priceScaleId": 'left', "title": c_name}})
+
+        renderLightweightCharts([{"chart": chart_opts_ss_wiki, "series": series_ss_wiki}], 'chart_wiki')
+
     else:
-        st.info("Menunggu data Derivatives. Pastikan script auto_update.py sudah berjalan!")
+        st.info("Menunggu data Social Sentiment. Pastikan script auto_update.py sudah menarik data terbaru!")
