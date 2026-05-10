@@ -126,5 +126,18 @@ if not df_mvrv.empty:
     df_mvrv['date'] = pd.to_datetime(df_mvrv['date'])
     df_mvrv.sort_values('date').to_csv("data_mvrv.csv", index=False)
     print("✅ data_mvrv.csv berhasil diperbarui.")
+    
+# ==========================================
+# 7. PIPELINE: FEAR & GREED
+# ==========================================
+print("Menarik data Fear & Greed...")
+df_fg = fetch_data("https://chartinspect.com/api/charts/crypto/fear-greed-index?timeframe=all&isProUser=false")
+if not df_fg.empty:
+    # Mengubah format timestamp menjadi tanggal YYYY-MM-DD
+    df_fg['date'] = pd.to_datetime(df_fg['timestamp'], unit='s').dt.strftime('%Y-%m-%d')
+    df_fg.rename(columns={'value': 'Fear & Greed'}, inplace=True)
+    df_fg_clean = df_fg[['date', 'Fear & Greed']]
+    df_fg_clean.sort_values('date').to_csv("data_fg.csv", index=False)
+    print("✅ data_fg.csv berhasil diperbarui.")
 
 print("Semua proses selesai!")
