@@ -12,57 +12,106 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
+# --- CSS SUPER CUSTOM UNTUK SIDEBAR TABS, SELECTBOX, DAN MENCEGAH CLIPPING ---
 st.markdown("""
 <style>
-/* Sidebar Tabs */
-section[data-testid="stSidebar"] { background-color: #0e1117; }
-section[data-testid="stSidebar"] div.stRadio > div[role="radiogroup"] { gap: 10px; }
-section[data-testid="stSidebar"] div.stRadio > div[role="radiogroup"] > label {
-    background-color: #1a1d24; padding: 12px 16px !important; border-radius: 8px !important;
-    border-left: 4px solid transparent; margin: 0 !important; cursor: pointer; transition: all 0.2s ease-in-out;
+/* ======================================================
+   A. STYLING SIDEBAR MENU MENJADI BENTUK "TAB" BESAR
+   ====================================================== */
+section[data-testid="stSidebar"] {
+    background-color: #171b26 !important; /* Warna beda dari main dashboard */
+    border-right: 1px solid #2a2e39 !important; /* Garis pembatas sidebar */
 }
-section[data-testid="stSidebar"] div.stRadio > div[role="radiogroup"] > label:hover { background-color: #262a35; }
+section[data-testid="stSidebar"] div.stRadio > div[role="radiogroup"] {
+    gap: 10px; 
+}
+section[data-testid="stSidebar"] div.stRadio > div[role="radiogroup"] > label {
+    background-color: #1a1d24;
+    padding: 12px 16px !important;
+    border-radius: 8px !important;
+    border-left: 4px solid transparent;
+    margin: 0 !important;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+}
+section[data-testid="stSidebar"] div.stRadio > div[role="radiogroup"] > label:hover {
+    background-color: #262a35;
+}
 section[data-testid="stSidebar"] div.stRadio > div[role="radiogroup"] > label[data-checked="true"] {
-    border-left: 4px solid #a855f7 !important; background-color: #2a203b !important;
+    border-left: 4px solid #a855f7 !important;
+    background-color: #2a203b !important;
 }
 section[data-testid="stSidebar"] div.stRadio > div[role="radiogroup"] p {
-    font-size: 1.15rem !important; font-weight: 600 !important; margin: 0 !important; color: #ffffff !important;
+    font-size: 1.15rem !important;
+    font-weight: 600 !important;
+    margin: 0 !important;
+    color: #ffffff !important;
 }
-section[data-testid="stSidebar"] div.stRadio > div[role="radiogroup"] > label > div:first-child { display: none !important; }
+section[data-testid="stSidebar"] div.stRadio > div[role="radiogroup"] > label > div:first-child {
+    display: none !important;
+}
 
-/* Control Panel Inputs */
-div[data-testid="stSelectbox"] *, div[data-testid="stRadio"] *, div[data-testid="stToggle"] *, div[data-testid="stNumberInput"] * {
+/* ======================================================
+   B. MENGECILKAN SELECTBOX, TOGGLE, DAN MENYAMAKAN FONT
+   ====================================================== */
+div[data-testid="stSelectbox"] *, 
+div[data-testid="stRadio"] *, 
+div[data-testid="stToggle"] *,
+div[data-testid="stNumberInput"] * {
     font-size: 0.85rem !important;
 }
-div[data-testid="stToggle"] label p { font-size: 0.85rem !important; margin-top: 2px !important; }
-div[data-testid="stSelectbox"] label, div[data-testid="stNumberInput"] label { padding-bottom: 2px !important; min-height: 0px !important; }
-
-/* Presisi Tengah Kotak Background Selectbox */
-div[data-baseweb="select"] > div {
-    min-height: 32px !important; height: 32px !important; border-radius: 6px !important; padding-bottom: 2px !important;
+div[data-testid="stToggle"] label p {
+    font-size: 0.85rem !important;
+    margin-top: 2px !important; 
 }
-div[data-baseweb="select"] > div > div { padding-top: 0px !important; padding-bottom: 0px !important; }
-div[data-baseweb="select"] span { display: inline-block; }
+div[data-testid="stSelectbox"] label, 
+div[data-testid="stNumberInput"] label {
+    padding-bottom: 2px !important;
+    min-height: 0px !important;
+}
 
-/* Spasi & Pills */
-.block-container { padding-top: 3rem !important; padding-bottom: 1.5rem !important; max-width: 100%; }
-div[data-testid="stPill"] button { font-size: 0.85rem !important; padding: 2px 12px !important; min-height: 28px !important; }
+/* Memotong Tinggi Selectbox & Presisi Tengah Vertikal */
+div[data-baseweb="select"] > div {
+    min-height: 32px !important;
+    height: 32px !important;
+    border-radius: 6px !important;
+    padding-bottom: 2px !important;
+}
+div[data-baseweb="select"] > div > div {
+    padding-top: 0px !important;
+    padding-bottom: 0px !important;
+}
+div[data-baseweb="select"] span {
+    display: inline-block;
+}
+
+/* ======================================================
+   C. MERAPIKAN SPASI UTAMA & MENCEGAH TEKS TERPOTONG
+   ====================================================== */
+.block-container { 
+    padding-top: 3rem !important; 
+    padding-bottom: 1.5rem !important; 
+    max-width: 100%; 
+}
+div[data-testid="stPill"] button {
+    font-size: 0.85rem !important;
+    padding: 2px 12px !important;
+    min-height: 28px !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
 # Inisialisasi Session State 
-# Tab Social Sentiment (gt = Google Trends, wk = Wikipedia) - Diset Default SMA 30d
-for key in ['tr_p', 'tr_ms', 'tr_mpl', 'tr_d', 'tr_gt', 'tr_wk']:
+for key in ['tr_p', 'tr_ms', 'tr_mpl', 'tr_d', 'tr_ss']:
     if key not in st.session_state: st.session_state[key] = "All Time"
-for key in ['cd_p', 'cd_ms', 'cd_mpl', 'cd_d', 'cd_gt', 'cd_wk']:
+for key in ['cd_p', 'cd_ms', 'cd_mpl', 'cd_d', 'cd_ss']:
     if key not in st.session_state: st.session_state[key] = 120
-for key in ['tf_p', 'tf_ms', 'tf_mpl', 'tf_d', 'tf_gt', 'tf_wk']:
+for key in ['tf_p', 'tf_ms', 'tf_mpl', 'tf_d', 'tf_ss']:
     if key not in st.session_state: st.session_state[key] = "Daily"
 for key in ['sma_p', 'sma_ms', 'sma_mpl', 'sma_d']:
     if key not in st.session_state: st.session_state[key] = "0d"
-for key in ['sma_gt', 'sma_wk']:
-    if key not in st.session_state: st.session_state[key] = "30d"  # Default 30d
-for key in ['cs_p', 'cs_ms', 'cs_mpl', 'cs_d', 'cs_gt', 'cs_wk']:
+if 'sma_ss' not in st.session_state: st.session_state['sma_ss'] = "30d"  
+for key in ['cs_p', 'cs_ms', 'cs_mpl', 'cs_d', 'cs_ss']:
     if key not in st.session_state: st.session_state[key] = 50
 for key in ['mode_gt', 'mode_wk']:
     if key not in st.session_state: st.session_state[key] = "Line"
@@ -76,7 +125,8 @@ def load_data_price():
         df = pd.read_csv("data_price_level.csv")
         df.rename(columns={'date': 'Date', 'btc_price': 'BTC Price', 'sth_cost_basis': 'STH Cost Basis', 'lth_cost_basis': 'LTH Cost Basis', 'realized_price': 'Realized Price', 'cvdd': 'CVDD', 'true_market_mean_price': 'True Market Mean'}, inplace=True)
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-        return df.dropna(subset=['Date']).sort_values('Date').drop_duplicates(subset=['Date'], keep='last')
+        df = df.dropna(subset=['Date']).sort_values('Date')
+        return df.drop_duplicates(subset=['Date'], keep='last') 
     except: return pd.DataFrame()
 
 @st.cache_data(ttl=3600)
@@ -85,7 +135,8 @@ def load_data_momentum():
         df = pd.read_csv("data_momentum.csv")
         df.rename(columns={'date': 'Date', 'btc_price': 'BTC Price', 'asopr': 'aSOPR', 'lth_sopr': 'LTH SOPR', 'sth_sopr': 'STH SOPR', 'net_realized_pl_usd': 'Net Realized PL', 'sth_pl_ratio': 'STH P/L Ratio', 'lth_pl_ratio': 'LTH P/L Ratio'}, inplace=True)
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-        return df.dropna(subset=['Date']).sort_values('Date').drop_duplicates(subset=['Date'], keep='last')
+        df = df.dropna(subset=['Date']).sort_values('Date')
+        return df.drop_duplicates(subset=['Date'], keep='last') 
     except: return pd.DataFrame()
 
 @st.cache_data(ttl=3600)
@@ -94,14 +145,14 @@ def load_data_derivatives():
         df = pd.read_csv("data_derivatives.csv")
         df.rename(columns={'date': 'Date', 'btc_price': 'BTC Price', 'total_oi': 'Open Interest', 'funding_rate': 'Funding Rate'}, inplace=True)
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-        return df.dropna(subset=['Date']).sort_values('Date').drop_duplicates(subset=['Date'], keep='last')
+        df = df.dropna(subset=['Date']).sort_values('Date')
+        return df.drop_duplicates(subset=['Date'], keep='last') 
     except: return pd.DataFrame()
 
 @st.cache_data(ttl=3600)
 def load_data_sentiment():
     try:
         df = pd.read_csv("data_sentiment.csv")
-        # Rename Top 7 Metrics
         df.rename(columns={
             'date': 'Date', 'btc_price': 'BTC Price',
             'trend_bitcoin': 'GTrend BTC', 'trend_crypto': 'GTrend Crypto', 'trend_ethereum': 'GTrend ETH',
@@ -110,7 +161,8 @@ def load_data_sentiment():
             'wiki_satoshi_nakamoto': 'Wiki Satoshi', 'wiki_blockchain': 'Wiki Blockchain', 'wiki_nft': 'Wiki NFT', 'wiki_dogecoin': 'Wiki DOGE'
         }, inplace=True)
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-        return df.dropna(subset=['Date']).sort_values('Date').drop_duplicates(subset=['Date'], keep='last')
+        df = df.dropna(subset=['Date']).sort_values('Date')
+        return df.drop_duplicates(subset=['Date'], keep='last') 
     except: return pd.DataFrame()
 
 df_price_raw = load_data_price()
@@ -206,7 +258,9 @@ if selected_menu == "Price Levels":
             st.markdown(f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:{tc}; font-size:0.95rem; font-weight:600;'>{title}</span><br><span style='color:{c}; font-size:1.4rem; font-weight:700;'>${value:,.2f}</span>{d}</div>", unsafe_allow_html=True)
 
         col_title, k1, k2, k3, k4, k5 = st.columns([1.5, 1, 1, 1, 1, 1], vertical_alignment="center")
-        with col_title: st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.4rem;'>On-Chain Price Levels<br><span style='font-size: 1rem; color: transparent;'>.</span></h3></div>", unsafe_allow_html=True)
+        
+        with col_title:
+            st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.4rem;'>On-Chain Price Levels<br><span style='font-size: 1rem; color: transparent;'>.</span></h3></div>", unsafe_allow_html=True)
             
         with k1: render_kpi_p("Current BTC Price", btc_p, True)
         with k2: render_kpi_p("STH Cost Basis", last_p.get('STH Cost Basis', 0))
@@ -277,7 +331,6 @@ elif selected_menu == "Profit & Loss":
             val_str = f"${value:,.2f}" if is_money else f"{value:.4f}"
             st.markdown(f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:{color}; font-size:0.95rem; font-weight:600;'>{title}</span><br><span style='color:{color}; font-size:1.4rem; font-weight:700;'>{val_str}</span>{d}</div>", unsafe_allow_html=True)
 
-        # BTC KPI tetap pake Persentase
         dp_btc_m = ((btc_m - btc_prev_m) / btc_prev_m * 100) if btc_prev_m else 0
         ip_btc_m = dp_btc_m >= 0
         dc_btc_m = "#00cc66" if ip_btc_m else "#ff4d4d"
@@ -464,7 +517,7 @@ elif selected_menu == "Derivatives":
             "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, 
             "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, 
             "crosshair": {"mode": 0}, "height": 850 if focus_d else 650, 
-            "rightPriceScale": {"visible": True}, "leftPriceScale": {"visible": True}, "funding_scale": {"visible": True, "position": "left", "autoScale": True} 
+            "rightPriceScale": {"visible": True}, "leftPriceScale": {"visible": True}, "funding_scale": {"visible": False} 
         }
         series_d = [{"type": 'Line', "data": get_s(df_d, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
 
@@ -486,7 +539,7 @@ elif selected_menu == "Derivatives":
         renderLightweightCharts([{"chart": chart_opts_d, "series": series_d}], 'chart_deriv')
 
 # ------------------------------------------------------------------------------
-# TAB 4: SOCIAL SENTIMENT (NEW)
+# TAB 4: SOCIAL SENTIMENT
 # ------------------------------------------------------------------------------
 elif selected_menu == "Social Sentiment":
     if not df_sentiment_raw.empty:
@@ -501,7 +554,7 @@ elif selected_menu == "Social Sentiment":
                 color = "#a3a8b8"
                 d = ""
             else: 
-                color = "#00cc66" if title.startswith("Wiki") else "#4da6ff"
+                color = "#4da6ff" 
                 diff = value - prev_val
                 ip = diff >= 0
                 dc = "#00cc66" if ip else "#ff4d4d"
@@ -525,8 +578,9 @@ elif selected_menu == "Social Sentiment":
         col_title_gt, k1_gt, k2_gt, k3_gt, k4_gt, k5_gt = st.columns([1.5, 1, 1, 1, 1, 1], vertical_alignment="center")
         with col_title_gt: st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.4rem;'>Social Sentiment<br><span style='font-size: 1rem; color: #d1d4dc;'>Google Trends (Global)</span></h3></div>", unsafe_allow_html=True)
         with k1_gt: st.markdown(btc_html_ss, unsafe_allow_html=True)
-        with k2_gt: render_kpi_ss("GTrend BTC", last_ss.get('GTrend BTC', 0), prev_ss.get('GTrend BTC', 0))
-        with k3_gt: render_kpi_ss("GTrend Crypto", last_ss.get('GTrend Crypto', 0), prev_ss.get('GTrend Crypto', 0))
+        with k2_gt: render_kpi_ss("BTC", last_ss.get('GTrend BTC', 0), prev_ss.get('GTrend BTC', 0))
+        with k3_gt: render_kpi_ss("Crypto", last_ss.get('GTrend Crypto', 0), prev_ss.get('GTrend Crypto', 0))
+        with k4_gt: render_kpi_ss("Binance", last_ss.get('GTrend Binance', 0), prev_ss.get('GTrend Binance', 0))
         st.markdown("---")
 
         df_gt, w_gt = apply_filters(df_sentiment_raw, st.session_state.tf_gt, st.session_state.sma_gt, st.session_state.cs_gt, st.session_state.tr_gt, st.session_state.cd_gt, ['GTrend BTC', 'GTrend Crypto', 'GTrend ETH', 'GTrend NFT', 'GTrend Binance', 'GTrend SOL', 'GTrend DOGE'])
@@ -542,19 +596,18 @@ elif selected_menu == "Social Sentiment":
         with col_custom_gt:
             if st.session_state.tr_gt == "Custom": st.session_state.cd_gt = st.number_input("Days back", min_value=7, value=st.session_state.cd_gt, label_visibility="collapsed", key="cdin_gt")
         
-        opts_gt_base = ['🔵 GTrend BTC', '🟢 GTrend ETH', '🟣 GTrend Crypto', '🟡 GTrend NFT', '🟠 GTrend Binance', '🔴 GTrend SOL', '🟤 GTrend DOGE']
-        colors_gt = {'🔵 GTrend BTC': ('#4da6ff', 'GTrend BTC'), '🟢 GTrend ETH': ('#00cc66', 'GTrend ETH'), '🟣 GTrend Crypto': ('#cc33ff', 'GTrend Crypto'), '🟡 GTrend NFT': ('#eab308', 'GTrend NFT'), '🟠 GTrend Binance': ('#ff9933', 'GTrend Binance'), '🔴 GTrend SOL': ('#ff4d4d', 'GTrend SOL'), '🟤 GTrend DOGE': ('#cc9966', 'GTrend DOGE')}
+        opts_gt_base = ['🔵 BTC', '🟢 ETH', '🟣 Crypto', '🟡 NFT', '🟠 Binance', '🔴 SOL', '🟤 DOGE']
+        colors_gt = {'🔵 BTC': ('#4da6ff', 'GTrend BTC'), '🟢 ETH': ('#00cc66', 'GTrend ETH'), '🟣 Crypto': ('#cc33ff', 'GTrend Crypto'), '🟡 NFT': ('#eab308', 'GTrend NFT'), '🟠 Binance': ('#ff9933', 'GTrend Binance'), '🔴 SOL': ('#ff4d4d', 'GTrend SOL'), '🟤 DOGE': ('#cc9966', 'GTrend DOGE')}
         
         all_opts_gt = opts_gt_base.copy()
         if w_gt > 1: all_opts_gt.extend([f"{m} (SMA {w_gt})" for m in opts_gt_base])
             
-        try: sel_gt = st.pills("GTrend Metrics", all_opts_gt, default=['🔵 GTrend BTC', '🟣 GTrend Crypto'], selection_mode="multi", label_visibility="collapsed")
-        except: sel_gt = st.multiselect("GTrend Metrics", all_opts_gt, default=['🔵 GTrend BTC', '🟣 GTrend Crypto'], label_visibility="collapsed")
+        try: sel_gt = st.pills("GTrend Metrics", all_opts_gt, default=['🔵 BTC', '🟣 Crypto'], selection_mode="multi", label_visibility="collapsed", key="pills_gtrend")
+        except: sel_gt = st.multiselect("GTrend Metrics", all_opts_gt, default=['🔵 BTC', '🟣 Crypto'], label_visibility="collapsed", key="ms_gtrend")
 
         chart_opts_gt = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 850 if focus_gt else 650, "rightPriceScale": {"visible": True}, "leftPriceScale": {"visible": True}}
         series_gt = [{"type": 'Line', "data": get_s(df_gt, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
 
-        # Engine Rendering Stacked vs Line (Google Trends)
         active_cols_gt = []
         for m in sel_gt:
             base_m = m.split(" (SMA")[0]
@@ -568,7 +621,6 @@ elif selected_menu == "Social Sentiment":
             for base_m, actual_col in active_cols_gt:
                 current_sum = current_sum + df_gt[actual_col].fillna(0)
                 df_gt[actual_col + "_stacked"] = current_sum
-            
             for base_m, actual_col in reversed(active_cols_gt):
                 c_col = colors_gt[base_m][0]
                 series_gt.append({"type": 'Area', "data": get_s(df_gt, actual_col + "_stacked"), "options": {"lineColor": c_col, "topColor": c_col + "66", "bottomColor": c_col + "0D", "lineWidth": 1, "priceScaleId": 'left', "title": actual_col}})
@@ -579,15 +631,17 @@ elif selected_menu == "Social Sentiment":
 
         renderLightweightCharts([{"chart": chart_opts_gt, "series": series_gt}], 'chart_gtrend')
         st.markdown("<br><br>", unsafe_allow_html=True)
-
+        
         # ===========================================
         # CHART 2: WIKIPEDIA PAGEVIEWS
         # ===========================================
         col_title_wk, k1_wk, k2_wk, k3_wk, k4_wk, k5_wk = st.columns([1.5, 1, 1, 1, 1, 1], vertical_alignment="center")
         with col_title_wk: st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.4rem;'>Social Sentiment<br><span style='font-size: 1rem; color: #d1d4dc;'>Wikipedia Pageviews</span></h3></div>", unsafe_allow_html=True)
         with k1_wk: st.markdown(btc_html_ss, unsafe_allow_html=True)
-        with k2_wk: render_kpi_ss("Wiki BTC", last_ss.get('Wiki BTC', 0), prev_ss.get('Wiki BTC', 0))
-        with k3_wk: render_kpi_ss("Wiki Crypto", last_ss.get('Wiki Crypto', 0), prev_ss.get('Wiki Crypto', 0))
+        with k2_wk: render_kpi_ss("BTC", last_ss.get('Wiki BTC', 0), prev_ss.get('Wiki BTC', 0))
+        with k3_wk: render_kpi_ss("Crypto", last_ss.get('Wiki Crypto', 0), prev_ss.get('Wiki Crypto', 0))
+        with k4_wk: render_kpi_ss("Satoshi", last_ss.get('Wiki Satoshi', 0), prev_ss.get('Wiki Satoshi', 0))
+        with k5_wk: render_kpi_ss("Blockchain", last_ss.get('Wiki Blockchain', 0), prev_ss.get('Wiki Blockchain', 0))
         st.markdown("---")
 
         df_wk, w_wk = apply_filters(df_sentiment_raw, st.session_state.tf_wk, st.session_state.sma_wk, st.session_state.cs_wk, st.session_state.tr_wk, st.session_state.cd_wk, ['Wiki BTC', 'Wiki Crypto', 'Wiki ETH', 'Wiki Satoshi', 'Wiki Blockchain', 'Wiki NFT', 'Wiki DOGE'])
@@ -603,19 +657,18 @@ elif selected_menu == "Social Sentiment":
         with col_custom_wk:
             if st.session_state.tr_wk == "Custom": st.session_state.cd_wk = st.number_input("Days back", min_value=7, value=st.session_state.cd_wk, label_visibility="collapsed", key="cdin_wk")
         
-        opts_wk_base = ['⚪ Wiki BTC', '🟢 Wiki Crypto', '🔵 Wiki ETH', '🟣 Wiki Satoshi', '🟡 Wiki Blockchain', '🔴 Wiki NFT', '🟤 Wiki DOGE']
-        colors_wk = {'⚪ Wiki BTC': ('#ffffff', 'Wiki BTC'), '🟢 Wiki Crypto': ('#00cc66', 'Wiki Crypto'), '🔵 Wiki ETH': ('#4da6ff', 'Wiki ETH'), '🟣 Wiki Satoshi': ('#cc33ff', 'Wiki Satoshi'), '🟡 Wiki Blockchain': ('#eab308', 'Wiki Blockchain'), '🔴 Wiki NFT': ('#ff4d4d', 'Wiki NFT'), '🟤 Wiki DOGE': ('#cc9966', 'Wiki DOGE')}
+        opts_wk_base = ['⚪ BTC', '🟢 Crypto', '🔵 ETH', '🟣 Satoshi', '🟡 Blockchain', '🔴 NFT', '🟤 DOGE']
+        colors_wk = {'⚪ BTC': ('#ffffff', 'Wiki BTC'), '🟢 Crypto': ('#00cc66', 'Wiki Crypto'), '🔵 ETH': ('#4da6ff', 'Wiki ETH'), '🟣 Satoshi': ('#cc33ff', 'Wiki Satoshi'), '🟡 Blockchain': ('#eab308', 'Wiki Blockchain'), '🔴 NFT': ('#ff4d4d', 'Wiki NFT'), '🟤 DOGE': ('#cc9966', 'Wiki DOGE')}
         
         all_opts_wk = opts_wk_base.copy()
         if w_wk > 1: all_opts_wk.extend([f"{m} (SMA {w_wk})" for m in opts_wk_base])
             
-        try: sel_wk = st.pills("Wiki Metrics", all_opts_wk, default=['⚪ Wiki BTC', '🟢 Wiki Crypto'], selection_mode="multi", label_visibility="collapsed")
-        except: sel_wk = st.multiselect("Wiki Metrics", all_opts_wk, default=['⚪ Wiki BTC', '🟢 Wiki Crypto'], label_visibility="collapsed")
+        try: sel_wk = st.pills("Wiki Metrics", all_opts_wk, default=['⚪ BTC', '🟢 Crypto'], selection_mode="multi", label_visibility="collapsed", key="pills_wiki")
+        except: sel_wk = st.multiselect("Wiki Metrics", all_opts_wk, default=['⚪ BTC', '🟢 Crypto'], label_visibility="collapsed", key="ms_wiki")
 
         chart_opts_wk = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 850 if focus_wk else 650, "rightPriceScale": {"visible": True}, "leftPriceScale": {"visible": True}}
         series_wk = [{"type": 'Line', "data": get_s(df_wk, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
 
-        # Engine Rendering Stacked vs Line (Wikipedia)
         active_cols_wk = []
         for m in sel_wk:
             base_m = m.split(" (SMA")[0]
@@ -629,7 +682,6 @@ elif selected_menu == "Social Sentiment":
             for base_m, actual_col in active_cols_wk:
                 current_sum_wk = current_sum_wk + df_wk[actual_col].fillna(0)
                 df_wk[actual_col + "_stacked"] = current_sum_wk
-            
             for base_m, actual_col in reversed(active_cols_wk):
                 c_col = colors_wk[base_m][0]
                 series_wk.append({"type": 'Area', "data": get_s(df_wk, actual_col + "_stacked"), "options": {"lineColor": c_col, "topColor": c_col + "66", "bottomColor": c_col + "0D", "lineWidth": 1, "priceScaleId": 'left', "title": actual_col}})
