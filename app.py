@@ -48,17 +48,18 @@ div[data-testid="stPill"] button { font-size: 0.85rem !important; padding: 2px 1
 </style>
 """, unsafe_allow_html=True)
 
-for key in ['tr_p', 'tr_mv', 'tr_ms', 'tr_mpl', 'tr_nupl', 'tr_d', 'tr_gt', 'tr_wk', 'tr_sd', 'tr_fg']:
+# State initialization (Termasuk Tab 7 Market Signals)
+for key in ['tr_p', 'tr_mv', 'tr_ms', 'tr_mpl', 'tr_nupl', 'tr_d', 'tr_gt', 'tr_wk', 'tr_sd', 'tr_fg', 'tr_msig']:
     if key not in st.session_state: st.session_state[key] = "All Time"
-for key in ['cd_p', 'cd_mv', 'cd_ms', 'cd_mpl', 'cd_nupl', 'cd_d', 'cd_gt', 'cd_wk', 'cd_sd', 'cd_fg']:
+for key in ['cd_p', 'cd_mv', 'cd_ms', 'cd_mpl', 'cd_nupl', 'cd_d', 'cd_gt', 'cd_wk', 'cd_sd', 'cd_fg', 'cd_msig']:
     if key not in st.session_state: st.session_state[key] = 120
-for key in ['tf_p', 'tf_mv', 'tf_ms', 'tf_mpl', 'tf_nupl', 'tf_d', 'tf_gt', 'tf_wk', 'tf_sd', 'tf_fg']:
+for key in ['tf_p', 'tf_mv', 'tf_ms', 'tf_mpl', 'tf_nupl', 'tf_d', 'tf_gt', 'tf_wk', 'tf_sd', 'tf_fg', 'tf_msig']:
     if key not in st.session_state: st.session_state[key] = "Daily"
-for key in ['sma_p', 'sma_mv', 'sma_ms', 'sma_mpl', 'sma_nupl', 'sma_d', 'sma_sd', 'sma_fg']:
+for key in ['sma_p', 'sma_mv', 'sma_ms', 'sma_mpl', 'sma_nupl', 'sma_d', 'sma_sd', 'sma_fg', 'sma_msig']:
     if key not in st.session_state: st.session_state[key] = "0d"
 for key in ['sma_gt', 'sma_wk']:
     if key not in st.session_state: st.session_state[key] = "30d"  
-for key in ['cs_p', 'cs_mv', 'cs_ms', 'cs_mpl', 'cs_nupl', 'cs_d', 'cs_gt', 'cs_wk', 'cs_sd', 'cs_fg']:
+for key in ['cs_p', 'cs_mv', 'cs_ms', 'cs_mpl', 'cs_nupl', 'cs_d', 'cs_gt', 'cs_wk', 'cs_sd', 'cs_fg', 'cs_msig']:
     if key not in st.session_state: st.session_state[key] = 50
 for key in ['mode_gt', 'mode_wk']:
     if key not in st.session_state: st.session_state[key] = "Line"
@@ -77,7 +78,18 @@ def load_data_price():
             '200_dma': '200 DMA', '50_wma': '50 WMA', '200_wma': '200 WMA'
         }, inplace=True)
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-        return df.dropna(subset=['Date']).sort_values('Date').drop_duplicates(subset=['Date'], keep='last')
+        df = df.dropna(subset=['Date']).sort_values('Date').drop_duplicates(subset=['Date'], keep='last')
+        
+        # KALKULASI NATIVE RSI 14 (PANDAS) UNTUK TAB 7
+        delta = df['BTC Price'].diff()
+        gain = delta.where(delta > 0, 0)
+        loss = -delta.where(delta < 0, 0)
+        avg_gain = gain.ewm(alpha=1/14, adjust=False).mean()
+        avg_loss = loss.ewm(alpha=1/14, adjust=False).mean()
+        rs = avg_gain / avg_loss
+        df['RSI'] = 100 - (100 / (1 + rs))
+        
+        return df
     except: return pd.DataFrame()
 
 @st.cache_data(ttl=3600)
@@ -194,8 +206,7 @@ def apply_filters(df, res_state, smooth_state, custom_smooth, time_state, custom
 
 def get_s(df, col): 
     if col not in df.columns: return []
-    # FIX KRUSIAL: Mencegah layar blank akibat nilai Infinity pada Rasio P/L
-    clean_df = df[['Date_str', col]].replace([float('inf'), float('-inf')], float('nan')).dropna()
+    clean_df = df[['Date_str', col]].dropna()
     return clean_df.rename(columns={'Date_str':'time', col:'value'}).to_dict('records')
 
 t_opts = ["1 Month", "3 Months", "6 Months", "1 Year", "4 Years (Cycle)", "All Time", "Custom"]
@@ -273,7 +284,7 @@ if selected_menu == "Price Levels":
         with col_custom:
             if st.session_state.tr_p == "Custom": st.session_state.cd_p = st.number_input("Days back", min_value=7, value=st.session_state.cd_p, label_visibility="collapsed", key="cdin_p")
         
-        opts_p_base = ['🔴 STH Cost Basis', '🔵 LTH Cost Basis', '⚪ Realized Price', '💎 True Market Mean', '🟢 CVDD', '🟨 200 DMA', '🟦 50 WMA', '🟪 200 WMA']
+        opts_p_base = ['🔴 STH Cost Basis', '🔵 LTH Cost Basis', '⚪ Realized Price', '🟣 True Market Mean', '🟢 CVDD', '🟨 200 DMA', '🟦 50 WMA', '🟪 200 WMA']
         all_opts_p = opts_p_base.copy()
         if w_p > 1: all_opts_p.extend([f"{m} (SMA {w_p})" for m in opts_p_base])
             
@@ -284,12 +295,12 @@ if selected_menu == "Price Levels":
         chart_p_opts = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 850 if focus_p else 650, "rightPriceScale": {"visible": True}, "leftPriceScale": {"visible": False}}
         series_p = [{"type": 'Line', "data": get_s(df_p, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
         
-        # Tuple format: (Warna, Nama Kolom, Style Garis -> 0:Solid, 2:Dashed)
+        # True Market Mean diubah ke Cyan (#00ffff)
         colors_p = {
             '🔴 STH Cost Basis': ('#ff4d4d', 'STH Cost Basis', 0), 
             '🔵 LTH Cost Basis': ('#4da6ff', 'LTH Cost Basis', 0), 
             '⚪ Realized Price': ('#ffffff', 'Realized Price', 0), 
-            '💎 True Market Mean': ('#00ffff', 'True Market Mean', 0), # Diganti warna Cyan
+            '🟣 True Market Mean': ('#00ffff', 'True Market Mean', 0), 
             '🟢 CVDD': ('#00cc66', 'CVDD', 0),
             '🟨 200 DMA': ('#ffe119', '200 DMA', 2), 
             '🟦 50 WMA': ('#4363d8', '50 WMA', 2), 
@@ -513,12 +524,12 @@ elif selected_menu == "Profit & Loss":
         try: sel_pl = st.pills("P/L Metrics", all_opts_pl, default=['⚪ Net Realized PL'], selection_mode="multi", label_visibility="collapsed")
         except: sel_pl = st.multiselect("P/L Metrics", all_opts_pl, default=['⚪ Net Realized PL'], label_visibility="collapsed")
 
-        # FIX: Hapus ratio_scale, pindahkan rasio langsung ke 'left' agar bisa di-adjust ukurannya oleh kursor
+        # FIX SKALA: ratio_scale disembunyikan agar UI tidak bertumpuk jelek, tapi fungsionalitas autoScale tetap ada.
         chart_opts_pl = {
             "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, 
             "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, 
             "crosshair": {"mode": 0}, "height": 850 if focus_mpl else 650, 
-            "rightPriceScale": {"visible": True}, "leftPriceScale": {"visible": True}  
+            "rightPriceScale": {"visible": True}, "leftPriceScale": {"visible": True}, "ratio_scale": {"visible": False}  
         }
         series_pl = [{"type": 'Line', "data": get_s(df_mpl, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
 
@@ -529,14 +540,15 @@ elif selected_menu == "Profit & Loss":
             if base_m == '🟣 STH P/L Ratio':
                 c_col_rgba = 'rgba(204, 51, 255, 0.7)'
                 c_name = 'STH P/L Ratio'
-                series_pl.append({"type": 'Line', "data": get_s(df_mpl, f"{c_name}_SMA" if is_sma else c_name), "options": {"color": c_col_rgba, "lineWidth": 1, "lineStyle": 2 if is_sma else 0, "priceScaleId": 'left', "title": f"{c_name} SMA" if is_sma else c_name}})
+                series_pl.append({"type": 'Line', "data": get_s(df_mpl, f"{c_name}_SMA" if is_sma else c_name), "options": {"color": c_col_rgba, "lineWidth": 1, "lineStyle": 2 if is_sma else 0, "priceScaleId": 'ratio_scale', "title": f"{c_name} SMA" if is_sma else c_name}})
             elif base_m == '🟤 LTH P/L Ratio':
                 c_col_rgba = 'rgba(204, 153, 102, 0.7)'
                 c_name = 'LTH P/L Ratio'
-                series_pl.append({"type": 'Line', "data": get_s(df_mpl, f"{c_name}_SMA" if is_sma else c_name), "options": {"color": c_col_rgba, "lineWidth": 1, "lineStyle": 2 if is_sma else 0, "priceScaleId": 'left', "title": f"{c_name} SMA" if is_sma else c_name}})
+                series_pl.append({"type": 'Line', "data": get_s(df_mpl, f"{c_name}_SMA" if is_sma else c_name), "options": {"color": c_col_rgba, "lineWidth": 1, "lineStyle": 2 if is_sma else 0, "priceScaleId": 'ratio_scale', "title": f"{c_name} SMA" if is_sma else c_name}})
             elif base_m == '⚪ Net Realized PL':
+                # DIUBAH: Baik SMA maupun Raw kini dirender sebagai Histogram agar skala lebih stabil dan estetis
                 if is_sma:
-                    series_pl.append({"type": 'Line', "data": get_s(df_mpl, 'Net Realized PL_SMA'), "options": {"color": '#ffffff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": "Net PL SMA"}})
+                    series_pl.append({"type": 'Histogram', "data": get_s(df_mpl, 'Net Realized PL_SMA'), "options": {"color": 'rgba(255, 255, 255, 0.4)', "priceScaleId": 'left', "title": "Net PL SMA"}})
                 else:
                     net_pl_raw = get_s(df_mpl, 'Net Realized PL')
                     for d in net_pl_raw: d['color'] = 'rgba(0, 204, 102, 0.7)' if d['value'] >= 0 else 'rgba(255, 77, 77, 0.7)'
@@ -545,7 +557,7 @@ elif selected_menu == "Profit & Loss":
         renderLightweightCharts([{"chart": chart_opts_pl, "series": series_pl}], 'chart_netpl')
         st.markdown("<br><br>", unsafe_allow_html=True)
         
-        # CHART 3: NUPL GROUP (Hapus kata 'Global')
+        # CHART 3: NUPL GROUP (Kata "Global" dihilangkan)
         col_title_3, k1_3, k2_3, k3_3, k4_3, k5_3 = st.columns([1.5, 1, 1, 1, 1, 1], vertical_alignment="center")
         with col_title_3: st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.4rem;'>Profit & Loss<br><span style='font-size: 1rem; color: #d1d4dc;'>NUPL Metric</span></h3></div>", unsafe_allow_html=True)
         with k1_3: st.markdown(btc_html_m, unsafe_allow_html=True)
@@ -1033,9 +1045,90 @@ elif selected_menu == "Social Sentiment":
             renderLightweightCharts([{"chart": chart_opts_fg, "series": series_fg}], 'chart_fg')
 
 # ------------------------------------------------------------------------------
-# TAB 7: MARKET SIGNALS (PLACEHOLDER)
+# TAB 7: MARKET SIGNALS (RSI IMPLEMENTED NATIVELY)
 # ------------------------------------------------------------------------------
 elif selected_menu == "Market Signals":
-    st.title("Market Signals & Alerts")
-    st.markdown("---")
-    st.info("Fitur deteksi sinyal otomatis (MVRV Crossover, Cost Basis Crossover, dll) akan dibangun di sini sesuai instruksi selanjutnya.")
+    if not df_price_raw.empty:
+        # Menggunakan df_price_raw yang sudah memiliki kolom RSI
+        last_msig = df_price_raw.iloc[-1]
+        prev_msig = df_price_raw.iloc[-2] if len(df_price_raw) > 1 else last_msig
+        
+        btc_msig = last_msig.get('BTC Price', 0)
+        btc_prev_msig = prev_msig.get('BTC Price', 0)
+        
+        def render_kpi_msig(title, value, prev_val):
+            if pd.isna(value) or value == 0: 
+                color = "#a3a8b8"
+                d = ""
+            else: 
+                # Kondisi warna RSI (Standard: >70 Merah Overbought, <30 Hijau Oversold)
+                color = "#ffffff"
+                if value > 70: color = "#ff4d4d"
+                elif value < 30: color = "#00cc66"
+
+                diff = value - prev_val
+                ip = diff >= 0
+                dc = "#00cc66" if ip else "#ff4d4d"
+                ar = "↑" if ip else "↓"
+                diff_str = f"{abs(diff):.2f}"
+                d = f"<div style='margin-top:4px;'><span style='color:{dc}; font-size:0.85rem; background-color:{dc}20; padding:2px 6px; border-radius:4px;'>{ar} {diff_str}</span></div>"
+
+            val_str = f"{value:.2f}"
+            st.markdown(f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:{color}; font-size:0.95rem; font-weight:600;'>{title}</span><br><span style='color:{color}; font-size:1.4rem; font-weight:700;'>{val_str}</span>{d}</div>", unsafe_allow_html=True)
+
+        dp_btc_msig = ((btc_msig - btc_prev_msig) / btc_prev_msig * 100) if btc_prev_msig else 0
+        ip_btc_msig = dp_btc_msig >= 0
+        dc_btc_msig = "#00cc66" if ip_btc_msig else "#ff4d4d"
+        ar_btc_msig = "↑" if ip_btc_msig else "↓"
+        d_btc_msig = f"<div style='margin-top:4px;'><span style='color:{dc_btc_msig}; font-size:0.85rem; background-color:{dc_btc_msig}20; padding:2px 6px; border-radius:4px;'>{ar_btc_msig} {abs(dp_btc_msig):.2f}%</span></div>"
+        btc_html_msig = f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:#f7931a; font-size:0.95rem; font-weight:600;'>Current BTC Price</span><br><span style='color:#f7931a; font-size:1.4rem; font-weight:700;'>${btc_msig:,.2f}</span>{d_btc_msig}</div>"
+
+        # CHART 1: TECHNICAL MOMENTUM (RSI)
+        col_title_msig, k1_msig, k2_msig, k3_msig, k4_msig, k5_msig = st.columns([1.5, 1, 1, 1, 1, 1], vertical_alignment="center")
+        with col_title_msig: st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.4rem;'>Market Signals<br><span style='font-size: 1rem; color: #d1d4dc;'>Technical Momentum</span></h3></div>", unsafe_allow_html=True)
+        with k1_msig: st.markdown(btc_html_msig, unsafe_allow_html=True)
+        with k2_msig: render_kpi_msig("14-Day RSI", last_msig.get('RSI', 0), prev_msig.get('RSI', 0))
+        st.markdown("---")
+
+        df_msig, w_msig = apply_filters(df_price_raw, st.session_state.tf_msig, st.session_state.sma_msig, st.session_state.cs_msig, st.session_state.tr_msig, st.session_state.cd_msig, ['RSI'])
+
+        col_fs_msig, col_tf_msig, col_sma_msig, col_sma_cst_msig, col_radio_msig, col_custom_msig = st.columns([1, 1.2, 1.2, 1, 6, 1.2], vertical_alignment="bottom", gap="small")
+        with col_fs_msig: focus_msig = st.toggle("Full Screen", key="tg_msig")
+        with col_tf_msig: st.session_state.tf_msig = st.selectbox("Timeframe", ["Daily", "3 Days", "Weekly", "Monthly"], index=["Daily", "3 Days", "Weekly", "Monthly"].index(st.session_state.tf_msig), key="tfs_msig")
+        with col_sma_msig: st.session_state.sma_msig = st.selectbox("SMA", ["0d", "7d", "14d", "30d", "Custom"], index=["0d", "7d", "14d", "30d", "Custom"].index(st.session_state.sma_msig), key="smas_msig")
+        with col_sma_cst_msig:
+            if st.session_state.sma_msig == "Custom": st.session_state.cs_msig = st.number_input("Days", min_value=1, value=st.session_state.cs_msig, label_visibility="collapsed", key="cst_msig")
+        with col_radio_msig:
+            c_idx_msig = t_opts.index(st.session_state.tr_msig) if st.session_state.tr_msig in t_opts else 5
+            st.session_state.tr_msig = st.radio("Range:", t_opts, index=c_idx_msig, horizontal=True, label_visibility="collapsed", key="rg_msig")
+        with col_custom_msig:
+            if st.session_state.tr_msig == "Custom": st.session_state.cd_msig = st.number_input("Days back", min_value=7, value=st.session_state.cd_msig, label_visibility="collapsed", key="cdin_msig")
+        
+        opts_msig_base = ['📊 14D RSI']
+        all_opts_msig = opts_msig_base.copy()
+        if w_msig > 1: all_opts_msig.extend([f"{m} (SMA {w_msig})" for m in opts_msig_base])
+            
+        try: sel_msig = st.pills("Signals", all_opts_msig, default=['📊 14D RSI'], selection_mode="multi", label_visibility="collapsed", key="pills_msig")
+        except: sel_msig = st.multiselect("Signals", all_opts_msig, default=['📊 14D RSI'], label_visibility="collapsed", key="ms_msig")
+
+        chart_opts_msig = {
+            "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, 
+            "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, 
+            "crosshair": {"mode": 0}, "height": 850 if focus_msig else 650, 
+            "rightPriceScale": {"visible": True}, "leftPriceScale": {"visible": True}
+        }
+        
+        series_msig = [{"type": 'Line', "data": get_s(df_msig, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
+        
+        # Garis batas Overbought (70) & Oversold (30)
+        df_msig['OB'] = 70.0
+        df_msig['OS'] = 30.0
+        series_msig.append({"type": 'Line', "data": get_s(df_msig, 'OB'), "options": {"color": '#ff4d4d', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": 'Overbought (70)'}})
+        series_msig.append({"type": 'Line', "data": get_s(df_msig, 'OS'), "options": {"color": '#00cc66', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": 'Oversold (30)'}})
+
+        for m in sel_msig:
+            is_sma = "(SMA" in m
+            if is_sma: series_msig.append({"type": 'Line', "data": get_s(df_msig, 'RSI_SMA'), "options": {"color": '#ffffff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": "RSI SMA"}})
+            else: series_msig.append({"type": 'Line', "data": get_s(df_msig, 'RSI'), "options": {"color": '#4da6ff', "lineWidth": 1, "priceScaleId": 'left', "title": '14D RSI'}})
+
+        renderLightweightCharts([{"chart": chart_opts_msig, "series": series_msig}], 'chart_msig')
