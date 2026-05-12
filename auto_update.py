@@ -31,14 +31,14 @@ if not df_price.empty and not df_tmm.empty:
     
     # Kalkulasi Moving Averages (WMA dikonversi ke skala harian: * 7)
     df_master_price['200_dma'] = df_master_price['btc_price'].rolling(window=200, min_periods=1).mean()
-    df_master_price['50_wma'] = df_master_price['btc_price'].rolling(window=350, min_periods=1).mean() # 50 Weeks
-    df_master_price['200_wma'] = df_master_price['btc_price'].rolling(window=1400, min_periods=1).mean() # 200 Weeks
+    df_master_price['50_wma'] = df_master_price['btc_price'].rolling(window=350, min_periods=1).mean()
+    df_master_price['200_wma'] = df_master_price['btc_price'].rolling(window=1400, min_periods=1).mean()
 
     df_master_price.to_csv("data_price_level.csv", index=False)
-    print("✅ data_price_level.csv berhasil diperbarui (termasuk WMA/DMA).")
+    print("✅ data_price_level.csv berhasil diperbarui.")
 
 # ==========================================
-# 2. PIPELINE: MOMENTUM & PROFIT/LOSS
+# 2. PIPELINE: MOMENTUM & P/L
 # ==========================================
 print("Menarik data Momentum & P/L...")
 df_sopr = fetch_data("https://chartinspect.com/api/onchain/sopr?timeframe=all&isProUser=false", ['date', 'btc_price', 'asopr'])
