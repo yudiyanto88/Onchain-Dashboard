@@ -48,18 +48,18 @@ div[data-testid="stPill"] button { font-size: 0.85rem !important; padding: 2px 1
 </style>
 """, unsafe_allow_html=True)
 
-# State initialization (Termasuk Tab 7 Market Signals)
-for key in ['tr_p', 'tr_mv', 'tr_ms', 'tr_mpl', 'tr_nupl', 'tr_d', 'tr_gt', 'tr_wk', 'tr_sd', 'tr_fg', 'tr_msig']:
+# State initialization (Termasuk ex untuk Exchange Flow)
+for key in ['tr_p', 'tr_mv', 'tr_ms', 'tr_mpl', 'tr_nupl', 'tr_d', 'tr_ex', 'tr_gt', 'tr_wk', 'tr_sd', 'tr_fg', 'tr_msig']:
     if key not in st.session_state: st.session_state[key] = "All Time"
-for key in ['cd_p', 'cd_mv', 'cd_ms', 'cd_mpl', 'cd_nupl', 'cd_d', 'cd_gt', 'cd_wk', 'cd_sd', 'cd_fg', 'cd_msig']:
+for key in ['cd_p', 'cd_mv', 'cd_ms', 'cd_mpl', 'cd_nupl', 'cd_d', 'cd_ex', 'cd_gt', 'cd_wk', 'cd_sd', 'cd_fg', 'cd_msig']:
     if key not in st.session_state: st.session_state[key] = 120
-for key in ['tf_p', 'tf_mv', 'tf_ms', 'tf_mpl', 'tf_nupl', 'tf_d', 'tf_gt', 'tf_wk', 'tf_sd', 'tf_fg', 'tf_msig']:
+for key in ['tf_p', 'tf_mv', 'tf_ms', 'tf_mpl', 'tf_nupl', 'tf_d', 'tf_ex', 'tf_gt', 'tf_wk', 'tf_sd', 'tf_fg', 'tf_msig']:
     if key not in st.session_state: st.session_state[key] = "Daily"
-for key in ['sma_p', 'sma_mv', 'sma_ms', 'sma_mpl', 'sma_nupl', 'sma_d', 'sma_sd', 'sma_fg', 'sma_msig']:
+for key in ['sma_p', 'sma_mv', 'sma_ms', 'sma_mpl', 'sma_nupl', 'sma_d', 'sma_ex', 'sma_sd', 'sma_fg', 'sma_msig']:
     if key not in st.session_state: st.session_state[key] = "0d"
 for key in ['sma_gt', 'sma_wk']:
     if key not in st.session_state: st.session_state[key] = "30d"  
-for key in ['cs_p', 'cs_mv', 'cs_ms', 'cs_mpl', 'cs_nupl', 'cs_d', 'cs_gt', 'cs_wk', 'cs_sd', 'cs_fg', 'cs_msig']:
+for key in ['cs_p', 'cs_mv', 'cs_ms', 'cs_mpl', 'cs_nupl', 'cs_d', 'cs_ex', 'cs_gt', 'cs_wk', 'cs_sd', 'cs_fg', 'cs_msig']:
     if key not in st.session_state: st.session_state[key] = 50
 for key in ['mode_gt', 'mode_wk']:
     if key not in st.session_state: st.session_state[key] = "Line"
@@ -80,7 +80,6 @@ def load_data_price():
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
         df = df.dropna(subset=['Date']).sort_values('Date').drop_duplicates(subset=['Date'], keep='last')
         
-        # KALKULASI NATIVE RSI 14 (PANDAS) UNTUK TAB 7
         delta = df['BTC Price'].diff()
         gain = delta.where(delta > 0, 0)
         loss = -delta.where(delta < 0, 0)
@@ -119,6 +118,18 @@ def load_data_derivatives():
     try:
         df = pd.read_csv("data_derivatives.csv")
         df.rename(columns={'date': 'Date', 'btc_price': 'BTC Price', 'total_oi': 'Open Interest', 'funding_rate': 'Funding Rate'}, inplace=True)
+        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        return df.dropna(subset=['Date']).sort_values('Date').drop_duplicates(subset=['Date'], keep='last')
+    except: return pd.DataFrame()
+
+@st.cache_data(ttl=3600)
+def load_data_exchange():
+    try:
+        df = pd.read_csv("data_exchange.csv")
+        df.rename(columns={
+            'date': 'Date', 'btc_price': 'BTC Price', 'total_balance': 'Total Balance', 
+            'net_flow': 'Net Flow', 'inflow': 'Inflow', 'outflow': 'Outflow'
+        }, inplace=True)
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
         return df.dropna(subset=['Date']).sort_values('Date').drop_duplicates(subset=['Date'], keep='last')
     except: return pd.DataFrame()
@@ -165,6 +176,7 @@ df_price_raw = load_data_price()
 df_mvrv_raw = load_data_mvrv()
 df_mom_raw = load_data_momentum()
 df_deriv_raw = load_data_derivatives()
+df_ex_raw = load_data_exchange()
 df_sentiment_raw = load_data_sentiment()
 df_supply_raw = load_data_supply()
 
@@ -219,9 +231,10 @@ with st.sidebar:
     st.markdown("<h3 style='text-align: center; color: #a855f7; font-weight: 800; font-size: 1.3rem; margin-top: -15px;'>ON-CHAIN DASHBOARD</h3>", unsafe_allow_html=True)
     st.markdown("<br>", unsafe_allow_html=True)
     
+    # Menambahkan "Exchange Flow" ke dalam urutan menu
     selected_menu = st.radio(
         "Menu Navigasi",
-        ["Price Levels", "Market Valuation", "Profit & Loss", "Supply Dynamics", "Derivatives", "Social Sentiment", "Market Signals"],
+        ["Price Levels", "Market Valuation", "Profit & Loss", "Supply Dynamics", "Exchange Flow", "Derivatives", "Social Sentiment", "Market Signals"],
         label_visibility="collapsed"
     )
     st.markdown("---")
@@ -295,7 +308,6 @@ if selected_menu == "Price Levels":
         chart_p_opts = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 850 if focus_p else 650, "rightPriceScale": {"visible": True}, "leftPriceScale": {"visible": False}}
         series_p = [{"type": 'Line', "data": get_s(df_p, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
         
-        # True Market Mean diubah ke Cyan (#00ffff)
         colors_p = {
             '🔴 STH Cost Basis': ('#ff4d4d', 'STH Cost Basis', 0), 
             '🔵 LTH Cost Basis': ('#4da6ff', 'LTH Cost Basis', 0), 
@@ -404,9 +416,6 @@ elif selected_menu == "Market Valuation":
             else: series_mv.append({"type": 'Line', "data": get_s(df_mv, c_name), "options": {"color": c_col_raw, "lineWidth": 1, "priceScaleId": target_scale, "title": c_name}})
         renderLightweightCharts([{"chart": chart_opts_mv, "series": series_mv}], 'chart_mvrv')
 
-    else:
-        st.info("Menunggu data Market Valuation. Pastikan script auto_update.py sudah menarik data terbaru!")
-
 # ------------------------------------------------------------------------------
 # TAB 3: PROFIT & LOSS 
 # ------------------------------------------------------------------------------
@@ -441,17 +450,16 @@ elif selected_menu == "Profit & Loss":
         d_btc_m = f"<div style='margin-top:4px;'><span style='color:{dc_btc_m}; font-size:0.85rem; background-color:{dc_btc_m}20; padding:2px 6px; border-radius:4px;'>{ar_btc_m} {abs(dp_btc_m):.2f}%</span></div>"
         btc_html_m = f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:#f7931a; font-size:0.95rem; font-weight:600;'>Current BTC Price</span><br><span style='color:#f7931a; font-size:1.4rem; font-weight:700;'>${btc_m:,.2f}</span>{d_btc_m}</div>"
 
-        # CHART 1: SOPR GROUP
+        # CHART 1: SOPR
         col_title_1, k1_1, k2_1, k3_1, k4_1, k5_1 = st.columns([1.5, 1, 1, 1, 1, 1], vertical_alignment="center")
         with col_title_1: st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.4rem;'>Profit & Loss<br><span style='font-size: 1rem; color: #d1d4dc;'>SOPR Metric</span></h3></div>", unsafe_allow_html=True)
         with k1_1: st.markdown(btc_html_m, unsafe_allow_html=True)
         with k2_1: render_kpi_m("aSOPR", last_m.get('aSOPR', 0), prev_m.get('aSOPR', 0), 1.0)
         with k3_1: render_kpi_m("LTH SOPR", last_m.get('LTH SOPR', 0), prev_m.get('LTH SOPR', 0), 1.0)
         with k4_1: render_kpi_m("STH SOPR", last_m.get('STH SOPR', 0), prev_m.get('STH SOPR', 0), 1.0)
-        
         st.markdown("---")
+        
         df_ms, w_ms = apply_filters(df_mom_raw, st.session_state.tf_ms, st.session_state.sma_ms, st.session_state.cs_ms, st.session_state.tr_ms, st.session_state.cd_ms, ['aSOPR', 'LTH SOPR', 'STH SOPR'])
-
         col_fs_ms, col_tf_ms, col_sma_ms, col_sma_cst_ms, col_radio_ms, col_custom_ms = st.columns([1, 1.2, 1.2, 1, 6, 1.2], vertical_alignment="bottom", gap="small")
         with col_fs_ms: focus_ms = st.toggle("Full Screen", key="tg_ms")
         with col_tf_ms: st.session_state.tf_ms = st.selectbox("Timeframe", ["Daily", "3 Days", "Weekly", "Monthly"], index=["Daily", "3 Days", "Weekly", "Monthly"].index(st.session_state.tf_ms), key="tfs_ms")
@@ -495,7 +503,7 @@ elif selected_menu == "Profit & Loss":
         renderLightweightCharts([{"chart": chart_opts_sopr, "series": series_sopr}], 'chart_sopr')
         st.markdown("<br><br>", unsafe_allow_html=True)
 
-        # CHART 2: REALIZED P/L GROUP
+        # CHART 2: REALIZED P/L
         col_title_2, k1_2, k2_2, k3_2, k4_2, k5_2 = st.columns([1.5, 1, 1, 1, 1, 1], vertical_alignment="center")
         with col_title_2: st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.4rem;'>Profit & Loss<br><span style='font-size: 1rem; color: #d1d4dc;'>Realized P&L Metric</span></h3></div>", unsafe_allow_html=True)
         with k1_2: st.markdown(btc_html_m, unsafe_allow_html=True)
@@ -524,7 +532,6 @@ elif selected_menu == "Profit & Loss":
         try: sel_pl = st.pills("P/L Metrics", all_opts_pl, default=['⚪ Net Realized PL'], selection_mode="multi", label_visibility="collapsed")
         except: sel_pl = st.multiselect("P/L Metrics", all_opts_pl, default=['⚪ Net Realized PL'], label_visibility="collapsed")
 
-        # FIX SKALA: ratio_scale disembunyikan agar UI tidak bertumpuk jelek, tapi fungsionalitas autoScale tetap ada.
         chart_opts_pl = {
             "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, 
             "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, 
@@ -546,7 +553,6 @@ elif selected_menu == "Profit & Loss":
                 c_name = 'LTH P/L Ratio'
                 series_pl.append({"type": 'Line', "data": get_s(df_mpl, f"{c_name}_SMA" if is_sma else c_name), "options": {"color": c_col_rgba, "lineWidth": 1, "lineStyle": 2 if is_sma else 0, "priceScaleId": 'ratio_scale', "title": f"{c_name} SMA" if is_sma else c_name}})
             elif base_m == '⚪ Net Realized PL':
-                # DIUBAH: Baik SMA maupun Raw kini dirender sebagai Histogram agar skala lebih stabil dan estetis
                 if is_sma:
                     series_pl.append({"type": 'Histogram', "data": get_s(df_mpl, 'Net Realized PL_SMA'), "options": {"color": 'rgba(255, 255, 255, 0.4)', "priceScaleId": 'left', "title": "Net PL SMA"}})
                 else:
@@ -557,7 +563,7 @@ elif selected_menu == "Profit & Loss":
         renderLightweightCharts([{"chart": chart_opts_pl, "series": series_pl}], 'chart_netpl')
         st.markdown("<br><br>", unsafe_allow_html=True)
         
-        # CHART 3: NUPL GROUP (Kata "Global" dihilangkan)
+        # CHART 3: NUPL 
         col_title_3, k1_3, k2_3, k3_3, k4_3, k5_3 = st.columns([1.5, 1, 1, 1, 1, 1], vertical_alignment="center")
         with col_title_3: st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.4rem;'>Profit & Loss<br><span style='font-size: 1rem; color: #d1d4dc;'>NUPL Metric</span></h3></div>", unsafe_allow_html=True)
         with k1_3: st.markdown(btc_html_m, unsafe_allow_html=True)
@@ -744,7 +750,114 @@ elif selected_menu == "Supply Dynamics":
         renderLightweightCharts([{"chart": chart_opts_sd2, "series": series_sd2}], 'chart_profitpct')
 
 # ------------------------------------------------------------------------------
-# TAB 5: DERIVATIVES 
+# TAB 5: EXCHANGE FLOW (NEW)
+# ------------------------------------------------------------------------------
+elif selected_menu == "Exchange Flow":
+    if not df_ex_raw.empty:
+        last_ex = df_ex_raw.iloc[-1]
+        prev_ex = df_ex_raw.iloc[-2] if len(df_ex_raw) > 1 else last_ex
+        
+        btc_ex = last_ex.get('BTC Price', 0)
+        btc_prev_ex = prev_ex.get('BTC Price', 0)
+        
+        def render_kpi_ex(title, value, prev_val, is_flow=False):
+            if pd.isna(value): 
+                color = "#a3a8b8"
+                d = ""
+            else: 
+                # Jika flow positif = Inflow = biasanya diartikan bearish (merah), outflow = bullish (hijau)
+                # Tapi untuk net flow standard: Hijau jika positif, merah jika negatif (secara angka).
+                color = "#00cc66" if value >= 0 else "#ff4d4d"
+                if "Inflow" in title: color = "#ff4d4d" # Merah karena masuk bursa = potensi jual
+                if "Outflow" in title: color = "#00cc66" # Hijau karena keluar bursa = akumulasi
+                if "Total Balance" in title: color = "#4da6ff"
+                
+                diff = value - prev_val
+                ip = diff >= 0
+                dc = "#00cc66" if ip else "#ff4d4d"
+                ar = "↑" if ip else "↓"
+                diff_str = f"{abs(diff):,.0f}"
+                d = f"<div style='margin-top:4px;'><span style='color:{dc}; font-size:0.85rem; background-color:{dc}20; padding:2px 6px; border-radius:4px;'>{ar} {diff_str}</span></div>"
+
+            val_str = f"{value:,.0f}"
+            st.markdown(f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:{color}; font-size:0.95rem; font-weight:600;'>{title}</span><br><span style='color:{color}; font-size:1.4rem; font-weight:700;'>{val_str}</span>{d}</div>", unsafe_allow_html=True)
+
+        dp_btc_ex = ((btc_ex - btc_prev_ex) / btc_prev_ex * 100) if btc_prev_ex else 0
+        ip_btc_ex = dp_btc_ex >= 0
+        dc_btc_ex = "#00cc66" if ip_btc_ex else "#ff4d4d"
+        ar_btc_ex = "↑" if ip_btc_ex else "↓"
+        d_btc_ex = f"<div style='margin-top:4px;'><span style='color:{dc_btc_ex}; font-size:0.85rem; background-color:{dc_btc_ex}20; padding:2px 6px; border-radius:4px;'>{ar_btc_ex} {abs(dp_btc_ex):.2f}%</span></div>"
+        btc_html_ex = f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:#f7931a; font-size:0.95rem; font-weight:600;'>Current BTC Price</span><br><span style='color:#f7931a; font-size:1.4rem; font-weight:700;'>${btc_ex:,.2f}</span>{d_btc_ex}</div>"
+
+        col_title_ex, k1_ex, k2_ex, k3_ex, k4_ex, k5_ex = st.columns([1.5, 1, 1, 1, 1, 1], vertical_alignment="center")
+        with col_title_ex: st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.4rem;'>Exchange Flow<br><span style='font-size: 1rem; color: #d1d4dc;'>Liquidity & Balance</span></h3></div>", unsafe_allow_html=True)
+        with k1_ex: st.markdown(btc_html_ex, unsafe_allow_html=True)
+        with k2_ex: render_kpi_ex("Total Balance", last_ex.get('Total Balance', 0), prev_ex.get('Total Balance', 0))
+        with k3_ex: render_kpi_ex("Net Flow", last_ex.get('Net Flow', 0), prev_ex.get('Net Flow', 0), True)
+        with k4_ex: render_kpi_ex("Inflow", last_ex.get('Inflow', 0), prev_ex.get('Inflow', 0), True)
+        with k5_ex: render_kpi_ex("Outflow", last_ex.get('Outflow', 0), prev_ex.get('Outflow', 0), True)
+        st.markdown("---")
+
+        df_ex, w_ex = apply_filters(df_ex_raw, st.session_state.tf_ex, st.session_state.sma_ex, st.session_state.cs_ex, st.session_state.tr_ex, st.session_state.cd_ex, ['Total Balance', 'Net Flow', 'Inflow', 'Outflow'])
+
+        col_fs_ex, col_tf_ex, col_sma_ex, col_sma_cst_ex, col_radio_ex, col_custom_ex = st.columns([1, 1.2, 1.2, 1, 6, 1.2], vertical_alignment="bottom", gap="small")
+        with col_fs_ex: focus_ex = st.toggle("Full Screen", key="tg_ex")
+        with col_tf_ex: st.session_state.tf_ex = st.selectbox("Timeframe", ["Daily", "3 Days", "Weekly", "Monthly"], index=["Daily", "3 Days", "Weekly", "Monthly"].index(st.session_state.tf_ex), key="tfs_ex")
+        with col_sma_ex: st.session_state.sma_ex = st.selectbox("SMA", ["0d", "7d", "14d", "30d", "Custom"], index=["0d", "7d", "14d", "30d", "Custom"].index(st.session_state.sma_ex), key="smas_ex")
+        with col_sma_cst_ex:
+            if st.session_state.sma_ex == "Custom": st.session_state.cs_ex = st.number_input("Days", min_value=1, value=st.session_state.cs_ex, label_visibility="collapsed", key="cst_ex")
+        with col_radio_ex:
+            c_idx_ex = t_opts.index(st.session_state.tr_ex) if st.session_state.tr_ex in t_opts else 5
+            st.session_state.tr_ex = st.radio("Range:", t_opts, index=c_idx_ex, horizontal=True, label_visibility="collapsed", key="rg_ex")
+        with col_custom_ex:
+            if st.session_state.tr_ex == "Custom": st.session_state.cd_ex = st.number_input("Days back", min_value=7, value=st.session_state.cd_ex, label_visibility="collapsed", key="cdin_ex")
+        
+        opts_ex_base = ['🔵 Total Balance', '⚪ Net Flow', '🔴 Inflow', '🟢 Outflow']
+        all_opts_ex = opts_ex_base.copy()
+        if w_ex > 1: all_opts_ex.extend([f"{m} (SMA {w_ex})" for m in opts_ex_base])
+            
+        try: sel_ex = st.pills("Metrics", all_opts_ex, default=['🔵 Total Balance', '⚪ Net Flow'], selection_mode="multi", label_visibility="collapsed", key="pills_ex")
+        except: sel_ex = st.multiselect("Metrics", all_opts_ex, default=['🔵 Total Balance', '⚪ Net Flow'], label_visibility="collapsed", key="ms_ex")
+
+        # Mengatur flow_scale tersembunyi agar Histogram Net Flow tidak merusak skala Balance
+        chart_opts_ex = {
+            "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, 
+            "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, 
+            "crosshair": {"mode": 0}, "height": 850 if focus_ex else 650, 
+            "rightPriceScale": {"visible": True}, "leftPriceScale": {"visible": True}, "flow_scale": {"visible": False}
+        }
+        series_ex = [{"type": 'Line', "data": get_s(df_ex, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
+
+        for m in sel_ex:
+            is_sma = "(SMA" in m
+            base_m = m.split(" (SMA")[0]
+            
+            if base_m == '🔵 Total Balance':
+                if is_sma: series_ex.append({"type": 'Line', "data": get_s(df_ex, 'Total Balance_SMA'), "options": {"color": '#4da6ff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": "Balance SMA"}})
+                else: series_ex.append({"type": 'Line', "data": get_s(df_ex, 'Total Balance'), "options": {"color": '#4da6ff', "lineWidth": 1, "priceScaleId": 'left', "title": 'Total Balance'}})
+            
+            elif base_m == '⚪ Net Flow':
+                if is_sma:
+                    series_ex.append({"type": 'Histogram', "data": get_s(df_ex, 'Net Flow_SMA'), "options": {"color": 'rgba(255, 255, 255, 0.4)', "priceScaleId": 'flow_scale', "title": "Net Flow SMA"}})
+                else:
+                    flow_raw = get_s(df_ex, 'Net Flow')
+                    for d_val in flow_raw: d_val['color'] = 'rgba(0, 204, 102, 0.7)' if d_val['value'] >= 0 else 'rgba(255, 77, 77, 0.7)'
+                    series_ex.append({"type": 'Histogram', "data": flow_raw, "options": {"priceScaleId": 'flow_scale', "title": 'Net Flow'}})
+            
+            elif base_m == '🔴 Inflow':
+                if is_sma: series_ex.append({"type": 'Line', "data": get_s(df_ex, 'Inflow_SMA'), "options": {"color": '#ff4d4d', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'flow_scale', "title": "Inflow SMA"}})
+                else: series_ex.append({"type": 'Line', "data": get_s(df_ex, 'Inflow'), "options": {"color": 'rgba(255, 77, 77, 0.7)', "lineWidth": 1, "priceScaleId": 'flow_scale', "title": 'Inflow'}})
+                
+            elif base_m == '🟢 Outflow':
+                if is_sma: series_ex.append({"type": 'Line', "data": get_s(df_ex, 'Outflow_SMA'), "options": {"color": '#00cc66', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'flow_scale', "title": "Outflow SMA"}})
+                else: series_ex.append({"type": 'Line', "data": get_s(df_ex, 'Outflow'), "options": {"color": 'rgba(0, 204, 102, 0.7)', "lineWidth": 1, "priceScaleId": 'flow_scale', "title": 'Outflow'}})
+
+        renderLightweightCharts([{"chart": chart_opts_ex, "series": series_ex}], 'chart_exchange')
+    else:
+        st.info("Menunggu data Exchange Flow. Pastikan script auto_update.py sudah menarik data terbaru!")
+
+# ------------------------------------------------------------------------------
+# TAB 6: DERIVATIVES 
 # ------------------------------------------------------------------------------
 elif selected_menu == "Derivatives":
     if not df_deriv_raw.empty:
@@ -831,7 +944,7 @@ elif selected_menu == "Derivatives":
         renderLightweightCharts([{"chart": chart_opts_d, "series": series_d}], 'chart_deriv')
 
 # ------------------------------------------------------------------------------
-# TAB 6: SOCIAL SENTIMENT
+# TAB 7: SOCIAL SENTIMENT
 # ------------------------------------------------------------------------------
 elif selected_menu == "Social Sentiment":
     if not df_sentiment_raw.empty:
@@ -1045,11 +1158,10 @@ elif selected_menu == "Social Sentiment":
             renderLightweightCharts([{"chart": chart_opts_fg, "series": series_fg}], 'chart_fg')
 
 # ------------------------------------------------------------------------------
-# TAB 7: MARKET SIGNALS (RSI IMPLEMENTED NATIVELY)
+# TAB 8: MARKET SIGNALS (RSI IMPLEMENTED NATIVELY)
 # ------------------------------------------------------------------------------
 elif selected_menu == "Market Signals":
     if not df_price_raw.empty:
-        # Menggunakan df_price_raw yang sudah memiliki kolom RSI
         last_msig = df_price_raw.iloc[-1]
         prev_msig = df_price_raw.iloc[-2] if len(df_price_raw) > 1 else last_msig
         
@@ -1061,7 +1173,6 @@ elif selected_menu == "Market Signals":
                 color = "#a3a8b8"
                 d = ""
             else: 
-                # Kondisi warna RSI (Standard: >70 Merah Overbought, <30 Hijau Oversold)
                 color = "#ffffff"
                 if value > 70: color = "#ff4d4d"
                 elif value < 30: color = "#00cc66"
@@ -1120,7 +1231,6 @@ elif selected_menu == "Market Signals":
         
         series_msig = [{"type": 'Line', "data": get_s(df_msig, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
         
-        # Garis batas Overbought (70) & Oversold (30)
         df_msig['OB'] = 70.0
         df_msig['OS'] = 30.0
         series_msig.append({"type": 'Line', "data": get_s(df_msig, 'OB'), "options": {"color": '#ff4d4d', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": 'Overbought (70)'}})
