@@ -144,4 +144,18 @@ if not df_fg.empty:
     df_fg_clean.sort_values('date').to_csv("data_fg.csv", index=False)
     print("✅ data_fg.csv berhasil diperbarui.")
 
+# ==========================================
+# 8. PIPELINE: EXCHANGE FLOWS
+# ==========================================
+print("Menarik data Exchange Flows...")
+df_exchange = fetch_data("https://chartinspect.com/api/charts/exchange-etf/exchange-flows?timeframe=all", 
+                         ['date', 'btc_price', 'total_balance', 'net_flow', 'inflow', 'outflow'])
+
+if not df_exchange.empty:
+    # Membersihkan format tanggal (dari "2010-07-16T04:00:00.000Z" menjadi "YYYY-MM-DD")
+    df_exchange['date'] = pd.to_datetime(df_exchange['date']).dt.strftime('%Y-%m-%d')
+    df_exchange['date'] = pd.to_datetime(df_exchange['date'])
+    df_exchange.sort_values('date').to_csv("data_exchange.csv", index=False)
+    print("✅ data_exchange.csv berhasil diperbarui.")
+    
 print("Semua proses selesai!")
