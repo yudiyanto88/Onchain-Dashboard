@@ -51,11 +51,15 @@ df_nupl = fetch_data("https://chartinspect.com/api/onchain/nupl?timeframe=all&is
 if not df_age.empty:
     sth_prof = df_age[[f'band_{i}_profit_usd' for i in range(5)]].sum(axis=1)
     sth_loss = df_age[[f'band_{i}_loss_usd' for i in range(5)]].sum(axis=1)
-    df_age['sth_pl_ratio'] = np.where(sth_loss == 0, np.nan, sth_prof / sth_loss)
+    
+    # 🟢 PERBAIKAN STH P/L Ratio: Ubah infinity/pembagian nol menjadi NaN, lalu teruskan nilai terakhir (ffill), fallback ke 1
+    df_age['sth_pl_ratio'] = (sth_prof / sth_loss).replace([np.inf, -np.inf], np.nan).ffill().fillna(1)
 
     lth_prof = df_age[[f'band_{i}_profit_usd' for i in range(5, 12)]].sum(axis=1)
     lth_loss = df_age[[f'band_{i}_loss_usd' for i in range(5, 12)]].sum(axis=1)
-    df_age['lth_pl_ratio'] = np.where(lth_loss == 0, np.nan, lth_prof / lth_loss)
+    
+    # 🟢 PERBAIKAN LTH P/L Ratio: Ubah infinity/pembagian nol menjadi NaN, lalu teruskan nilai terakhir (ffill), fallback ke 1
+    df_age['lth_pl_ratio'] = (lth_prof / lth_loss).replace([np.inf, -np.inf], np.nan).ffill().fillna(1)
     
     df_age_clean = df_age[['date', 'sth_pl_ratio', 'lth_pl_ratio']]
 else:
