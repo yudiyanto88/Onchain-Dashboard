@@ -502,27 +502,29 @@ elif selected_menu == "Profit & Loss":
         except: sel_sopr = st.multiselect("SOPR Metrics", all_opts_sopr, default=['🔵 aSOPR', '🟢 LTH SOPR'], label_visibility="collapsed")
 
         # ==========================================
-        # SETUP DUAL-PANE CHART (SYNCED)
+        # SETUP DUAL-PANE CHART (SYNCED CROSSHAIR)
         # ==========================================
         
         tinggi_total = 850 if focus_ms else 650
-        tinggi_atas = int(tinggi_total * 0.6) # 60% porsi untuk Harga BTC
-        tinggi_bawah = int(tinggi_total * 0.4) # 40% porsi untuk Metrik (SOPR)
+        tinggi_atas = int(tinggi_total * 0.6) 
+        tinggi_bawah = int(tinggi_total * 0.4) 
 
         # 1. CHART ATAS: BTC PRICE
         chart_opts_top = {
+            "pane": 0, # <--- TRIGGER SINKRONISASI NTF FORK
             "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, 
             "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, 
             "crosshair": {"mode": 0}, 
             "height": tinggi_atas, 
             "rightPriceScale": {"visible": True}, 
             "leftPriceScale": {"visible": False},
-            "timeScale": {"visible": False} # SEMBUNYIKAN WAKTU DI CHART ATAS AGAR TERLIHAT MENYATU
+            "timeScale": {"visible": False} # Waktu di chart atas disembunyikan agar rapi
         }
         series_top = [{"type": 'Line', "data": get_s(df_ms, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
 
         # 2. CHART BAWAH: SOPR METRICS
         chart_opts_bottom = {
+            "pane": 1, # <--- TRIGGER SINKRONISASI NTF FORK
             "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, 
             "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, 
             "crosshair": {"mode": 0}, 
@@ -531,11 +533,11 @@ elif selected_menu == "Profit & Loss":
             "leftPriceScale": {"visible": False} 
         }
         
-        # Garis Netral dimasukkan ke Chart Bawah
+        # Garis Netral
         df_ms['Neutral_Line'] = 1.0
         series_bottom = [{"type": 'Line', "data": get_s(df_ms, 'Neutral_Line'), "options": {"color": '#ffffff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'right', "title": 'Neutral (1.0)'}}]
 
-        # Looping Metrik Pilihan User (Masuk ke Chart Bawah)
+        # Looping Metrik Pilihan
         for m in sel_sopr:
             is_sma = "(SMA" in m
             base_m = m.split(" (SMA")[0]
@@ -550,12 +552,11 @@ elif selected_menu == "Profit & Loss":
             else: 
                 series_bottom.append({"type": 'Line', "data": get_s(df_ms, c_name), "options": {"color": c_col_raw, "lineWidth": 1, "priceScaleId": 'right', "title": c_name}})
 
-        # 3. RENDER BERSAMAAN DALAM SATU ARRAY (AUTO-SYNC ZOMM/PAN)
+        # 3. RENDER (Perhatikan parameter 'multipane' di akhir)
         renderLightweightCharts([
             {"chart": chart_opts_top, "series": series_top},
             {"chart": chart_opts_bottom, "series": series_bottom}
-        ], 'chart_sopr_dual')
-
+        ], 'multipane')
         
         #chart_opts_sopr = {
          #   "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, 
