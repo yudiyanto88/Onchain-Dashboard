@@ -49,21 +49,19 @@ df_age = fetch_data("https://chartinspect.com/api/onchain/realized-profit-by-age
 df_nupl = fetch_data("https://chartinspect.com/api/onchain/nupl?timeframe=all&isProUser=false", ['date', 'nupl', 'sth_nupl', 'lth_nupl'])
 
 if not df_age.empty:
-    sth_prof = df_age[[f'band_{i}_profit_usd' for i in range(5)]].sum(axis=1)
-    sth_loss = df_age[[f'band_{i}_loss_usd' for i in range(5)]].sum(axis=1)
-    # Biarkan NaN jika loss = 0 agar skala chart tidak hancur
-    df_age['sth_pl_ratio'] = np.where(sth_loss == 0, np.nan, sth_prof / sth_loss)
+    # STH: Sesuai aturan sisa, yaitu band 0-2 (range(3) -> 0, 1, 2)
+    sth_prof = df_age[[f'band_{i}_profit_usd' for i in range(3)]].sum(axis=1)
+    sth_loss = df_age[[f'band_{i}_loss_usd' for i in range(3)]].sum(axis=1)
+    df_age['sth_pl_ratio'] = (sth_prof / sth_loss).replace([np.inf, -np.inf], np.nan).ffill().fillna(1.0)
 
-    # LTH: Age bands 5-11 (Mewakili 6m hingga 10y+)
-    lth_prof = df_age[[f'band_{i}_profit_usd' for i in range(5, 12)]].sum(axis=1)
-    lth_loss = df_age[[f'band_{i}_loss_usd' for i in range(5, 12)]].sum(axis=1)
-    df_age['lth_pl_ratio'] = np.where(lth_loss == 0, np.nan, lth_prof / lth_loss)
+    # 🟢 LTH FIX: Menggunakan age bands 3-10 sesuai dokumentasi (range(3, 11) -> 3 sampai 10)
+    lth_prof = df_age[[f'band_{i}_profit_usd' for i in range(3, 11)]].sum(axis=1)
+    lth_loss = df_age[[f'band_{i}_loss_usd' for i in range(3, 11)]].sum(axis=1)
+    df_age['lth_pl_ratio'] = (lth_prof / lth_loss).replace([np.inf, -np.inf], np.nan).ffill().fillna(1.0)
     
-    # 🟢 EKSTRAKSI NET P/L UNTUK CUMULATIVE PRICE
-    df_age['lth_net_pl_usd'] = lth_prof - lth_loss
-    df_age_clean = df_age[['date', 'sth_pl_ratio', 'lth_pl_ratio', 'lth_net_pl_usd']]
+    df_age_clean = df_age[['date', 'sth_pl_ratio', 'lth_pl_ratio']]
 else:
-    df_age_clean = pd.DataFrame(columns=['date', 'sth_pl_ratio', 'lth_pl_ratio', 'lth_net_pl_usd'])
+    df_age_clean = pd.DataFrame(columns=['date', 'sth_pl_ratio', 'lth_pl_ratio'])
 
 dfs = [df_sopr, df_lth_sopr, df_sth_sopr, df_net_pl, df_age_clean, df_nupl]
 df_master_mom = dfs[0]
