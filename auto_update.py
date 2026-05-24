@@ -10,8 +10,20 @@ def fetch_data(url, columns_to_keep=None):
         res = requests.get(url)
         data = res.json().get('data', [])
         df = pd.DataFrame(data)
-        if columns_to_keep and not df.empty:
-            df = df[[col for col in columns_to_keep if col in df.columns]]
+        
+        if not df.empty:
+            # 🟢 ROOT CAUSE FIX: Sanitasi format tanggal secara mutlak di hulu
+            if 'date' in df.columns:
+                # Paksa standarisasi timezone ke UTC, lalu potong murni menjadi string YYYY-MM-DD
+                df['date'] = pd.to_datetime(df['date'], utc=True, errors='coerce').dt.strftime('%Y-%m-%d')
+            
+            if columns_to_keep:
+                df = df[[col for col in columns_to_keep if col in df.columns]]
+                
+            # Bersihkan anomali duplikasi internal sejak dari sumbernya
+            if 'date' in df.columns:
+                df = df.dropna(subset=['date']).drop_duplicates(subset=['date'], keep='last')
+                
         return df
     except Exception as e:
         print(f"Error fetching {url}: {e}")
