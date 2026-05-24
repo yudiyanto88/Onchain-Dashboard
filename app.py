@@ -110,7 +110,12 @@ def load_data_momentum():
             'nupl': 'NUPL', 'sth_nupl': 'STH NUPL', 'lth_nupl': 'LTH NUPL'
         }, inplace=True)
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-        return df.dropna(subset=['Date']).sort_values('Date').drop_duplicates(subset=['Date'], keep='last')
+        df = df.dropna(subset=['Date']).sort_values('Date').drop_duplicates(subset=['Date'], keep='last')
+        
+        # 🟢 PERBAIKAN VISUAL: Menambal chart putus-putus dengan mewariskan nilai sebelumnya (ffill)
+        df['LTH P/L Ratio'] = df['LTH P/L Ratio'].ffill().fillna(1.0)
+        df['STH P/L Ratio'] = df['STH P/L Ratio'].ffill().fillna(1.0)
+        return df
     except: return pd.DataFrame()
 
 @st.cache_data(ttl=3600)
@@ -172,6 +177,15 @@ def load_data_fg():
         return df.dropna(subset=['Date']).sort_values('Date').drop_duplicates(subset=['Date'], keep='last')
     except: return pd.DataFrame()
 
+@st.cache_data(ttl=3600)
+def load_data_cum():
+    try:
+        df = pd.read_csv("data_cum_pl.csv")
+        df.rename(columns={'date': 'Date', 'cum_pl_price': 'Cum P/L Price', 'pl_price_ratio': 'P/L Price Ratio'}, inplace=True)
+        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        return df.dropna(subset=['Date']).sort_values('Date').drop_duplicates(subset=['Date'], keep='last')
+    except: return pd.DataFrame()
+
 df_price_raw = load_data_price()
 df_mvrv_raw = load_data_mvrv()
 df_mom_raw = load_data_momentum()
@@ -179,6 +193,13 @@ df_deriv_raw = load_data_derivatives()
 df_ex_raw = load_data_exchange()
 df_sentiment_raw = load_data_sentiment()
 df_supply_raw = load_data_supply()
+df_cum_raw = load_data_cum()
+
+# 🟢 MERGE DATA BARU KE PRICE DAN MOMENTUM
+if not df_cum_raw.empty and not df_price_raw.empty:
+    df_price_raw = pd.merge(df_price_raw, df_cum_raw[['Date', 'Cum P/L Price']], on='Date', how='left')
+if not df_cum_raw.empty and not df_mom_raw.empty:
+    df_mom_raw = pd.merge(df_mom_raw, df_cum_raw[['Date', 'P/L Price Ratio']], on='Date', how='left')
 
 df_fg_base = load_data_fg()
 if not df_fg_base.empty and not df_price_raw.empty:
