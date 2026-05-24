@@ -555,11 +555,19 @@ elif selected_menu == "Profit & Loss":
         try: sel_pl = st.pills("P/L Metrics", all_opts_pl, default=['⚪ Net Realized PL'], selection_mode="multi", label_visibility="collapsed")
         except: sel_pl = st.multiselect("P/L Metrics", all_opts_pl, default=['⚪ Net Realized PL'], label_visibility="collapsed")
 
+       # Konfigurasi Chart dengan Skala Logaritma untuk Rasio Ekstrem
         chart_opts_pl = {
             "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, 
             "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, 
-            "crosshair": {"mode": 0}, "height": 850 if focus_mpl else 650, 
-            "rightPriceScale": {"visible": True}, "leftPriceScale": {"visible": True}, "ratio_scale": {"visible": False}  
+            "crosshair": {"mode": 0}, 
+            "height": 850 if focus_mpl else 650, 
+            "rightPriceScale": {"visible": True}, 
+            "leftPriceScale": {"visible": True}, 
+            "ratio_scale": {
+                "visible": True, 
+                "mode": 1,  # 🟢 INDIKATOR KUNCI: 1 mengubah skala Y-axis menjadi Logarithmic
+                "autoScale": True
+            }  
         }
         series_pl = [{"type": 'Line', "data": get_s(df_mpl, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
 
