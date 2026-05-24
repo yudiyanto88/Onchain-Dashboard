@@ -51,19 +51,19 @@ df_nupl = fetch_data("https://chartinspect.com/api/onchain/nupl?timeframe=all&is
 if not df_age.empty:
     sth_prof = df_age[[f'band_{i}_profit_usd' for i in range(5)]].sum(axis=1)
     sth_loss = df_age[[f'band_{i}_loss_usd' for i in range(5)]].sum(axis=1)
-    
-    # 🟢 PERBAIKAN STH P/L Ratio: Ubah infinity/pembagian nol menjadi NaN, lalu teruskan nilai terakhir (ffill), fallback ke 1
-    df_age['sth_pl_ratio'] = (sth_prof / sth_loss).replace([np.inf, -np.inf], np.nan).ffill().fillna(1)
+    # Biarkan NaN jika loss = 0 agar skala chart tidak hancur
+    df_age['sth_pl_ratio'] = np.where(sth_loss == 0, np.nan, sth_prof / sth_loss)
 
+    # LTH: Age bands 5-11 (Mewakili 6m hingga 10y+)
     lth_prof = df_age[[f'band_{i}_profit_usd' for i in range(5, 12)]].sum(axis=1)
     lth_loss = df_age[[f'band_{i}_loss_usd' for i in range(5, 12)]].sum(axis=1)
+    df_age['lth_pl_ratio'] = np.where(lth_loss == 0, np.nan, lth_prof / lth_loss)
     
-    # 🟢 PERBAIKAN LTH P/L Ratio: Ubah infinity/pembagian nol menjadi NaN, lalu teruskan nilai terakhir (ffill), fallback ke 1
-    df_age['lth_pl_ratio'] = (lth_prof / lth_loss).replace([np.inf, -np.inf], np.nan).ffill().fillna(1)
-    
-    df_age_clean = df_age[['date', 'sth_pl_ratio', 'lth_pl_ratio']]
+    # 🟢 EKSTRAKSI NET P/L UNTUK CUMULATIVE PRICE
+    df_age['lth_net_pl_usd'] = lth_prof - lth_loss
+    df_age_clean = df_age[['date', 'sth_pl_ratio', 'lth_pl_ratio', 'lth_net_pl_usd']]
 else:
-    df_age_clean = pd.DataFrame(columns=['date', 'sth_pl_ratio', 'lth_pl_ratio'])
+    df_age_clean = pd.DataFrame(columns=['date', 'sth_pl_ratio', 'lth_pl_ratio', 'lth_net_pl_usd'])
 
 dfs = [df_sopr, df_lth_sopr, df_sth_sopr, df_net_pl, df_age_clean, df_nupl]
 df_master_mom = dfs[0]
@@ -304,5 +304,45 @@ if not df_ex.empty:
     df_ex['date'] = pd.to_datetime(df_ex['date'], format='mixed', errors='coerce').dt.tz_localize(None)
     df_ex.sort_values('date').to_csv("data_exchange.csv", index=False)
     print("✅ data_exchange.csv berhasil diperbarui.")
+
+# ==========================================
+# 9. PIPELINE: CUMULATIVE P/L PRICE & RATIO
+# ==========================================
+print("Mengkalkulasi Cumulative P/L Price...")
+try:
+    # Load ulang file yang baru saja dibuat oleh pipeline di atas
+    df_p = pd.read_csv("data_price_level.csv")
+    df_m = pd.read_csv("data_momentum.csv")
+    df_s = pd.read_csv("data_supply.csv")
+
+    # Siapkan data harian yang valid
+    df_cum = df_m[['date', 'lth_net_pl_usd']].dropna().copy()
+    df_cum['date'] = pd.to_datetime(df_cum['date'])
+    df_p['date'] = pd.to_datetime(df_p['date'])
+    df_s['date'] = pd.to_datetime(df_s['date'])
+
+    # Gabungkan LTH Cost Basis, LTH Supply, dan BTC Price
+    df_cum = pd.merge(df_cum, df_p[['date', 'btc_price', 'lth_cost_basis']], on='date', how='inner')
+    df_cum = pd.merge(df_cum, df_s[['date', 'lth_supply_btc']], on='date', how='inner')
+    df_cum = df_cum.sort_values('date').reset_index(drop=True)
+
+    if not df_cum.empty:
+        # LTH Realized Price pada hari pertama sebagai starting point
+        initial_lth_price = df_cum['lth_cost_basis'].dropna().iloc[0]
+
+        # 1. CumulativeNetPL = ∑ NetPLday
+        df_cum['cum_net_pl'] = df_cum['lth_net_pl_usd'].cumsum()
+
+        # 2. Cumulative P/L Price = Initial Price + (CumulativeNetPL / LTH Supply)
+        df_cum['cum_pl_price'] = initial_lth_price + (df_cum['cum_net_pl'] / df_cum['lth_supply_btc'])
+
+        # 3. P/L Price Ratio = BTC Price / Cumulative P/L Price
+        df_cum['pl_price_ratio'] = df_cum['btc_price'] / df_cum['cum_pl_price']
+
+        # Simpan ke dataset terpisah agar dasbor bersih
+        df_cum[['date', 'cum_pl_price', 'pl_price_ratio']].to_csv("data_cum_pl.csv", index=False)
+        print("✅ data_cum_pl.csv berhasil diperbarui.")
+except Exception as e:
+    print(f"❌ Error kalkulasi Cumulative P/L: {e}")
     
 print("Semua proses selesai!")
