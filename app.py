@@ -502,42 +502,42 @@ elif selected_menu == "Profit & Loss":
         except: sel_sopr = st.multiselect("SOPR Metrics", all_opts_sopr, default=['🔵 aSOPR', '🟢 LTH SOPR'], label_visibility="collapsed")
 
         # ==========================================
-        # SETUP DUAL-PANE CHART (SYNCED CROSSHAIR)
+        # SETUP DUAL-PANE PRO (1 CHART, SPLIT MARGINS)
         # ==========================================
         
-        tinggi_total = 850 if focus_ms else 650
-        tinggi_atas = int(tinggi_total * 0.6) 
-        tinggi_bawah = int(tinggi_total * 0.4) 
-
-        # 1. CHART ATAS: BTC PRICE
-        chart_opts_top = {
-            "pane": 0, # <--- TRIGGER SINKRONISASI NTF FORK
+        chart_opts_sopr = {
             "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, 
             "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, 
             "crosshair": {"mode": 0}, 
-            "height": tinggi_atas, 
-            "rightPriceScale": {"visible": True}, 
-            "leftPriceScale": {"visible": False},
-            "timeScale": {"visible": False} # Waktu di chart atas disembunyikan agar rapi
-        }
-        series_top = [{"type": 'Line', "data": get_s(df_ms, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
-
-        # 2. CHART BAWAH: SOPR METRICS
-        chart_opts_bottom = {
-            "pane": 1, # <--- TRIGGER SINKRONISASI NTF FORK
-            "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, 
-            "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, 
-            "crosshair": {"mode": 0}, 
-            "height": tinggi_bawah, 
-            "rightPriceScale": {"visible": True}, 
-            "leftPriceScale": {"visible": False} 
+            "height": 850 if focus_ms else 650, 
+            
+            # 1. PANE ATAS: Harga BTC (Skala Kanan)
+            "rightPriceScale": {
+                "visible": True,
+                "scaleMargins": {
+                    "top": 0.05,    # Jarak 5% dari atap
+                    "bottom": 0.45  # Disisakan 45% ruang kosong di bawah agar tidak menyentuh SOPR
+                }
+            },
+            
+            # 2. PANE BAWAH: Metrik SOPR (Skala Kiri)
+            "leftPriceScale": {
+                "visible": True,
+                "scaleMargins": {
+                    "top": 0.60,    # Mulai di-render pada posisi 60% (di bawah BTC)
+                    "bottom": 0.05  # Jarak 5% dari lantai
+                }
+            }
         }
         
-        # Garis Netral
+        # Karena kembali menjadi 1 chart, kita masukkan semua ke dalam series_sopr
+        # Perhatikan 'priceScaleId' yang membagi metrik ke pane atas atau bawah
+        
+        series_sopr = [{"type": 'Line', "data": get_s(df_ms, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
+        
         df_ms['Neutral_Line'] = 1.0
-        series_bottom = [{"type": 'Line', "data": get_s(df_ms, 'Neutral_Line'), "options": {"color": '#ffffff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'right', "title": 'Neutral (1.0)'}}]
+        series_sopr.append({"type": 'Line', "data": get_s(df_ms, 'Neutral_Line'), "options": {"color": '#ffffff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": 'Neutral (1.0)'}})
 
-        # Looping Metrik Pilihan
         for m in sel_sopr:
             is_sma = "(SMA" in m
             base_m = m.split(" (SMA")[0]
@@ -547,16 +547,14 @@ elif selected_menu == "Profit & Loss":
             elif base_m == '🟢 LTH SOPR': c_col, c_col_raw, c_name = '#00cc66', 'rgba(0, 204, 102, 0.7)', 'LTH SOPR'
             else: continue
             
+            # Semua metrik SOPR diarahkan ke 'left' (Pane Bawah)
             if is_sma: 
-                series_bottom.append({"type": 'Line', "data": get_s(df_ms, f"{c_name}_SMA"), "options": {"color": c_col, "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'right', "title": f"{c_name} SMA"}})
+                series_sopr.append({"type": 'Line', "data": get_s(df_ms, f"{c_name}_SMA"), "options": {"color": c_col, "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": f"{c_name} SMA"}})
             else: 
-                series_bottom.append({"type": 'Line', "data": get_s(df_ms, c_name), "options": {"color": c_col_raw, "lineWidth": 1, "priceScaleId": 'right', "title": c_name}})
+                series_sopr.append({"type": 'Line', "data": get_s(df_ms, c_name), "options": {"color": c_col_raw, "lineWidth": 1, "priceScaleId": 'left', "title": c_name}})
 
-        # 3. RENDER (Perhatikan parameter 'multipane' di akhir)
-        renderLightweightCharts([
-            {"chart": chart_opts_top, "series": series_top},
-            {"chart": chart_opts_bottom, "series": series_bottom}
-        ], 'multipane')
+        # Panggil kembali render standar (bebas bug crosshair)
+        renderLightweightCharts([{"chart": chart_opts_sopr, "series": series_sopr}], 'chart_sopr')
         
         #chart_opts_sopr = {
          #   "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, 
