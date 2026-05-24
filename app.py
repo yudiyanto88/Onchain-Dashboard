@@ -318,7 +318,7 @@ if selected_menu == "Price Levels":
         with col_custom:
             if st.session_state.tr_p == "Custom": st.session_state.cd_p = st.number_input("Days back", min_value=7, value=st.session_state.cd_p, label_visibility="collapsed", key="cdin_p")
         
-        opts_p_base = ['🔴 STH Cost Basis', '🔵 LTH Cost Basis', '⚪ Realized Price', '🟣 True Market Mean', '🟢 CVDD', '🟨 200 DMA', '🟦 50 WMA', '🟪 200 WMA']
+        opts_p_base = ['🔴 STH Cost Basis', '🔵 LTH Cost Basis', '⚪ Realized Price', '🟣 True Market Mean', '🟢 CVDD', '🟤 Cum P/L Price', '🟨 200 DMA', '🟦 50 WMA', '🟪 200 WMA']
         all_opts_p = opts_p_base.copy()
         if w_p > 1: all_opts_p.extend([f"{m} (SMA {w_p})" for m in opts_p_base])
             
@@ -335,6 +335,7 @@ if selected_menu == "Price Levels":
             '⚪ Realized Price': ('#ffffff', 'Realized Price', 0), 
             '🟣 True Market Mean': ('#00ffff', 'True Market Mean', 0), 
             '🟢 CVDD': ('#00cc66', 'CVDD', 0),
+            '🟤 Cum P/L Price': ('#cc9966', 'Cum P/L Price', 0),
             '🟨 200 DMA': ('#ffe119', '200 DMA', 2), 
             '🟦 50 WMA': ('#4363d8', '50 WMA', 2), 
             '🟪 200 WMA': ('#f032e6', '200 WMA', 2)
@@ -531,9 +532,10 @@ elif selected_menu == "Profit & Loss":
         with k2_2: render_kpi_m("Net Realized PL", last_m.get('Net Realized PL', 0), prev_m.get('Net Realized PL', 0), 0.0, True)
         with k3_2: render_kpi_m("STH P/L Ratio", last_m.get('STH P/L Ratio', 0), prev_m.get('STH P/L Ratio', 0), 1.0)
         with k4_2: render_kpi_m("LTH P/L Ratio", last_m.get('LTH P/L Ratio', 0), prev_m.get('LTH P/L Ratio', 0), 1.0)
+        with k5_2: render_kpi_m("P/L Price Ratio", last_m.get('P/L Price Ratio', 0), prev_m.get('P/L Price Ratio', 0), 1.0)
         st.markdown("---")
         
-        df_mpl, w_mpl = apply_filters(df_mom_raw, st.session_state.tf_mpl, st.session_state.sma_mpl, st.session_state.cs_mpl, st.session_state.tr_mpl, st.session_state.cd_mpl, ['STH P/L Ratio', 'LTH P/L Ratio', 'Net Realized PL'])
+        df_mpl, w_mpl = apply_filters(df_mom_raw, st.session_state.tf_mpl, st.session_state.sma_mpl, st.session_state.cs_mpl, st.session_state.tr_mpl, st.session_state.cd_mpl, ['STH P/L Ratio', 'LTH P/L Ratio', 'Net Realized PL', 'P/L Price Ratio'])
         col_fs_mpl, col_tf_mpl, col_sma_mpl, col_sma_cst_mpl, col_radio_mpl, col_custom_mpl = st.columns([1, 1.2, 1.2, 1, 6, 1.2], vertical_alignment="bottom", gap="small")
         with col_fs_mpl: focus_mpl = st.toggle("Full Screen", key="tg_mpl")
         with col_tf_mpl: st.session_state.tf_mpl = st.selectbox("Timeframe", ["Daily", "3 Days", "Weekly", "Monthly"], index=["Daily", "3 Days", "Weekly", "Monthly"].index(st.session_state.tf_mpl), key="tfs_mpl")
@@ -546,7 +548,7 @@ elif selected_menu == "Profit & Loss":
         with col_custom_mpl:
             if st.session_state.tr_mpl == "Custom": st.session_state.cd_mpl = st.number_input("Days back", min_value=7, value=st.session_state.cd_mpl, label_visibility="collapsed", key="cdin_mpl")
             
-        opts_pl_base = ['⚪ Net Realized PL', '🟣 STH P/L Ratio', '🟤 LTH P/L Ratio']
+        opts_pl_base = ['⚪ Net Realized PL', '🟣 STH P/L Ratio', '🟤 LTH P/L Ratio', '🟠 P/L Price Ratio']
         all_opts_pl = opts_pl_base.copy()
         if w_mpl > 1: all_opts_pl.extend([f"{m} (SMA {w_mpl})" for m in opts_pl_base])
 
@@ -573,6 +575,10 @@ elif selected_menu == "Profit & Loss":
                 c_col_rgba = 'rgba(204, 153, 102, 0.7)'
                 c_name = 'LTH P/L Ratio'
                 series_pl.append({"type": 'Line', "data": get_s(df_mpl, f"{c_name}_SMA" if is_sma else c_name), "options": {"color": c_col_rgba, "lineWidth": 1, "lineStyle": 2 if is_sma else 0, "priceScaleId": 'ratio_scale', "title": f"{c_name} SMA" if is_sma else c_name}})
+            elif base_m == '🟠 P/L Price Ratio':
+                c_col_rgba = 'rgba(255, 153, 51, 0.9)'
+                c_name = 'P/L Price Ratio'
+                series_pl.append({"type": 'Line', "data": get_s(df_mpl, f"{c_name}_SMA" if is_sma else c_name), "options": {"color": c_col_rgba, "lineWidth": 1.5, "lineStyle": 2 if is_sma else 0, "priceScaleId": 'ratio_scale', "title": f"{c_name} SMA" if is_sma else c_name}})
             elif base_m == '⚪ Net Realized PL':
                 if is_sma:
                     series_pl.append({"type": 'Histogram', "data": get_s(df_mpl, 'Net Realized PL_SMA'), "options": {"color": 'rgba(255, 255, 255, 0.4)', "priceScaleId": 'left', "title": "Net PL SMA"}})
