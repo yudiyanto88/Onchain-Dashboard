@@ -310,39 +310,58 @@ if not df_ex.empty:
 # ==========================================
 print("Mengkalkulasi Cumulative P/L Price...")
 try:
-    # Load ulang file yang baru saja dibuat oleh pipeline di atas
+    # 1. Load data yang dibutuhkan
     df_p = pd.read_csv("data_price_level.csv")
     df_m = pd.read_csv("data_momentum.csv")
     df_s = pd.read_csv("data_supply.csv")
+    
+    print(f"➜ Baris terbaca - Price: {len(df_p)}, Momentum: {len(df_m)}, Supply: {len(df_s)}")
+    
+    # 2. Validasi apakah kolom lth_net_pl_usd benar-benar ada
+    if 'lth_net_pl_usd' not in df_m.columns:
+        print("❌ GAGAL: Kolom 'lth_net_pl_usd' tidak ditemukan. Pastikan Pipeline 2 sudah di-update.")
+    else:
+        df_cum = df_m[['date', 'lth_net_pl_usd']].copy()
+        
+        # Ganti NaN dengan 0 agar kalkulasi cumulative tidak error
+        df_cum['lth_net_pl_usd'] = df_cum['lth_net_pl_usd'].fillna(0)
+        
+        # 3. NORMALISASI TANGGAL (Penting!)
+        # Hilangkan jam & timezone agar semua format tanggal seragam (YYYY-MM-DD)
+        df_cum['date'] = pd.to_datetime(df_cum['date'], format='mixed', errors='coerce').dt.tz_localize(None).dt.floor('D')
+        df_p['date'] = pd.to_datetime(df_p['date'], format='mixed', errors='coerce').dt.tz_localize(None).dt.floor('D')
+        df_s['date'] = pd.to_datetime(df_s['date'], format='mixed', errors='coerce').dt.tz_localize(None).dt.floor('D')
+        
+        # 4. Merge Data
+        df_cum = pd.merge(df_cum, df_p[['date', 'btc_price', 'lth_cost_basis']], on='date', how='inner')
+        df_cum = pd.merge(df_cum, df_s[['date', 'lth_supply_btc']], on='date', how='inner')
+        
+        # Urutkan berdasarkan tanggal paling lama ke terbaru
+        df_cum = df_cum.sort_values('date').reset_index(drop=True)
+        print(f"➜ Baris setelah disatukan (merge): {len(df_cum)}")
+        
+        if not df_cum.empty:
+            # Cari harga Initial LTH Cost Basis (Harga valid pertama kali di sejarah)
+            valid_lth = df_cum['lth_cost_basis'].dropna()
+            initial_lth_price = valid_lth.iloc[0] if not valid_lth.empty else 0
+            
+            # Kalkulasi Matematika sesuai Formula LTH Realized P/L Ratio
+            df_cum['cum_net_pl'] = df_cum['lth_net_pl_usd'].cumsum()
+            safe_supply = df_cum['lth_supply_btc'].replace(0, np.nan) # Amankan dari pembagian nol
+            
+            df_cum['cum_pl_price'] = initial_lth_price + (df_cum['cum_net_pl'] / safe_supply)
+            df_cum['pl_price_ratio'] = df_cum['btc_price'] / df_cum['cum_pl_price']
+            
+            # Ambil tanggal versi string untuk disimpan
+            df_cum['date'] = df_cum['date'].dt.strftime('%Y-%m-%d')
+            
+            # 5. Simpan File
+            df_cum[['date', 'cum_pl_price', 'pl_price_ratio']].to_csv("data_cum_pl.csv", index=False)
+            print("✅ data_cum_pl.csv BERHASIL diperbarui!")
+        else:
+            print("❌ GAGAL: Data kosong setelah di-merge. Pastikan tanggal CSV sinkron.")
 
-    # Siapkan data harian yang valid
-    df_cum = df_m[['date', 'lth_net_pl_usd']].dropna().copy()
-    df_cum['date'] = pd.to_datetime(df_cum['date'])
-    df_p['date'] = pd.to_datetime(df_p['date'])
-    df_s['date'] = pd.to_datetime(df_s['date'])
-
-    # Gabungkan LTH Cost Basis, LTH Supply, dan BTC Price
-    df_cum = pd.merge(df_cum, df_p[['date', 'btc_price', 'lth_cost_basis']], on='date', how='inner')
-    df_cum = pd.merge(df_cum, df_s[['date', 'lth_supply_btc']], on='date', how='inner')
-    df_cum = df_cum.sort_values('date').reset_index(drop=True)
-
-    if not df_cum.empty:
-        # LTH Realized Price pada hari pertama sebagai starting point
-        initial_lth_price = df_cum['lth_cost_basis'].dropna().iloc[0]
-
-        # 1. CumulativeNetPL = ∑ NetPLday
-        df_cum['cum_net_pl'] = df_cum['lth_net_pl_usd'].cumsum()
-
-        # 2. Cumulative P/L Price = Initial Price + (CumulativeNetPL / LTH Supply)
-        df_cum['cum_pl_price'] = initial_lth_price + (df_cum['cum_net_pl'] / df_cum['lth_supply_btc'])
-
-        # 3. P/L Price Ratio = BTC Price / Cumulative P/L Price
-        df_cum['pl_price_ratio'] = df_cum['btc_price'] / df_cum['cum_pl_price']
-
-        # Simpan ke dataset terpisah agar dasbor bersih
-        df_cum[['date', 'cum_pl_price', 'pl_price_ratio']].to_csv("data_cum_pl.csv", index=False)
-        print("✅ data_cum_pl.csv berhasil diperbarui.")
 except Exception as e:
-    print(f"❌ Error kalkulasi Cumulative P/L: {e}")
+    print(f"❌ Error fatal saat kalkulasi Cumulative P/L: {e}")
     
 print("Semua proses selesai!")
