@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import timedelta
-from streamlit_lightweight_charts import renderLightweightCharts
+from streamlit_lightweight_charts_ntf import renderLightweightCharts
 
 # ==============================================================================
 # 1. PAGE CONFIGURATION, SESSION STATE & CSS
