@@ -224,6 +224,27 @@ try:
         print("❌ GAGAL: Endpoint API realized-profit-by-age tidak merespons.")
 except Exception as e:
     print(f"❌ Error Sistem: {e}")
+
+# ==========================================
+# 10. PIPELINE: RHODL RATIO (NEW)
+# ==========================================
+print("\n[10/10] Menarik data RHODL Ratio...")
+try:
+    df_rhodl = fetch_data("https://chartinspect.com/api/onchain/rhodl?historical=true&timeframe=all&isProUser=false", 
+                          ['date', 'btc_price', 'rhodl_ratio'])
     
+    if not df_rhodl.empty:
+        # Format tanggal sudah ditangani oleh fungsi fetch_data yang kita perbaiki sebelumnya
+        df_rhodl = df_rhodl.sort_values('date').reset_index(drop=True)
+        
+        # Simpan ke file terpisah sesuai instruksi
+        df_rhodl.to_csv("data_rhodl.csv", index=False)
+        print("✅ data_rhodl.csv berhasil diperbarui.")
+        print(df_rhodl[['date', 'btc_price', 'rhodl_ratio']].tail(3).to_string(index=False))
+    else:
+        print("❌ GAGAL: Endpoint API RHODL tidak merespons atau kosong.")
+except Exception as e:
+    print(f"❌ Error Sistem (RHODL): {e}")
+
 print("\n🎉 Semua proses selesai! CSV tersimpan rapi.")
 
