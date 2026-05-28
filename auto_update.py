@@ -226,25 +226,65 @@ except Exception as e:
     print(f"❌ Error Sistem: {e}")
 
 # ==========================================
-# 10. PIPELINE: RHODL RATIO (NEW)
+# 10. PIPELINE: RHODL RATIO
 # ==========================================
-print("\n[10/10] Menarik data RHODL Ratio...")
-try:
-    df_rhodl = fetch_data("https://chartinspect.com/api/onchain/rhodl?historical=true&timeframe=all&isProUser=false", 
-                          ['date', 'btc_price', 'rhodl_ratio'])
+print("\n[10/11] Menarik data RHODL Ratio...")
+df_rhodl = fetch_data("https://chartinspect.com/api/onchain/rhodl?historical=true&timeframe=all&isProUser=false")
+if not df_rhodl.empty:
+    # Ambil metrik intinya saja agar file CSV tetap ringan dan hemat token
+    cols_rhodl = ['date', 'btc_price', 'rhodl_ratio', 'realized_cap_1w', 'realized_cap_1_2y']
+    available_cols = [c for c in cols_rhodl if c in df_rhodl.columns]
     
-    if not df_rhodl.empty:
-        # Format tanggal sudah ditangani oleh fungsi fetch_data yang kita perbaiki sebelumnya
-        df_rhodl = df_rhodl.sort_values('date').reset_index(drop=True)
+    df_rhodl_clean = df_rhodl[available_cols].copy()
+    df_rhodl_clean = df_rhodl_clean.sort_values('date').reset_index(drop=True)
+    df_rhodl_clean.to_csv("data_rhodl.csv", index=False)
+    
+    print("✅ data_rhodl.csv berhasil diperbarui.")
+    print(df_rhodl_clean[['date', 'rhodl_ratio']].tail(3).to_string(index=False))
+
+# ==========================================
+# 11. PIPELINE: HODL WAVES (SPECIAL PARSING)
+# ==========================================
+print("\n[11/11] Menarik data HODL Waves...")
+try:
+    url_hw = "https://chartinspect.com/api/onchain/hodl-waves?timeframe=all&waveType=standard&historical=true&resolution=auto&maxPoints=2000&isProUser=false"
+    res_hw = requests.get(url_hw)
+    
+    # 🟢 FIX: Menggunakan key 'historical' bukan 'data'
+    raw_hw = res_hw.json().get('historical', []) 
+    
+    if raw_hw:
+        rows_hw = []
+        for item in raw_hw:
+            # Standarisasi format tanggal dari timestamp (ms) ke string YYYY-MM-DD
+            dt_obj = pd.to_datetime(item['timestamp'], unit='ms')
+            date_str = dt_obj.strftime('%Y-%m-%d')
+            
+            # Buat baris dasar
+            row = {'date': date_str, 'btc_price': item.get('btc_price')}
+            
+            # 🟢 FIX: "Meratakan" nested array menjadi kolom dinamis
+            for w in item.get('waves', []):
+                bucket_name = w['age_bucket'] # Contoh: "1y-2y"
+                row[f"supply_{bucket_name}"] = w['percentage_of_supply']
+                row[f"realized_cap_{bucket_name}"] = w['percentage_of_realized_cap']
+                
+            rows_hw.append(row)
         
-        # Simpan ke file terpisah sesuai instruksi
-        df_rhodl.to_csv("data_rhodl.csv", index=False)
-        print("✅ data_rhodl.csv berhasil diperbarui.")
-        print(df_rhodl[['date', 'btc_price', 'rhodl_ratio']].tail(3).to_string(index=False))
+        df_hw = pd.DataFrame(rows_hw)
+        
+        # Bersihkan duplikat tanggal
+        df_hw = df_hw.dropna(subset=['date']).drop_duplicates(subset=['date'], keep='last')
+        df_hw = df_hw.sort_values('date').reset_index(drop=True)
+        
+        df_hw.to_csv("data_hodl_waves.csv", index=False)
+        print("✅ data_hodl_waves.csv berhasil diperbarui.")
+        # Cek sampel 2 kolom untuk memastikan data rata dengan benar
+        print(df_hw[['date', 'supply_1y-2y', 'realized_cap_1y-2y']].tail(3).to_string(index=False))
     else:
-        print("❌ GAGAL: Endpoint API RHODL tidak merespons atau kosong.")
+        print("❌ GAGAL: Endpoint HODL Waves mengembalikan array kosong.")
 except Exception as e:
-    print(f"❌ Error Sistem (RHODL): {e}")
+    print(f"❌ Error fetching HODL Waves: {e}")
 
 print("\n🎉 Semua proses selesai! CSV tersimpan rapi.")
 
