@@ -64,6 +64,33 @@ for key in ['cs_p', 'cs_mv', 'cs_ms', 'cs_mpl', 'cs_nupl', 'cs_d', 'cs_ex', 'cs_
 for key in ['mode_gt', 'mode_wk']:
     if key not in st.session_state: st.session_state[key] = "Line"
 
+# Backtesting Engine state
+DEFAULT_BT_CODE = '''# Kolom tersedia: Date, BTC Price, MVRV, STH MVRV, LTH MVRV,
+# aSOPR, LTH SOPR, STH SOPR, NUPL, STH NUPL, LTH NUPL,
+# Net Realized PL, STH P/L Ratio, LTH P/L Ratio,
+# Open Interest, Funding Rate, Net Flow, Total Balance,
+# LTH Supply, STH Supply, LTH % Profit, STH % Profit, Total % Profit,
+# STH Cost Basis, LTH Cost Basis, Realized Price, CVDD, True Market Mean
+#
+# Wajib: assign boolean Series ke variabel "buy" dan "sell"
+# Contoh: aSOPR cross below BB lower band
+
+import pandas_ta as ta
+
+bb = ta.bbands(df["aSOPR"].ffill(), length=50, std=2.5)
+if bb is not None:
+    bb_lower = bb.iloc[:, 0]
+    bb_upper = bb.iloc[:, 2]
+    buy  = (df["aSOPR"] < bb_lower) & (df["aSOPR"].shift(1) >= bb_lower.shift(1))
+    sell = (df["aSOPR"] > bb_upper) & (df["aSOPR"].shift(1) <= bb_upper.shift(1))
+else:
+    buy  = pd.Series(False, index=df.index)
+    sell = pd.Series(False, index=df.index)
+'''
+if 'bt_code' not in st.session_state: st.session_state['bt_code'] = DEFAULT_BT_CODE
+if 'bt_capital' not in st.session_state: st.session_state['bt_capital'] = 10000.0
+if 'bt_result' not in st.session_state: st.session_state['bt_result'] = None
+
 # ==============================================================================
 # 2. DATA LOADING & FILTERING ENGINE
 # ==============================================================================
@@ -255,7 +282,7 @@ with st.sidebar:
     # Menambahkan "Exchange Flow" ke dalam urutan menu
     selected_menu = st.radio(
         "Menu Navigasi",
-        ["Price Levels", "Market Valuation", "Profit & Loss", "Supply Dynamics", "Exchange Flow", "Derivatives", "Social Sentiment", "Market Signals", "Backtesting"],
+        ["Price Levels", "Market Valuation", "Profit & Loss", "Supply Dynamics", "Exchange Flow", "Derivatives", "Social Sentiment", "Market Signals", "Backtesting", "⚡ Backtesting Engine"],
         label_visibility="collapsed"
     )
     st.markdown("---")
@@ -1512,3 +1539,211 @@ elif selected_menu == "Backtesting":
             {"chart": chart_bt_mid, "series": series_bt_mid},
             {"chart": chart_bt_bot, "series": series_bt_bot},
         ], 'chart_backtesting')
+
+# ------------------------------------------------------------------------------
+# TAB 10: BACKTESTING ENGINE
+# ------------------------------------------------------------------------------
+elif selected_menu == "⚡ Backtesting Engine":
+    import traceback
+
+    # Gabung semua data
+    df_eng = df_mvrv_raw.copy() if not df_mvrv_raw.empty else pd.DataFrame()
+    for src_df, cols in [
+        (df_mom_raw,    ['aSOPR','LTH SOPR','STH SOPR','NUPL','STH NUPL','LTH NUPL','Net Realized PL','STH P/L Ratio','LTH P/L Ratio']),
+        (df_supply_raw, ['LTH Supply','STH Supply','LTH % Profit','STH % Profit','Total % Profit']),
+        (df_ex_raw,     ['Net Flow','Total Balance']),
+        (df_deriv_raw,  ['Open Interest','Funding Rate']),
+        (df_price_raw,  ['STH Cost Basis','LTH Cost Basis','Realized Price','CVDD','True Market Mean']),
+    ]:
+        if not src_df.empty and not df_eng.empty:
+            df_eng = pd.merge(df_eng, src_df[['Date'] + [c for c in cols if c in src_df.columns]], on='Date', how='left')
+
+    st.markdown("<h3 style='color:#a855f7; margin-bottom:0;'>⚡ Backtesting Engine</h3>", unsafe_allow_html=True)
+    st.markdown("<p style='color:#a3a8b8; font-size:0.9rem; margin-top:4px;'>Tulis signal rules dalam Python. Variabel <code>df</code> sudah tersedia dengan semua kolom onchain.</p>", unsafe_allow_html=True)
+    st.markdown("---")
+
+    col_left, col_right = st.columns([1.8, 1], gap="large")
+
+    with col_left:
+        st.markdown("**📝 Signal Rules**")
+        code_input = st.text_area(
+            "Signal code",
+            value=st.session_state.bt_code,
+            height=340,
+            label_visibility="collapsed",
+            key="bt_code_input",
+            help="Assign boolean Series ke variabel 'buy' dan 'sell'"
+        )
+        st.session_state.bt_code = code_input
+
+        col_cap, col_run = st.columns([1, 1], gap="small")
+        with col_cap:
+            capital = st.number_input("Modal awal (USD)", min_value=100.0, value=st.session_state.bt_capital, step=1000.0, key="bt_capital_input")
+            st.session_state.bt_capital = capital
+        with col_run:
+            st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+            run_bt = st.button("▶ Run Backtest", type="primary", use_container_width=True)
+
+    with col_right:
+        st.markdown("**📋 Kolom tersedia**")
+        avail_cols = [c for c in df_eng.columns if c not in ['Date','Date_str']]
+        st.markdown(
+            "<div style='background:#1a1d24; border-radius:8px; padding:10px 14px; font-size:0.78rem; color:#a3a8b8; line-height:1.9; max-height:380px; overflow-y:auto;'>"
+            + "<br>".join(f"<code style='color:#a855f7'>{c}</code>" for c in avail_cols)
+            + "</div>",
+            unsafe_allow_html=True
+        )
+
+    # ── RUN ENGINE ──
+    if run_bt:
+        st.session_state.bt_result = None
+        with st.spinner("Menghitung sinyal & simulasi..."):
+            try:
+                df = df_eng.copy().sort_values('Date').reset_index(drop=True)
+
+                # Jalankan user code dalam namespace terbatas
+                local_ns = {"df": df, "pd": pd, "np": __import__("numpy")}
+                try:
+                    import pandas_ta as _pta
+                    local_ns["ta"] = _pta
+                except ImportError:
+                    pass
+                exec(compile(code_input, "<bt_signal>", "exec"), local_ns)
+
+                buy_sig  = local_ns.get("buy")
+                sell_sig = local_ns.get("sell")
+
+                if buy_sig is None or sell_sig is None:
+                    st.error("❌ Variabel `buy` atau `sell` tidak ditemukan. Pastikan keduanya di-assign di code.")
+                else:
+                    buy_sig  = buy_sig.fillna(False).astype(bool)
+                    sell_sig = sell_sig.fillna(False).astype(bool)
+
+                    # ── Simulasi posisi: 100% masuk saat buy, keluar saat sell ──
+                    trades = []
+                    in_trade = False
+                    entry_date = entry_price = None
+
+                    for i, row in df.iterrows():
+                        price = row['BTC Price']
+                        if pd.isna(price): continue
+                        if not in_trade and buy_sig.iloc[i]:
+                            in_trade = True
+                            entry_date  = row['Date']
+                            entry_price = price
+                        elif in_trade and sell_sig.iloc[i]:
+                            pnl_pct = (price - entry_price) / entry_price * 100
+                            hold_days = (row['Date'] - entry_date).days
+                            trades.append({
+                                'Entry Date':  entry_date,
+                                'Exit Date':   row['Date'],
+                                'Entry Price': entry_price,
+                                'Exit Price':  price,
+                                'PnL %':       pnl_pct,
+                                'Hold Days':   hold_days,
+                            })
+                            in_trade = False
+
+                    if not trades:
+                        st.warning("⚠️ Tidak ada trade yang terbentuk. Coba periksa logika sinyal atau perluas time range data.")
+                    else:
+                        tr_df = pd.DataFrame(trades)
+
+                        # ── Equity curve ──
+                        equity = [capital]
+                        for _, t in tr_df.iterrows():
+                            equity.append(equity[-1] * (1 + t['PnL %'] / 100))
+                        tr_df['Equity'] = equity[1:]
+
+                        # ── Metrics ──
+                        total_return  = (equity[-1] - capital) / capital * 100
+                        winrate       = (tr_df['PnL %'] > 0).mean() * 100
+                        avg_win       = tr_df.loc[tr_df['PnL %'] > 0, 'PnL %'].mean() if (tr_df['PnL %'] > 0).any() else 0
+                        avg_loss      = tr_df.loc[tr_df['PnL %'] <= 0, 'PnL %'].mean() if (tr_df['PnL %'] <= 0).any() else 0
+                        rr_ratio      = abs(avg_win / avg_loss) if avg_loss != 0 else float('inf')
+                        avg_hold      = tr_df['Hold Days'].mean()
+                        n_trades      = len(tr_df)
+                        peak          = pd.Series(equity).cummax()
+                        drawdown      = ((pd.Series(equity) - peak) / peak * 100)
+                        max_dd        = drawdown.min()
+                        final_equity  = equity[-1]
+
+                        st.session_state.bt_result = {
+                            'tr_df': tr_df, 'equity': equity,
+                            'total_return': total_return, 'winrate': winrate,
+                            'avg_win': avg_win, 'avg_loss': avg_loss, 'rr_ratio': rr_ratio,
+                            'avg_hold': avg_hold, 'n_trades': n_trades,
+                            'max_dd': max_dd, 'final_equity': final_equity,
+                            'buy_sig': buy_sig, 'sell_sig': sell_sig,
+                        }
+
+            except Exception as e:
+                st.error(f"❌ Error saat eksekusi:\n```\n{traceback.format_exc()}\n```")
+
+    # ── TAMPILKAN HASIL ──
+    if st.session_state.bt_result:
+        r = st.session_state.bt_result
+        st.markdown("---")
+        st.markdown("### 📊 Hasil Backtest")
+
+        # KPI metrics
+        mc1, mc2, mc3, mc4, mc5, mc6 = st.columns(6)
+        def kpi_card(col, label, value, color="#ffffff", suffix=""):
+            col.markdown(
+                f"<div style='background:#1a1d24; border-radius:10px; padding:12px 10px; text-align:center;'>"
+                f"<div style='font-size:0.75rem; color:#a3a8b8; margin-bottom:4px;'>{label}</div>"
+                f"<div style='font-size:1.3rem; font-weight:700; color:{color};'>{value}{suffix}</div>"
+                f"</div>",
+                unsafe_allow_html=True
+            )
+        kpi_card(mc1, "Total Return",  f"{r['total_return']:+.1f}", "#00cc66" if r['total_return'] >= 0 else "#ff4d4d", "%")
+        kpi_card(mc2, "Win Rate",       f"{r['winrate']:.1f}",      "#4da6ff", "%")
+        kpi_card(mc3, "Max Drawdown",  f"{r['max_dd']:.1f}",        "#ff4d4d", "%")
+        kpi_card(mc4, "Jumlah Trade",  f"{r['n_trades']}",          "#ffffff")
+        kpi_card(mc5, "Avg Hold",      f"{r['avg_hold']:.0f}",      "#a3a8b8", " hari")
+        kpi_card(mc6, "Risk/Reward",   f"{r['rr_ratio']:.2f}",      "#ffe119", "x")
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        col_eq, col_tr = st.columns([1.2, 1], gap="large")
+
+        with col_eq:
+            st.markdown("**📈 Equity Curve**")
+            eq_dates = [capital] + r['equity'][1:]
+            tr_df = r['tr_df']
+            eq_data = [{"time": tr_df.iloc[i]['Exit Date'].strftime('%Y-%m-%d'), "value": round(r['equity'][i+1], 2)} for i in range(len(tr_df))]
+            chart_eq = {
+                "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}},
+                "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}},
+                "height": 280,
+                "rightPriceScale": {"visible": True},
+                "leftPriceScale": {"visible": False},
+                "crosshair": {"mode": 0},
+            }
+            series_eq = [{"type": "Area", "data": eq_data, "options": {
+                "lineColor": "#a855f7", "topColor": "rgba(168,85,247,0.3)",
+                "bottomColor": "rgba(168,85,247,0.0)", "lineWidth": 2,
+                "priceScaleId": "right", "title": "Equity"
+            }}]
+            renderLightweightCharts([{"chart": chart_eq, "series": series_eq}], 'chart_equity')
+
+        with col_tr:
+            st.markdown("**📋 Trade Log**")
+            display_df = tr_df[['Entry Date','Exit Date','Entry Price','Exit Price','PnL %','Hold Days']].copy()
+            display_df['Entry Date'] = display_df['Entry Date'].dt.strftime('%Y-%m-%d')
+            display_df['Exit Date']  = display_df['Exit Date'].dt.strftime('%Y-%m-%d')
+            display_df['Entry Price'] = display_df['Entry Price'].apply(lambda x: f"${x:,.0f}")
+            display_df['Exit Price']  = display_df['Exit Price'].apply(lambda x: f"${x:,.0f}")
+            display_df['PnL %'] = display_df['PnL %'].apply(lambda x: f"{x:+.2f}%")
+            st.dataframe(
+                display_df.rename(columns={'Entry Date':'Entry','Exit Date':'Exit','Entry Price':'Buy','Exit Price':'Sell','Hold Days':'Days'}),
+                use_container_width=True, height=280,
+                hide_index=True
+            )
+
+        # Win/Loss summary
+        st.markdown("<br>", unsafe_allow_html=True)
+        wl1, wl2, wl3 = st.columns(3)
+        wl1.metric("Avg Win", f"{r['avg_win']:+.2f}%")
+        wl2.metric("Avg Loss", f"{r['avg_loss']:+.2f}%")
+        wl3.metric("Final Equity", f"${r['final_equity']:,.0f}")
