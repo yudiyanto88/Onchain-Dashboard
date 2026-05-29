@@ -428,7 +428,7 @@ elif selected_menu == "Market Valuation":
             "height": h_top_mv,
             "rightPriceScale": {"visible": True},
             "leftPriceScale": {"visible": False},
-            "timeScale": {"visible": False},
+            "timeScale": {"borderVisible": False, "ticksVisible": False, "visible": True},
         }
         series_top_mv = [{"type": 'Line', "data": get_s(df_mv, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
 
@@ -541,7 +541,7 @@ elif selected_menu == "Profit & Loss":
             "height": tinggi_atas, 
             "rightPriceScale": {"visible": True}, 
             "leftPriceScale": {"visible": False},
-            "timeScale": {"visible": False} # SEMBUNYIKAN WAKTU DI CHART ATAS AGAR TERLIHAT MENYATU
+            "timeScale": {"borderVisible": False, "ticksVisible": False, "visible": True}
         }
         series_top = [{"type": 'Line', "data": get_s(df_ms, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
 
@@ -1443,7 +1443,9 @@ elif selected_menu == "Backtesting":
         }
 
         # ── CHART ATAS: BTC + Price Levels ──
-        chart_bt_top = {**BASE_CHART, "height": h_top_bt, "timeScale": {"visible": False}}
+        # timeScale harus tetap ada (visible) agar crosshair sync antar pane bekerja di ntf
+        # Kita sembunyikan visual-nya saja via borderVisible+ticksVisible false, bukan visible:false
+        chart_bt_top = {**BASE_CHART, "height": h_top_bt, "timeScale": {"borderVisible": False, "ticksVisible": False, "visible": True}}
         series_bt_top = [{"type": 'Line', "data": get_s(df_bt, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
         pl_colors = {
             '🔴 STH Cost Basis': ('#ff4d4d', 'STH Cost Basis'),
@@ -1460,7 +1462,7 @@ elif selected_menu == "Backtesting":
         # ── CHART TENGAH: Indikator ──
         # Indikator dengan range mirip (0–5) → right; yang berbeda → left
         # LTH MVRV → left, sisanya → right; NUPL group → left
-        chart_bt_mid = {**BASE_CHART, "height": h_mid_bt, "timeScale": {"visible": False}}
+        chart_bt_mid = {**BASE_CHART, "height": h_mid_bt, "timeScale": {"borderVisible": False, "ticksVisible": False, "visible": True}}
         df_bt['Neutral_mid'] = 1.0
         series_bt_mid = [{"type": 'Line', "data": get_s(df_bt, 'Neutral_mid'), "options": {"color": 'rgba(255,255,255,0.2)', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'right', "title": 'Neutral 1.0'}}]
         mid_map = {
