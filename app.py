@@ -242,6 +242,15 @@ def get_s(df, col):
     clean_df = df[['Date_str', col]].dropna()
     return clean_df.rename(columns={'Date_str':'time', col:'value'}).to_dict('records')
 
+def get_window(sma_state, custom_smooth):
+    """Hitung nilai window SMA dari session_state tanpa perlu apply_filters.
+    Dipakai untuk build pills options agar langsung sync saat user klik."""
+    if sma_state == "7d": return 7
+    elif sma_state == "14d": return 14
+    elif sma_state == "30d": return 30
+    elif sma_state == "Custom": return custom_smooth
+    return 1
+
 t_opts = ["1 Month", "3 Months", "6 Months", "1 Year", "4 Years (Cycle)", "All Time", "Custom"]
 
 # ==============================================================================
@@ -320,7 +329,7 @@ if selected_menu == "Price Levels":
         
         opts_p_base = ['🔴 STH Cost Basis', '🔵 LTH Cost Basis', '⚪ Realized Price', '🟣 True Market Mean', '🟢 CVDD', '🟤 Cum P/L Price', '🟨 200 DMA', '🟦 50 WMA', '🟪 200 WMA']
         all_opts_p = opts_p_base.copy()
-        if w_p > 1: all_opts_p.extend([f"{m} (SMA {w_p})" for m in opts_p_base])
+        if get_window(st.session_state.sma_p, st.session_state.cs_p) > 1: all_opts_p.extend([f"{m} (SMA {get_window(st.session_state.sma_p, st.session_state.cs_p)})" for m in opts_p_base])
             
         try: active_metrics_p = st.pills("Metrics", all_opts_p, default=['🔴 STH Cost Basis', '🔵 LTH Cost Basis', '⚪ Realized Price'], selection_mode="multi", label_visibility="collapsed")
         except: active_metrics_p = st.multiselect("Metrics", all_opts_p, default=['🔴 STH Cost Basis', '🔵 LTH Cost Basis', '⚪ Realized Price'], label_visibility="collapsed")
@@ -410,7 +419,7 @@ elif selected_menu == "Market Valuation":
         
         opts_mv_base = ['🔵 MVRV', '🔴 STH MVRV', '🟢 LTH MVRV']
         all_opts_mv = opts_mv_base.copy()
-        if w_mv > 1: all_opts_mv.extend([f"{m} (SMA {w_mv})" for m in opts_mv_base])
+        if get_window(st.session_state.sma_mv, st.session_state.cs_mv) > 1: all_opts_mv.extend([f"{m} (SMA {get_window(st.session_state.sma_mv, st.session_state.cs_mv)})" for m in opts_mv_base])
             
         try: sel_mv = st.pills("MVRV Metrics", all_opts_mv, default=['🔵 MVRV', '🟢 LTH MVRV'], selection_mode="multi", label_visibility="collapsed")
         except: sel_mv = st.multiselect("MVRV Metrics", all_opts_mv, default=['🔵 MVRV', '🟢 LTH MVRV'], label_visibility="collapsed")
@@ -496,7 +505,7 @@ elif selected_menu == "Profit & Loss":
         
         opts_sopr_base = ['🔵 aSOPR', '🔴 STH SOPR', '🟢 LTH SOPR']
         all_opts_sopr = opts_sopr_base.copy()
-        if w_ms > 1: all_opts_sopr.extend([f"{m} (SMA {w_ms})" for m in opts_sopr_base])
+        if get_window(st.session_state.sma_ms, st.session_state.cs_ms) > 1: all_opts_sopr.extend([f"{m} (SMA {get_window(st.session_state.sma_ms, st.session_state.cs_ms)})" for m in opts_sopr_base])
             
         try: sel_sopr = st.pills("SOPR Metrics", all_opts_sopr, default=['🔵 aSOPR', '🟢 LTH SOPR'], selection_mode="multi", label_visibility="collapsed")
         except: sel_sopr = st.multiselect("SOPR Metrics", all_opts_sopr, default=['🔵 aSOPR', '🟢 LTH SOPR'], label_visibility="collapsed")
@@ -605,7 +614,7 @@ elif selected_menu == "Profit & Loss":
             
         opts_pl_base = ['⚪ Net Realized PL', '🟣 STH P/L Ratio', '🟤 LTH P/L Ratio', '🟠 P/L Price Ratio']
         all_opts_pl = opts_pl_base.copy()
-        if w_mpl > 1: all_opts_pl.extend([f"{m} (SMA {w_mpl})" for m in opts_pl_base])
+        if get_window(st.session_state.sma_mpl, st.session_state.cs_mpl) > 1: all_opts_pl.extend([f"{m} (SMA {get_window(st.session_state.sma_mpl, st.session_state.cs_mpl)})" for m in opts_pl_base])
 
         try: sel_pl = st.pills("P/L Metrics", all_opts_pl, default=['⚪ Net Realized PL'], selection_mode="multi", label_visibility="collapsed")
         except: sel_pl = st.multiselect("P/L Metrics", all_opts_pl, default=['⚪ Net Realized PL'], label_visibility="collapsed")
@@ -677,7 +686,7 @@ elif selected_menu == "Profit & Loss":
             
         opts_nupl_base = ['🔵 NUPL', '🔴 STH NUPL', '🟢 LTH NUPL']
         all_opts_nupl = opts_nupl_base.copy()
-        if w_nupl > 1: all_opts_nupl.extend([f"{m} (SMA {w_nupl})" for m in opts_nupl_base])
+        if get_window(st.session_state.sma_nupl, st.session_state.cs_nupl) > 1: all_opts_nupl.extend([f"{m} (SMA {get_window(st.session_state.sma_nupl, st.session_state.cs_nupl)})" for m in opts_nupl_base])
 
         try: sel_nupl = st.pills("NUPL Metrics", all_opts_nupl, default=['🔵 NUPL', '🟢 LTH NUPL'], selection_mode="multi", label_visibility="collapsed")
         except: sel_nupl = st.multiselect("NUPL Metrics", all_opts_nupl, default=['🔵 NUPL', '🟢 LTH NUPL'], label_visibility="collapsed")
@@ -768,7 +777,7 @@ elif selected_menu == "Supply Dynamics":
         
         opts_sd_sup = ['🔵 LTH Supply', '🔴 STH Supply']
         all_opts_sd_sup = opts_sd_sup.copy()
-        if w_sd > 1: all_opts_sd_sup.extend([f"{m} (SMA {w_sd})" for m in opts_sd_sup])
+        if get_window(st.session_state.sma_sd, st.session_state.cs_sd) > 1: all_opts_sd_sup.extend([f"{m} (SMA {get_window(st.session_state.sma_sd, st.session_state.cs_sd)})" for m in opts_sd_sup])
             
         try: sel_sd_sup = st.pills("Supply Metrics", all_opts_sd_sup, default=opts_sd_sup, selection_mode="multi", label_visibility="collapsed", key="pills_sup")
         except: sel_sd_sup = st.multiselect("Supply Metrics", all_opts_sd_sup, default=opts_sd_sup, label_visibility="collapsed", key="ms_sup")
@@ -815,7 +824,7 @@ elif selected_menu == "Supply Dynamics":
             
         opts_sd_pct = ['⚪ Total % Profit', '⚫ Total % Loss', '🔵 LTH % Profit', '🟣 LTH % Loss', '🔴 STH % Profit', '🟠 STH % Loss']
         all_opts_sd_pct = opts_sd_pct.copy()
-        if w_sd2 > 1: all_opts_sd_pct.extend([f"{m} (SMA {w_sd2})" for m in opts_sd_pct])
+        if get_window(st.session_state.sma_sd, st.session_state.cs_sd) > 1: all_opts_sd_pct.extend([f"{m} (SMA {get_window(st.session_state.sma_sd, st.session_state.cs_sd)})" for m in opts_sd_pct])
             
         try: sel_sd_pct = st.pills("Profit Metrics", all_opts_sd_pct, default=['⚪ Total % Profit', '🔵 LTH % Profit', '🔴 STH % Profit'], selection_mode="multi", label_visibility="collapsed", key="pills_pct")
         except: sel_sd_pct = st.multiselect("Profit Metrics", all_opts_sd_pct, default=['⚪ Total % Profit', '🔵 LTH % Profit', '🔴 STH % Profit'], label_visibility="collapsed", key="ms_pct")
@@ -904,7 +913,7 @@ elif selected_menu == "Exchange Flow":
         
         opts_ex_base = ['🔵 Total Balance', '⚪ Net Flow', '🔴 Inflow', '🟢 Outflow']
         all_opts_ex = opts_ex_base.copy()
-        if w_ex > 1: all_opts_ex.extend([f"{m} (SMA {w_ex})" for m in opts_ex_base])
+        if get_window(st.session_state.sma_ex, st.session_state.cs_ex) > 1: all_opts_ex.extend([f"{m} (SMA {get_window(st.session_state.sma_ex, st.session_state.cs_ex)})" for m in opts_ex_base])
             
         try: sel_ex = st.pills("Metrics", all_opts_ex, default=['🔵 Total Balance', '⚪ Net Flow'], selection_mode="multi", label_visibility="collapsed", key="pills_ex")
         except: sel_ex = st.multiselect("Metrics", all_opts_ex, default=['🔵 Total Balance', '⚪ Net Flow'], label_visibility="collapsed", key="ms_ex")
@@ -1003,7 +1012,7 @@ elif selected_menu == "Derivatives":
         
         opts_d_base = ['🔵 Open Interest', '📊 Funding Rate']
         all_opts_d = opts_d_base.copy()
-        if w_d > 1: all_opts_d.extend([f"{m} (SMA {w_d})" for m in opts_d_base])
+        if get_window(st.session_state.sma_d, st.session_state.cs_d) > 1: all_opts_d.extend([f"{m} (SMA {get_window(st.session_state.sma_d, st.session_state.cs_d)})" for m in opts_d_base])
             
         try: active_metrics_d = st.pills("Metrics", all_opts_d, default=opts_d_base, selection_mode="multi", label_visibility="collapsed")
         except: active_metrics_d = st.multiselect("Metrics", all_opts_d, default=opts_d_base, label_visibility="collapsed")
@@ -1093,7 +1102,7 @@ elif selected_menu == "Social Sentiment":
         colors_gt = {'🔵 BTC': ('#4da6ff', 'GTrend BTC'), '🟢 ETH': ('#00cc66', 'GTrend ETH'), '🟣 Crypto': ('#cc33ff', 'GTrend Crypto'), '🟡 NFT': ('#eab308', 'GTrend NFT'), '🟠 Binance': ('#ff9933', 'GTrend Binance'), '🔴 SOL': ('#ff4d4d', 'GTrend SOL'), '🟤 DOGE': ('#cc9966', 'GTrend DOGE')}
         
         all_opts_gt = opts_gt_base.copy()
-        if w_gt > 1: all_opts_gt.extend([f"{m} (SMA {w_gt})" for m in opts_gt_base])
+        if get_window(st.session_state.sma_gt, st.session_state.cs_gt) > 1: all_opts_gt.extend([f"{m} (SMA {get_window(st.session_state.sma_gt, st.session_state.cs_gt)})" for m in opts_gt_base])
             
         try: sel_gt = st.pills("GTrend Metrics", all_opts_gt, default=['🔵 BTC', '🟣 Crypto'], selection_mode="multi", label_visibility="collapsed", key="pills_gtrend")
         except: sel_gt = st.multiselect("GTrend Metrics", all_opts_gt, default=['🔵 BTC', '🟣 Crypto'], label_visibility="collapsed", key="ms_gtrend")
@@ -1152,7 +1161,7 @@ elif selected_menu == "Social Sentiment":
         colors_wk = {'⚪ BTC': ('#ffffff', 'Wiki BTC'), '🟢 Crypto': ('#00cc66', 'Wiki Crypto'), '🔵 ETH': ('#4da6ff', 'Wiki ETH'), '🟣 Satoshi': ('#cc33ff', 'Wiki Satoshi'), '🟡 Blockchain': ('#eab308', 'Wiki Blockchain'), '🔴 NFT': ('#ff4d4d', 'Wiki NFT'), '🟤 DOGE': ('#cc9966', 'Wiki DOGE')}
         
         all_opts_wk = opts_wk_base.copy()
-        if w_wk > 1: all_opts_wk.extend([f"{m} (SMA {w_wk})" for m in opts_wk_base])
+        if get_window(st.session_state.sma_wk, st.session_state.cs_wk) > 1: all_opts_wk.extend([f"{m} (SMA {get_window(st.session_state.sma_wk, st.session_state.cs_wk)})" for m in opts_wk_base])
             
         try: sel_wk = st.pills("Wiki Metrics", all_opts_wk, default=['⚪ BTC', '🟢 Crypto'], selection_mode="multi", label_visibility="collapsed", key="pills_wiki")
         except: sel_wk = st.multiselect("Wiki Metrics", all_opts_wk, default=['⚪ BTC', '🟢 Crypto'], label_visibility="collapsed", key="ms_wiki")
@@ -1307,7 +1316,7 @@ elif selected_menu == "Market Signals":
         
         opts_msig_base = ['📊 14D RSI']
         all_opts_msig = opts_msig_base.copy()
-        if w_msig > 1: all_opts_msig.extend([f"{m} (SMA {w_msig})" for m in opts_msig_base])
+        if get_window(st.session_state.sma_msig, st.session_state.cs_msig) > 1: all_opts_msig.extend([f"{m} (SMA {get_window(st.session_state.sma_msig, st.session_state.cs_msig)})" for m in opts_msig_base])
             
         try: sel_msig = st.pills("Signals", all_opts_msig, default=['📊 14D RSI'], selection_mode="multi", label_visibility="collapsed", key="pills_msig")
         except: sel_msig = st.multiselect("Signals", all_opts_msig, default=['📊 14D RSI'], label_visibility="collapsed", key="ms_msig")
