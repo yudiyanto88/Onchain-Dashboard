@@ -49,11 +49,11 @@ div[data-testid="stPill"] button { font-size: 0.85rem !important; padding: 2px 1
 """, unsafe_allow_html=True)
 
 # State initialization (Termasuk ex untuk Exchange Flow)
-for key in ['tr_p', 'tr_mv', 'tr_ms', 'tr_mpl', 'tr_nupl', 'tr_d', 'tr_ex', 'tr_gt', 'tr_wk', 'tr_sd', 'tr_fg', 'tr_msig']:
+for key in ['tr_p', 'tr_mv', 'tr_ms', 'tr_mpl', 'tr_nupl', 'tr_d', 'tr_ex', 'tr_gt', 'tr_wk', 'tr_sd', 'tr_fg', 'tr_msig', 'tr_bt']:
     if key not in st.session_state: st.session_state[key] = "All Time"
-for key in ['cd_p', 'cd_mv', 'cd_ms', 'cd_mpl', 'cd_nupl', 'cd_d', 'cd_ex', 'cd_gt', 'cd_wk', 'cd_sd', 'cd_fg', 'cd_msig']:
+for key in ['cd_p', 'cd_mv', 'cd_ms', 'cd_mpl', 'cd_nupl', 'cd_d', 'cd_ex', 'cd_gt', 'cd_wk', 'cd_sd', 'cd_fg', 'cd_msig', 'cd_bt']:
     if key not in st.session_state: st.session_state[key] = 120
-for key in ['tf_p', 'tf_mv', 'tf_ms', 'tf_mpl', 'tf_nupl', 'tf_d', 'tf_ex', 'tf_gt', 'tf_wk', 'tf_sd', 'tf_fg', 'tf_msig']:
+for key in ['tf_p', 'tf_mv', 'tf_ms', 'tf_mpl', 'tf_nupl', 'tf_d', 'tf_ex', 'tf_gt', 'tf_wk', 'tf_sd', 'tf_fg', 'tf_msig', 'tf_bt']:
     if key not in st.session_state: st.session_state[key] = "Daily"
 for key in ['sma_p', 'sma_mv', 'sma_ms', 'sma_mpl', 'sma_nupl', 'sma_d', 'sma_ex', 'sma_sd', 'sma_fg', 'sma_msig']:
     if key not in st.session_state: st.session_state[key] = "0d"
@@ -242,15 +242,6 @@ def get_s(df, col):
     clean_df = df[['Date_str', col]].dropna()
     return clean_df.rename(columns={'Date_str':'time', col:'value'}).to_dict('records')
 
-def get_window(sma_state, custom_smooth):
-    """Hitung nilai window SMA dari session_state tanpa perlu apply_filters.
-    Dipakai untuk build pills options agar langsung sync saat user klik."""
-    if sma_state == "7d": return 7
-    elif sma_state == "14d": return 14
-    elif sma_state == "30d": return 30
-    elif sma_state == "Custom": return custom_smooth
-    return 1
-
 t_opts = ["1 Month", "3 Months", "6 Months", "1 Year", "4 Years (Cycle)", "All Time", "Custom"]
 
 # ==============================================================================
@@ -264,7 +255,7 @@ with st.sidebar:
     # Menambahkan "Exchange Flow" ke dalam urutan menu
     selected_menu = st.radio(
         "Menu Navigasi",
-        ["Price Levels", "Market Valuation", "Profit & Loss", "Supply Dynamics", "Exchange Flow", "Derivatives", "Social Sentiment", "Market Signals"],
+        ["Price Levels", "Market Valuation", "Profit & Loss", "Supply Dynamics", "Exchange Flow", "Derivatives", "Social Sentiment", "Market Signals", "Backtesting"],
         label_visibility="collapsed"
     )
     st.markdown("---")
@@ -329,7 +320,7 @@ if selected_menu == "Price Levels":
         
         opts_p_base = ['🔴 STH Cost Basis', '🔵 LTH Cost Basis', '⚪ Realized Price', '🟣 True Market Mean', '🟢 CVDD', '🟤 Cum P/L Price', '🟨 200 DMA', '🟦 50 WMA', '🟪 200 WMA']
         all_opts_p = opts_p_base.copy()
-        if get_window(st.session_state.sma_p, st.session_state.cs_p) > 1: all_opts_p.extend([f"{m} (SMA {get_window(st.session_state.sma_p, st.session_state.cs_p)})" for m in opts_p_base])
+        if w_p > 1: all_opts_p.extend([f"{m} (SMA {w_p})" for m in opts_p_base])
             
         try: active_metrics_p = st.pills("Metrics", all_opts_p, default=['🔴 STH Cost Basis', '🔵 LTH Cost Basis', '⚪ Realized Price'], selection_mode="multi", label_visibility="collapsed")
         except: active_metrics_p = st.multiselect("Metrics", all_opts_p, default=['🔴 STH Cost Basis', '🔵 LTH Cost Basis', '⚪ Realized Price'], label_visibility="collapsed")
@@ -421,31 +412,55 @@ elif selected_menu == "Market Valuation":
         all_opts_mv = opts_mv_base.copy()
         if get_window(st.session_state.sma_mv, st.session_state.cs_mv) > 1: all_opts_mv.extend([f"{m} (SMA {get_window(st.session_state.sma_mv, st.session_state.cs_mv)})" for m in opts_mv_base])
             
-        try: sel_mv = st.pills("MVRV Metrics", all_opts_mv, default=['🔵 MVRV', '🟢 LTH MVRV'], selection_mode="multi", label_visibility="collapsed")
-        except: sel_mv = st.multiselect("MVRV Metrics", all_opts_mv, default=['🔵 MVRV', '🟢 LTH MVRV'], label_visibility="collapsed")
+        try: sel_mv = st.pills("MVRV Metrics", all_opts_mv, default=['🔵 MVRV', '🔴 STH MVRV', '🟢 LTH MVRV'], selection_mode="multi", label_visibility="collapsed", key="pills_mv")
+        except: sel_mv = st.multiselect("MVRV Metrics", all_opts_mv, default=['🔵 MVRV', '🔴 STH MVRV', '🟢 LTH MVRV'], label_visibility="collapsed", key="ms_mv")
 
-        chart_opts_mv = {
-            "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, 
-            "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, 
-            "crosshair": {"mode": 0}, "height": 850 if focus_mv else 650, 
-            "rightPriceScale": {"visible": True}, "leftPriceScale": {"visible": True}, "scale3": {"visible": False} 
+        # ── Dual pane: MVRV / STH → right scale, LTH → left scale (keduanya draggable) ──
+        h_total_mv = 850 if focus_mv else 650
+        h_top_mv   = int(h_total_mv * 0.45)
+        h_bot_mv   = h_total_mv - h_top_mv
+
+        # Chart atas — BTC Price saja, timeScale disembunyikan agar menyatu
+        chart_top_mv = {
+            "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}},
+            "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}},
+            "crosshair": {"mode": 0},
+            "height": h_top_mv,
+            "rightPriceScale": {"visible": True},
+            "leftPriceScale": {"visible": False},
+            "timeScale": {"visible": False},
         }
-        series_mv = [{"type": 'Line', "data": get_s(df_mv, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
+        series_top_mv = [{"type": 'Line', "data": get_s(df_mv, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
+
+        # Chart bawah — LTH MVRV → left (draggable), MVRV + STH MVRV → right (draggable)
+        chart_bot_mv = {
+            "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}},
+            "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}},
+            "crosshair": {"mode": 0},
+            "height": h_bot_mv,
+            "rightPriceScale": {"visible": True},
+            "leftPriceScale": {"visible": True},
+        }
+        # Garis netral 1.0 di right scale sebagai referensi
         df_mv['Neutral_Line'] = 1.0
-        series_mv.append({"type": 'Line', "data": get_s(df_mv, 'Neutral_Line'), "options": {"color": '#ffffff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": 'Neutral (1.0)'}})
+        series_bot_mv = [{"type": 'Line', "data": get_s(df_mv, 'Neutral_Line'), "options": {"color": 'rgba(255,255,255,0.3)', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'right', "title": 'Neutral (1.0)'}}]
 
         for m in sel_mv:
             is_sma = "(SMA" in m
             base_m = m.split(" (SMA")[0]
-            target_scale = "scale3" if base_m == '🟢 LTH MVRV' else "left"
-            if base_m == '🔵 MVRV': c_col, c_col_raw, c_name = '#4da6ff', 'rgba(77, 166, 255, 0.7)', 'MVRV'
-            elif base_m == '🔴 STH MVRV': c_col, c_col_raw, c_name = '#ff4d4d', 'rgba(255, 77, 77, 0.7)', 'STH MVRV'
-            elif base_m == '🟢 LTH MVRV': c_col, c_col_raw, c_name = '#00cc66', 'rgba(0, 204, 102, 0.7)', 'LTH MVRV'
+            # LTH MVRV → left scale (range lebih besar, perlu scale sendiri)
+            # MVRV & STH MVRV → right scale (range mirip, share scale)
+            if base_m == '🔵 MVRV':     c_col, c_col_raw, c_name, tscale = '#4da6ff', 'rgba(77,166,255,0.85)',   'MVRV',     'right'
+            elif base_m == '🔴 STH MVRV': c_col, c_col_raw, c_name, tscale = '#ff4d4d', 'rgba(255,77,77,0.85)',    'STH MVRV', 'right'
+            elif base_m == '🟢 LTH MVRV': c_col, c_col_raw, c_name, tscale = '#00cc66', 'rgba(0,204,102,0.85)',    'LTH MVRV', 'left'
             else: continue
-            
-            if is_sma: series_mv.append({"type": 'Line', "data": get_s(df_mv, f"{c_name}_SMA"), "options": {"color": c_col, "lineWidth": 1, "lineStyle": 2, "priceScaleId": target_scale, "title": f"{c_name} SMA"}})
-            else: series_mv.append({"type": 'Line', "data": get_s(df_mv, c_name), "options": {"color": c_col_raw, "lineWidth": 1, "priceScaleId": target_scale, "title": c_name}})
-        renderLightweightCharts([{"chart": chart_opts_mv, "series": series_mv}], 'chart_mvrv')
+            if is_sma: series_bot_mv.append({"type": 'Line', "data": get_s(df_mv, f"{c_name}_SMA"), "options": {"color": c_col, "lineWidth": 1, "lineStyle": 2, "priceScaleId": tscale, "title": f"{c_name} SMA"}})
+            else:      series_bot_mv.append({"type": 'Line', "data": get_s(df_mv, c_name),            "options": {"color": c_col_raw, "lineWidth": 1.5, "priceScaleId": tscale, "title": c_name}})
+
+        renderLightweightCharts([
+            {"chart": chart_top_mv, "series": series_top_mv},
+            {"chart": chart_bot_mv, "series": series_bot_mv},
+        ], 'chart_mvrv_dual')
 
 # ------------------------------------------------------------------------------
 # TAB 3: PROFIT & LOSS 
@@ -505,7 +520,7 @@ elif selected_menu == "Profit & Loss":
         
         opts_sopr_base = ['🔵 aSOPR', '🔴 STH SOPR', '🟢 LTH SOPR']
         all_opts_sopr = opts_sopr_base.copy()
-        if get_window(st.session_state.sma_ms, st.session_state.cs_ms) > 1: all_opts_sopr.extend([f"{m} (SMA {get_window(st.session_state.sma_ms, st.session_state.cs_ms)})" for m in opts_sopr_base])
+        if w_ms > 1: all_opts_sopr.extend([f"{m} (SMA {w_ms})" for m in opts_sopr_base])
             
         try: sel_sopr = st.pills("SOPR Metrics", all_opts_sopr, default=['🔵 aSOPR', '🟢 LTH SOPR'], selection_mode="multi", label_visibility="collapsed")
         except: sel_sopr = st.multiselect("SOPR Metrics", all_opts_sopr, default=['🔵 aSOPR', '🟢 LTH SOPR'], label_visibility="collapsed")
@@ -614,7 +629,7 @@ elif selected_menu == "Profit & Loss":
             
         opts_pl_base = ['⚪ Net Realized PL', '🟣 STH P/L Ratio', '🟤 LTH P/L Ratio', '🟠 P/L Price Ratio']
         all_opts_pl = opts_pl_base.copy()
-        if get_window(st.session_state.sma_mpl, st.session_state.cs_mpl) > 1: all_opts_pl.extend([f"{m} (SMA {get_window(st.session_state.sma_mpl, st.session_state.cs_mpl)})" for m in opts_pl_base])
+        if w_mpl > 1: all_opts_pl.extend([f"{m} (SMA {w_mpl})" for m in opts_pl_base])
 
         try: sel_pl = st.pills("P/L Metrics", all_opts_pl, default=['⚪ Net Realized PL'], selection_mode="multi", label_visibility="collapsed")
         except: sel_pl = st.multiselect("P/L Metrics", all_opts_pl, default=['⚪ Net Realized PL'], label_visibility="collapsed")
@@ -686,7 +701,7 @@ elif selected_menu == "Profit & Loss":
             
         opts_nupl_base = ['🔵 NUPL', '🔴 STH NUPL', '🟢 LTH NUPL']
         all_opts_nupl = opts_nupl_base.copy()
-        if get_window(st.session_state.sma_nupl, st.session_state.cs_nupl) > 1: all_opts_nupl.extend([f"{m} (SMA {get_window(st.session_state.sma_nupl, st.session_state.cs_nupl)})" for m in opts_nupl_base])
+        if w_nupl > 1: all_opts_nupl.extend([f"{m} (SMA {w_nupl})" for m in opts_nupl_base])
 
         try: sel_nupl = st.pills("NUPL Metrics", all_opts_nupl, default=['🔵 NUPL', '🟢 LTH NUPL'], selection_mode="multi", label_visibility="collapsed")
         except: sel_nupl = st.multiselect("NUPL Metrics", all_opts_nupl, default=['🔵 NUPL', '🟢 LTH NUPL'], label_visibility="collapsed")
@@ -777,7 +792,7 @@ elif selected_menu == "Supply Dynamics":
         
         opts_sd_sup = ['🔵 LTH Supply', '🔴 STH Supply']
         all_opts_sd_sup = opts_sd_sup.copy()
-        if get_window(st.session_state.sma_sd, st.session_state.cs_sd) > 1: all_opts_sd_sup.extend([f"{m} (SMA {get_window(st.session_state.sma_sd, st.session_state.cs_sd)})" for m in opts_sd_sup])
+        if w_sd > 1: all_opts_sd_sup.extend([f"{m} (SMA {w_sd})" for m in opts_sd_sup])
             
         try: sel_sd_sup = st.pills("Supply Metrics", all_opts_sd_sup, default=opts_sd_sup, selection_mode="multi", label_visibility="collapsed", key="pills_sup")
         except: sel_sd_sup = st.multiselect("Supply Metrics", all_opts_sd_sup, default=opts_sd_sup, label_visibility="collapsed", key="ms_sup")
@@ -824,7 +839,7 @@ elif selected_menu == "Supply Dynamics":
             
         opts_sd_pct = ['⚪ Total % Profit', '⚫ Total % Loss', '🔵 LTH % Profit', '🟣 LTH % Loss', '🔴 STH % Profit', '🟠 STH % Loss']
         all_opts_sd_pct = opts_sd_pct.copy()
-        if get_window(st.session_state.sma_sd, st.session_state.cs_sd) > 1: all_opts_sd_pct.extend([f"{m} (SMA {get_window(st.session_state.sma_sd, st.session_state.cs_sd)})" for m in opts_sd_pct])
+        if w_sd2 > 1: all_opts_sd_pct.extend([f"{m} (SMA {w_sd2})" for m in opts_sd_pct])
             
         try: sel_sd_pct = st.pills("Profit Metrics", all_opts_sd_pct, default=['⚪ Total % Profit', '🔵 LTH % Profit', '🔴 STH % Profit'], selection_mode="multi", label_visibility="collapsed", key="pills_pct")
         except: sel_sd_pct = st.multiselect("Profit Metrics", all_opts_sd_pct, default=['⚪ Total % Profit', '🔵 LTH % Profit', '🔴 STH % Profit'], label_visibility="collapsed", key="ms_pct")
@@ -913,7 +928,7 @@ elif selected_menu == "Exchange Flow":
         
         opts_ex_base = ['🔵 Total Balance', '⚪ Net Flow', '🔴 Inflow', '🟢 Outflow']
         all_opts_ex = opts_ex_base.copy()
-        if get_window(st.session_state.sma_ex, st.session_state.cs_ex) > 1: all_opts_ex.extend([f"{m} (SMA {get_window(st.session_state.sma_ex, st.session_state.cs_ex)})" for m in opts_ex_base])
+        if w_ex > 1: all_opts_ex.extend([f"{m} (SMA {w_ex})" for m in opts_ex_base])
             
         try: sel_ex = st.pills("Metrics", all_opts_ex, default=['🔵 Total Balance', '⚪ Net Flow'], selection_mode="multi", label_visibility="collapsed", key="pills_ex")
         except: sel_ex = st.multiselect("Metrics", all_opts_ex, default=['🔵 Total Balance', '⚪ Net Flow'], label_visibility="collapsed", key="ms_ex")
@@ -1012,7 +1027,7 @@ elif selected_menu == "Derivatives":
         
         opts_d_base = ['🔵 Open Interest', '📊 Funding Rate']
         all_opts_d = opts_d_base.copy()
-        if get_window(st.session_state.sma_d, st.session_state.cs_d) > 1: all_opts_d.extend([f"{m} (SMA {get_window(st.session_state.sma_d, st.session_state.cs_d)})" for m in opts_d_base])
+        if w_d > 1: all_opts_d.extend([f"{m} (SMA {w_d})" for m in opts_d_base])
             
         try: active_metrics_d = st.pills("Metrics", all_opts_d, default=opts_d_base, selection_mode="multi", label_visibility="collapsed")
         except: active_metrics_d = st.multiselect("Metrics", all_opts_d, default=opts_d_base, label_visibility="collapsed")
@@ -1102,7 +1117,7 @@ elif selected_menu == "Social Sentiment":
         colors_gt = {'🔵 BTC': ('#4da6ff', 'GTrend BTC'), '🟢 ETH': ('#00cc66', 'GTrend ETH'), '🟣 Crypto': ('#cc33ff', 'GTrend Crypto'), '🟡 NFT': ('#eab308', 'GTrend NFT'), '🟠 Binance': ('#ff9933', 'GTrend Binance'), '🔴 SOL': ('#ff4d4d', 'GTrend SOL'), '🟤 DOGE': ('#cc9966', 'GTrend DOGE')}
         
         all_opts_gt = opts_gt_base.copy()
-        if get_window(st.session_state.sma_gt, st.session_state.cs_gt) > 1: all_opts_gt.extend([f"{m} (SMA {get_window(st.session_state.sma_gt, st.session_state.cs_gt)})" for m in opts_gt_base])
+        if w_gt > 1: all_opts_gt.extend([f"{m} (SMA {w_gt})" for m in opts_gt_base])
             
         try: sel_gt = st.pills("GTrend Metrics", all_opts_gt, default=['🔵 BTC', '🟣 Crypto'], selection_mode="multi", label_visibility="collapsed", key="pills_gtrend")
         except: sel_gt = st.multiselect("GTrend Metrics", all_opts_gt, default=['🔵 BTC', '🟣 Crypto'], label_visibility="collapsed", key="ms_gtrend")
@@ -1161,7 +1176,7 @@ elif selected_menu == "Social Sentiment":
         colors_wk = {'⚪ BTC': ('#ffffff', 'Wiki BTC'), '🟢 Crypto': ('#00cc66', 'Wiki Crypto'), '🔵 ETH': ('#4da6ff', 'Wiki ETH'), '🟣 Satoshi': ('#cc33ff', 'Wiki Satoshi'), '🟡 Blockchain': ('#eab308', 'Wiki Blockchain'), '🔴 NFT': ('#ff4d4d', 'Wiki NFT'), '🟤 DOGE': ('#cc9966', 'Wiki DOGE')}
         
         all_opts_wk = opts_wk_base.copy()
-        if get_window(st.session_state.sma_wk, st.session_state.cs_wk) > 1: all_opts_wk.extend([f"{m} (SMA {get_window(st.session_state.sma_wk, st.session_state.cs_wk)})" for m in opts_wk_base])
+        if w_wk > 1: all_opts_wk.extend([f"{m} (SMA {w_wk})" for m in opts_wk_base])
             
         try: sel_wk = st.pills("Wiki Metrics", all_opts_wk, default=['⚪ BTC', '🟢 Crypto'], selection_mode="multi", label_visibility="collapsed", key="pills_wiki")
         except: sel_wk = st.multiselect("Wiki Metrics", all_opts_wk, default=['⚪ BTC', '🟢 Crypto'], label_visibility="collapsed", key="ms_wiki")
@@ -1316,7 +1331,7 @@ elif selected_menu == "Market Signals":
         
         opts_msig_base = ['📊 14D RSI']
         all_opts_msig = opts_msig_base.copy()
-        if get_window(st.session_state.sma_msig, st.session_state.cs_msig) > 1: all_opts_msig.extend([f"{m} (SMA {get_window(st.session_state.sma_msig, st.session_state.cs_msig)})" for m in opts_msig_base])
+        if w_msig > 1: all_opts_msig.extend([f"{m} (SMA {w_msig})" for m in opts_msig_base])
             
         try: sel_msig = st.pills("Signals", all_opts_msig, default=['📊 14D RSI'], selection_mode="multi", label_visibility="collapsed", key="pills_msig")
         except: sel_msig = st.multiselect("Signals", all_opts_msig, default=['📊 14D RSI'], label_visibility="collapsed", key="ms_msig")
@@ -1341,3 +1356,157 @@ elif selected_menu == "Market Signals":
             else: series_msig.append({"type": 'Line', "data": get_s(df_msig, 'RSI'), "options": {"color": '#4da6ff', "lineWidth": 1, "priceScaleId": 'left', "title": '14D RSI'}})
 
         renderLightweightCharts([{"chart": chart_opts_msig, "series": series_msig}], 'chart_msig')
+
+# ------------------------------------------------------------------------------
+# TAB 9: BACKTESTING VIEW
+# ------------------------------------------------------------------------------
+elif selected_menu == "Backtesting":
+    # Merge semua data yang dibutuhkan ke satu dataframe
+    df_bt_base = df_mvrv_raw.copy() if not df_mvrv_raw.empty else pd.DataFrame()
+    if not df_mom_raw.empty and not df_bt_base.empty:
+        df_bt_base = pd.merge(df_bt_base, df_mom_raw[['Date','aSOPR','LTH SOPR','STH SOPR','NUPL','STH NUPL','LTH NUPL','Net Realized PL','STH P/L Ratio','LTH P/L Ratio']], on='Date', how='left')
+    if not df_supply_raw.empty and not df_bt_base.empty:
+        df_bt_base = pd.merge(df_bt_base, df_supply_raw[['Date','LTH Supply','STH Supply','LTH % Profit','STH % Profit','Total % Profit']], on='Date', how='left')
+    if not df_ex_raw.empty and not df_bt_base.empty:
+        df_bt_base = pd.merge(df_bt_base, df_ex_raw[['Date','Net Flow','Total Balance']], on='Date', how='left')
+    if not df_deriv_raw.empty and not df_bt_base.empty:
+        df_bt_base = pd.merge(df_bt_base, df_deriv_raw[['Date','Open Interest','Funding Rate']], on='Date', how='left')
+    if not df_price_raw.empty and not df_bt_base.empty:
+        df_bt_base = pd.merge(df_bt_base, df_price_raw[['Date','STH Cost Basis','LTH Cost Basis','Realized Price','CVDD','True Market Mean']], on='Date', how='left')
+
+    if df_bt_base.empty:
+        st.warning("Data tidak tersedia untuk Backtesting View.")
+    else:
+        # KPI row
+        last_bt = df_bt_base.iloc[-1]
+        prev_bt = df_bt_base.iloc[-2] if len(df_bt_base) > 1 else last_bt
+        btc_bt = last_bt.get('BTC Price', 0)
+        btc_prev_bt = prev_bt.get('BTC Price', 0)
+        dp_bt = ((btc_bt - btc_prev_bt) / btc_prev_bt * 100) if btc_prev_bt else 0
+        dc_bt = "#00cc66" if dp_bt >= 0 else "#ff4d4d"
+        ar_bt = "↑" if dp_bt >= 0 else "↓"
+        d_bt  = f"<div style='margin-top:4px;'><span style='color:{dc_bt}; font-size:0.85rem; background-color:{dc_bt}20; padding:2px 6px; border-radius:4px;'>{ar_bt} {abs(dp_bt):.2f}%</span></div>"
+        col_title_bt, k1_bt = st.columns([1.5, 2], vertical_alignment="center")
+        with col_title_bt: st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.4rem;'>Backtesting View<br><span style='font-size: 1rem; color: #d1d4dc;'>Multi-Indicator</span></h3></div>", unsafe_allow_html=True)
+        with k1_bt: st.markdown(f"<div style='line-height:1.4; padding:5px 0;'><span style='color:#f7931a; font-size:0.95rem; font-weight:600;'>Current BTC Price</span><br><span style='color:#f7931a; font-size:1.4rem; font-weight:700;'>${btc_bt:,.2f}</span>{d_bt}</div>", unsafe_allow_html=True)
+        st.markdown("---")
+
+        # Controls
+        col_fs_bt, col_tf_bt, col_radio_bt, col_custom_bt = st.columns([1, 1.2, 6, 1.2], vertical_alignment="bottom", gap="small")
+        with col_fs_bt: focus_bt = st.toggle("Full Screen", key="tg_bt")
+        with col_tf_bt: st.session_state.tf_bt = st.selectbox("Timeframe", ["Daily", "3 Days", "Weekly", "Monthly"], index=["Daily", "3 Days", "Weekly", "Monthly"].index(st.session_state.tf_bt), key="tfs_bt")
+        with col_radio_bt:
+            c_idx_bt = t_opts.index(st.session_state.tr_bt) if st.session_state.tr_bt in t_opts else 5
+            st.session_state.tr_bt = st.radio("Range:", t_opts, index=c_idx_bt, horizontal=True, label_visibility="collapsed", key="rg_bt")
+        with col_custom_bt:
+            if st.session_state.tr_bt == "Custom": st.session_state.cd_bt = st.number_input("Days back", min_value=7, value=st.session_state.cd_bt, label_visibility="collapsed", key="cdin_bt")
+
+        # Apply filters
+        all_bt_cols = ['MVRV','STH MVRV','LTH MVRV','aSOPR','LTH SOPR','STH SOPR','NUPL','STH NUPL','LTH NUPL',
+                       'Net Realized PL','STH P/L Ratio','LTH P/L Ratio','LTH Supply','STH Supply',
+                       'LTH % Profit','STH % Profit','Total % Profit','Net Flow','Total Balance',
+                       'Open Interest','Funding Rate','STH Cost Basis','LTH Cost Basis','Realized Price','CVDD','True Market Mean']
+        df_bt_base['Date_str'] = df_bt_base['Date'].dt.strftime('%Y-%m-%d') if 'Date_str' not in df_bt_base.columns else df_bt_base['Date_str']
+        df_bt, _ = apply_filters(df_bt_base, st.session_state.tf_bt, "0d", 50, st.session_state.tr_bt, st.session_state.cd_bt, [])
+
+        # ── Pill selectors ──
+        # Chart atas: Price Levels overlay di BTC
+        price_level_opts = ['🔴 STH Cost Basis', '🔵 LTH Cost Basis', '⚪ Realized Price', '🟣 True Market Mean', '🟢 CVDD']
+        st.markdown("<span style='font-size:0.8rem; color:#a3a8b8;'>CHART ATAS — BTC + Price Levels</span>", unsafe_allow_html=True)
+        try: sel_bt_pl = st.pills("Price Levels", price_level_opts, default=['🔴 STH Cost Basis', '🔵 LTH Cost Basis', '⚪ Realized Price'], selection_mode="multi", label_visibility="collapsed", key="pills_bt_pl")
+        except: sel_bt_pl = st.multiselect("Price Levels", price_level_opts, default=['🔴 STH Cost Basis', '🔵 LTH Cost Basis', '⚪ Realized Price'], label_visibility="collapsed", key="ms_bt_pl")
+
+        # Chart tengah: indikator pilihan (right scale)
+        mid_ind_opts = ['🔵 MVRV', '🔴 STH MVRV', '🟢 LTH MVRV', '🩵 aSOPR', '🟠 STH SOPR', '🟤 LTH SOPR', '🟣 NUPL', '🩶 STH NUPL', '🫐 LTH NUPL', '⚪ STH P/L Ratio', '🟨 LTH P/L Ratio']
+        st.markdown("<span style='font-size:0.8rem; color:#a3a8b8;'>CHART TENGAH — Indikator (drag scale kiri/kanan untuk adjust)</span>", unsafe_allow_html=True)
+        try: sel_bt_mid = st.pills("Mid Indicators", mid_ind_opts, default=['🔵 MVRV', '🩵 aSOPR'], selection_mode="multi", label_visibility="collapsed", key="pills_bt_mid")
+        except: sel_bt_mid = st.multiselect("Mid Indicators", mid_ind_opts, default=['🔵 MVRV', '🩵 aSOPR'], label_visibility="collapsed", key="ms_bt_mid")
+
+        # Chart bawah: indikator pilihan (left scale)
+        bot_ind_opts = ['📊 Net Flow', '💰 Total Balance', '📈 Open Interest', '💸 Funding Rate', '🔵 LTH Supply', '🔴 STH Supply', '⚪ Total % Profit', '🟦 LTH % Profit', '🟥 STH % Profit']
+        st.markdown("<span style='font-size:0.8rem; color:#a3a8b8;'>CHART BAWAH — Indikator (drag scale kiri/kanan untuk adjust)</span>", unsafe_allow_html=True)
+        try: sel_bt_bot = st.pills("Bot Indicators", bot_ind_opts, default=['📊 Net Flow', '📈 Open Interest'], selection_mode="multi", label_visibility="collapsed", key="pills_bt_bot")
+        except: sel_bt_bot = st.multiselect("Bot Indicators", bot_ind_opts, default=['📊 Net Flow', '📈 Open Interest'], label_visibility="collapsed", key="ms_bt_bot")
+
+        # ── Height split ──
+        h_total_bt = 1100 if focus_bt else 900
+        h_top_bt = int(h_total_bt * 0.38)
+        h_mid_bt = int(h_total_bt * 0.32)
+        h_bot_bt = h_total_bt - h_top_bt - h_mid_bt
+
+        BASE_CHART = {
+            "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}},
+            "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}},
+            "crosshair": {"mode": 0},
+            "rightPriceScale": {"visible": True},
+            "leftPriceScale": {"visible": True},
+        }
+
+        # ── CHART ATAS: BTC + Price Levels ──
+        chart_bt_top = {**BASE_CHART, "height": h_top_bt, "timeScale": {"visible": False}}
+        series_bt_top = [{"type": 'Line', "data": get_s(df_bt, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
+        pl_colors = {
+            '🔴 STH Cost Basis': ('#ff4d4d', 'STH Cost Basis'),
+            '🔵 LTH Cost Basis': ('#4da6ff', 'LTH Cost Basis'),
+            '⚪ Realized Price':  ('#ffffff', 'Realized Price'),
+            '🟣 True Market Mean':('#00ffff', 'True Market Mean'),
+            '🟢 CVDD':           ('#00cc66', 'CVDD'),
+        }
+        for m in sel_bt_pl:
+            if m in pl_colors:
+                c_col, c_name = pl_colors[m]
+                series_bt_top.append({"type": 'Line', "data": get_s(df_bt, c_name), "options": {"color": c_col, "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'right', "title": c_name}})
+
+        # ── CHART TENGAH: Indikator ──
+        # Indikator dengan range mirip (0–5) → right; yang berbeda → left
+        # LTH MVRV → left, sisanya → right; NUPL group → left
+        chart_bt_mid = {**BASE_CHART, "height": h_mid_bt, "timeScale": {"visible": False}}
+        df_bt['Neutral_mid'] = 1.0
+        series_bt_mid = [{"type": 'Line', "data": get_s(df_bt, 'Neutral_mid'), "options": {"color": 'rgba(255,255,255,0.2)', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'right', "title": 'Neutral 1.0'}}]
+        mid_map = {
+            '🔵 MVRV':         ('#4da6ff', 'MVRV',         'right'),
+            '🔴 STH MVRV':     ('#ff4d4d', 'STH MVRV',     'right'),
+            '🟢 LTH MVRV':     ('#00cc66', 'LTH MVRV',     'left'),
+            '🩵 aSOPR':        ('#00e6e6', 'aSOPR',        'right'),
+            '🟠 STH SOPR':     ('#ff9933', 'STH SOPR',     'right'),
+            '🟤 LTH SOPR':     ('#cc9966', 'LTH SOPR',     'left'),
+            '🟣 NUPL':         ('#cc33ff', 'NUPL',         'left'),
+            '🩶 STH NUPL':     ('#a3a8b8', 'STH NUPL',     'left'),
+            '🫐 LTH NUPL':     ('#6666ff', 'LTH NUPL',     'left'),
+            '⚪ STH P/L Ratio':('#ffffff', 'STH P/L Ratio','right'),
+            '🟨 LTH P/L Ratio':('#ffe119', 'LTH P/L Ratio','left'),
+        }
+        for m in sel_bt_mid:
+            if m in mid_map:
+                c_col, c_name, tscale = mid_map[m]
+                series_bt_mid.append({"type": 'Line', "data": get_s(df_bt, c_name), "options": {"color": c_col, "lineWidth": 1.5, "priceScaleId": tscale, "title": c_name}})
+
+        # ── CHART BAWAH: Indikator supply/flow/derivatives ──
+        chart_bt_bot = {**BASE_CHART, "height": h_bot_bt}
+        series_bt_bot = []
+        bot_map = {
+            '📊 Net Flow':       ('#ff6666', 'Net Flow',       'left'),
+            '💰 Total Balance':  ('#4da6ff', 'Total Balance',  'right'),
+            '📈 Open Interest':  ('#00cc66', 'Open Interest',  'right'),
+            '💸 Funding Rate':   ('#ffe119', 'Funding Rate',   'left'),
+            '🔵 LTH Supply':     ('#4da6ff', 'LTH Supply',     'right'),
+            '🔴 STH Supply':     ('#ff4d4d', 'STH Supply',     'right'),
+            '⚪ Total % Profit': ('#ffffff', 'Total % Profit', 'left'),
+            '🟦 LTH % Profit':   ('#4da6ff', 'LTH % Profit',  'left'),
+            '🟥 STH % Profit':   ('#ff4d4d', 'STH % Profit',  'left'),
+        }
+        for m in sel_bt_bot:
+            if m in bot_map:
+                c_col, c_name, tscale = bot_map[m]
+                series_bt_bot.append({"type": 'Line', "data": get_s(df_bt, c_name), "options": {"color": c_col, "lineWidth": 1.5, "priceScaleId": tscale, "title": c_name}})
+
+        # Kalau chart bawah kosong (tidak ada yang dipilih), tetap render placeholder
+        if not series_bt_bot:
+            df_bt['_empty'] = float('nan')
+            series_bt_bot = [{"type": 'Line', "data": [], "options": {"color": '#131722', "priceScaleId": 'right'}}]
+
+        renderLightweightCharts([
+            {"chart": chart_bt_top, "series": series_bt_top},
+            {"chart": chart_bt_mid, "series": series_bt_mid},
+            {"chart": chart_bt_bot, "series": series_bt_bot},
+        ], 'chart_backtesting')
