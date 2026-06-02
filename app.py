@@ -466,7 +466,7 @@ elif selected_menu == "Market Valuation":
             "crosshair": {"mode": 0},
             "height": h_bot_mv,
             "rightPriceScale": {"visible": True},
-            "leftPriceScale": {"visible": True},
+            "leftPriceScale": {"visible": False},
         }
         # Garis netral 1.0 di right scale sebagai referensi
         df_mv['Neutral_Line'] = 1.0
@@ -475,15 +475,14 @@ elif selected_menu == "Market Valuation":
         for m in sel_mv:
             is_sma = "(SMA" in m
             base_m = m.split(" (SMA")[0]
-            # LTH MVRV → left scale (range lebih besar, perlu scale sendiri)
-            # MVRV & STH MVRV → right scale (range mirip, share scale)
+            # 🟢 FIX: Semua metrik MVRV sekarang diarahkan ke 'right' tscale
             if base_m == '🔵 MVRV':     c_col, c_col_raw, c_name, tscale = '#4da6ff', 'rgba(77,166,255,0.85)',   'MVRV',     'right'
             elif base_m == '🔴 STH MVRV': c_col, c_col_raw, c_name, tscale = '#ff4d4d', 'rgba(255,77,77,0.85)',    'STH MVRV', 'right'
-            elif base_m == '🟢 LTH MVRV': c_col, c_col_raw, c_name, tscale = '#00cc66', 'rgba(0,204,102,0.85)',    'LTH MVRV', 'left'
+            elif base_m == '🟢 LTH MVRV': c_col, c_col_raw, c_name, tscale = '#00cc66', 'rgba(0,204,102,0.85)',    'LTH MVRV', 'right'
             else: continue
+            
             if is_sma: series_bot_mv.append({"type": 'Line', "data": get_s(df_mv, f"{c_name}_SMA"), "options": {"color": c_col, "lineWidth": 1, "lineStyle": 2, "priceScaleId": tscale, "title": f"{c_name} SMA"}})
             else:      series_bot_mv.append({"type": 'Line', "data": get_s(df_mv, c_name),            "options": {"color": c_col_raw, "lineWidth": 1.5, "priceScaleId": tscale, "title": c_name}})
-
         renderLightweightCharts([
             {"chart": chart_top_mv, "series": series_top_mv},
             {"chart": chart_bot_mv, "series": series_bot_mv},
