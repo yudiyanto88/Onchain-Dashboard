@@ -437,7 +437,7 @@ elif selected_menu == "Market Valuation":
         
         opts_mv_base = ['🔵 MVRV', '🔴 STH MVRV', '🟢 LTH MVRV']
         all_opts_mv = opts_mv_base.copy()
-        if get_window(st.session_state.sma_mv, st.session_state.cs_mv) > 1: all_opts_mv.extend([f"{m} (SMA {get_window(st.session_state.sma_mv, st.session_state.cs_mv)})" for m in opts_mv_base])
+        if w_mv > 1: all_opts_mv.extend([f"{m} (SMA {w_mv})" for m in opts_mv_base])
             
         try: sel_mv = st.pills("MVRV Metrics", all_opts_mv, default=['🔵 MVRV', '🔴 STH MVRV', '🟢 LTH MVRV'], selection_mode="multi", label_visibility="collapsed", key="pills_mv")
         except: sel_mv = st.multiselect("MVRV Metrics", all_opts_mv, default=['🔵 MVRV', '🔴 STH MVRV', '🟢 LTH MVRV'], label_visibility="collapsed", key="ms_mv")
