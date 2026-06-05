@@ -286,5 +286,50 @@ try:
 except Exception as e:
     print(f"❌ Error fetching HODL Waves: {e}")
 
+# ==========================================
+# 12. PIPELINE: REALIZED CAP
+# ==========================================
+print("\n[12/13] Menarik data Realized Cap...")
+try:
+    # URL diubah ke timeframe=all agar menarik seluruh historis
+    url_rcap = "https://chartinspect.com/api/onchain/realized-cap?timeframe=all&isProUser=false"
+    
+    # Target kolom yang relevan
+    cols_rcap = ['date', 'btc_price', 'realized_cap_usd', 'lth_realized_cap_usd', 'sth_realized_cap_usd']
+    df_rcap = fetch_data(url_rcap, cols_rcap)
+    
+    if not df_rcap.empty:
+        df_rcap = df_rcap.sort_values('date').reset_index(drop=True)
+        df_rcap.to_csv("data_realized_cap.csv", index=False)
+        print("✅ data_realized_cap.csv berhasil diperbarui.")
+        print(df_rcap[['date', 'realized_cap_usd']].tail(3).to_string(index=False))
+    else:
+        print("❌ GAGAL: Data Realized Cap kosong atau gagal ditarik.")
+except Exception as e:
+    print(f"❌ Error fetching Realized Cap: {e}")
+
+# ==========================================
+# 13. PIPELINE: COIN DAYS DESTROYED (CDD)
+# ==========================================
+print("\n[13/13] Menarik data Coin Days Destroyed (CDD)...")
+try:
+    url_cdd = "https://chartinspect.com/api/onchain/cdd?timeframe=all&isProUser=false"
+    
+    # Target kolom yang relevan (tanpa btc_price karena tidak ada di JSON sampel)
+    cols_cdd = ['date', 'cdd', 'vdd_30d_ma', 'vdd_365d_ma', 'vdd_multiple']
+    df_cdd = fetch_data(url_cdd, cols_cdd)
+    
+    if not df_cdd.empty:
+        # Jika butuh harga BTC, kita bisa merge dengan df_price yang sudah ada di memori (opsional)
+        # Tapi karena permintaannya dipisah ke CSV masing-masing, kita langsung simpan saja.
+        df_cdd = df_cdd.sort_values('date').reset_index(drop=True)
+        df_cdd.to_csv("data_cdd.csv", index=False)
+        print("✅ data_cdd.csv berhasil diperbarui.")
+        print(df_cdd[['date', 'cdd', 'vdd_multiple']].tail(3).to_string(index=False))
+    else:
+        print("❌ GAGAL: Data CDD kosong atau gagal ditarik.")
+except Exception as e:
+    print(f"❌ Error fetching CDD: {e}")
+
 print("\n🎉 Semua proses selesai! CSV tersimpan rapi.")
 
