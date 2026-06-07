@@ -1117,124 +1117,9 @@ elif selected_menu == "Social Sentiment":
         d_btc_ss = f"<div style='margin-top:4px;'><span style='color:{dc_btc_ss}; font-size:0.85rem; background-color:{dc_btc_ss}20; padding:2px 6px; border-radius:4px;'>{ar_btc_ss} {abs(dp_btc_ss):.2f}%</span></div>"
         btc_html_ss = f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:#f7931a; font-size:0.95rem; font-weight:600;'>Current BTC Price</span><br><span style='color:#f7931a; font-size:1.4rem; font-weight:700;'>${btc_ss:,.2f}</span>{d_btc_ss}</div>"
 
-        # CHART 1: GOOGLE TRENDS
-        col_title_gt, k1_gt, k2_gt, k3_gt, k4_gt, k5_gt = st.columns([1.5, 1, 1, 1, 1, 1], vertical_alignment="center")
-        with col_title_gt: st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.4rem;'>Social Sentiment<br><span style='font-size: 1rem; color: #d1d4dc;'>Google Trends (Global)</span></h3></div>", unsafe_allow_html=True)
-        with k1_gt: st.markdown(btc_html_ss, unsafe_allow_html=True)
-        with k2_gt: render_kpi_ss("BTC", last_ss.get('GTrend BTC', 0), prev_ss.get('GTrend BTC', 0))
-        with k3_gt: render_kpi_ss("Crypto", last_ss.get('GTrend Crypto', 0), prev_ss.get('GTrend Crypto', 0))
-        with k4_gt: render_kpi_ss("Binance", last_ss.get('GTrend Binance', 0), prev_ss.get('GTrend Binance', 0))
-        st.markdown("---")
-
-        df_gt, w_gt = apply_filters(df_sentiment_raw, st.session_state.tf_gt, st.session_state.sma_gt, st.session_state.cs_gt, st.session_state.tr_gt, st.session_state.cd_gt, ['GTrend BTC', 'GTrend Crypto', 'GTrend ETH', 'GTrend NFT', 'GTrend Binance', 'GTrend SOL', 'GTrend DOGE'])
-
-        col_fs_gt, col_tf_gt, col_sma_gt, col_mode_gt, col_radio_gt, col_custom_gt = st.columns([1, 1.2, 1.2, 1.2, 5.5, 1.2], vertical_alignment="bottom", gap="small")
-        with col_fs_gt: focus_gt = st.toggle("Full Screen", key="tg_gt")
-        with col_tf_gt: st.session_state.tf_gt = st.selectbox("Timeframe", ["Daily", "3 Days", "Weekly", "Monthly"], index=["Daily", "3 Days", "Weekly", "Monthly"].index(st.session_state.tf_gt), key="tfs_gt")
-        with col_sma_gt: st.session_state.sma_gt = st.selectbox("SMA", ["0d", "7d", "14d", "30d", "Custom"], index=["0d", "7d", "14d", "30d", "Custom"].index(st.session_state.sma_gt), key="smas_gt")
-        with col_mode_gt: st.session_state.mode_gt = st.selectbox("Chart Type", ["Line", "Stacked Area"], index=["Line", "Stacked Area"].index(st.session_state.mode_gt), key="md_gt")
-        with col_radio_gt:
-            c_idx_gt = t_opts.index(st.session_state.tr_gt) if st.session_state.tr_gt in t_opts else 5
-            st.session_state.tr_gt = st.radio("Range:", t_opts, index=c_idx_gt, horizontal=True, label_visibility="collapsed", key="rg_gt")
-        with col_custom_gt:
-            if st.session_state.tr_gt == "Custom": st.session_state.cd_gt = st.number_input("Days back", min_value=7, value=st.session_state.cd_gt, label_visibility="collapsed", key="cdin_gt")
-        
-        opts_gt_base = ['🔵 BTC', '🟢 ETH', '🟣 Crypto', '🟡 NFT', '🟠 Binance', '🔴 SOL', '🟤 DOGE']
-        colors_gt = {'🔵 BTC': ('#4da6ff', 'GTrend BTC'), '🟢 ETH': ('#00cc66', 'GTrend ETH'), '🟣 Crypto': ('#cc33ff', 'GTrend Crypto'), '🟡 NFT': ('#eab308', 'GTrend NFT'), '🟠 Binance': ('#ff9933', 'GTrend Binance'), '🔴 SOL': ('#ff4d4d', 'GTrend SOL'), '🟤 DOGE': ('#cc9966', 'GTrend DOGE')}
-        
-        all_opts_gt = opts_gt_base.copy()
-        if w_gt > 1: all_opts_gt.extend([f"{m} (SMA {w_gt})" for m in opts_gt_base])
-            
-        try: sel_gt = st.pills("GTrend Metrics", all_opts_gt, default=['🔵 BTC', '🟣 Crypto'], selection_mode="multi", label_visibility="collapsed", key="pills_gtrend")
-        except: sel_gt = st.multiselect("GTrend Metrics", all_opts_gt, default=['🔵 BTC', '🟣 Crypto'], label_visibility="collapsed", key="ms_gtrend")
-
-        chart_opts_gt = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 850 if focus_gt else 650, "rightPriceScale": {"visible": True}, "leftPriceScale": {"visible": True}}
-        series_gt = [{"type": 'Line', "data": get_s(df_gt, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
-
-        active_cols_gt = []
-        for m in sel_gt:
-            base_m = m.split(" (SMA")[0]
-            if base_m in colors_gt:
-                c_name = colors_gt[base_m][1]
-                actual_col = f"{c_name}_SMA" if "(SMA" in m else c_name
-                active_cols_gt.append((base_m, actual_col))
-
-        if st.session_state.mode_gt == "Stacked Area":
-            current_sum = pd.Series(0.0, index=df_gt.index)
-            for base_m, actual_col in active_cols_gt:
-                current_sum = current_sum + df_gt[actual_col].fillna(0)
-                df_gt[actual_col + "_stacked"] = current_sum
-            for base_m, actual_col in reversed(active_cols_gt):
-                c_col = colors_gt[base_m][0]
-                series_gt.append({"type": 'Area', "data": get_s(df_gt, actual_col + "_stacked"), "options": {"lineColor": c_col, "topColor": c_col + "66", "bottomColor": c_col + "0D", "lineWidth": 1, "priceScaleId": 'left', "title": actual_col}})
-        else:
-            for base_m, actual_col in active_cols_gt:
-                c_col = colors_gt[base_m][0]
-                series_gt.append({"type": 'Line', "data": get_s(df_gt, actual_col), "options": {"color": c_col, "lineWidth": 1, "priceScaleId": 'left', "title": actual_col}})
-
-        renderLightweightCharts([{"chart": chart_opts_gt, "series": series_gt}], 'chart_gtrend')
-        st.markdown("<br><br>", unsafe_allow_html=True)
-        
-        # CHART 2: WIKIPEDIA PAGEVIEWS
-        col_title_wk, k1_wk, k2_wk, k3_wk, k4_wk, k5_wk = st.columns([1.5, 1, 1, 1, 1, 1], vertical_alignment="center")
-        with col_title_wk: st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.4rem;'>Social Sentiment<br><span style='font-size: 1rem; color: #d1d4dc;'>Wikipedia Pageviews</span></h3></div>", unsafe_allow_html=True)
-        with k1_wk: st.markdown(btc_html_ss, unsafe_allow_html=True)
-        with k2_wk: render_kpi_ss("BTC", last_ss.get('Wiki BTC', 0), prev_ss.get('Wiki BTC', 0))
-        with k3_wk: render_kpi_ss("Crypto", last_ss.get('Wiki Crypto', 0), prev_ss.get('Wiki Crypto', 0))
-        with k4_wk: render_kpi_ss("Satoshi", last_ss.get('Wiki Satoshi', 0), prev_ss.get('Wiki Satoshi', 0))
-        with k5_wk: render_kpi_ss("Blockchain", last_ss.get('Wiki Blockchain', 0), prev_ss.get('Wiki Blockchain', 0))
-        st.markdown("---")
-
-        df_wk, w_wk = apply_filters(df_sentiment_raw, st.session_state.tf_wk, st.session_state.sma_wk, st.session_state.cs_wk, st.session_state.tr_wk, st.session_state.cd_wk, ['Wiki BTC', 'Wiki Crypto', 'Wiki ETH', 'Wiki Satoshi', 'Wiki Blockchain', 'Wiki NFT', 'Wiki DOGE'])
-
-        col_fs_wk, col_tf_wk, col_sma_wk, col_mode_wk, col_radio_wk, col_custom_wk = st.columns([1, 1.2, 1.2, 1.2, 5.5, 1.2], vertical_alignment="bottom", gap="small")
-        with col_fs_wk: focus_wk = st.toggle("Full Screen", key="tg_wk")
-        with col_tf_wk: st.session_state.tf_wk = st.selectbox("Timeframe", ["Daily", "3 Days", "Weekly", "Monthly"], index=["Daily", "3 Days", "Weekly", "Monthly"].index(st.session_state.tf_wk), key="tfs_wk")
-        with col_sma_wk: st.session_state.sma_wk = st.selectbox("SMA", ["0d", "7d", "14d", "30d", "Custom"], index=["0d", "7d", "14d", "30d", "Custom"].index(st.session_state.sma_wk), key="smas_wk")
-        with col_mode_wk: st.session_state.mode_wk = st.selectbox("Chart Type", ["Line", "Stacked Area"], index=["Line", "Stacked Area"].index(st.session_state.mode_wk), key="md_wk")
-        with col_radio_wk:
-            c_idx_wk = t_opts.index(st.session_state.tr_wk) if st.session_state.tr_wk in t_opts else 5
-            st.session_state.tr_wk = st.radio("Range:", t_opts, index=c_idx_wk, horizontal=True, label_visibility="collapsed", key="rg_wk")
-        with col_custom_wk:
-            if st.session_state.tr_wk == "Custom": st.session_state.cd_wk = st.number_input("Days back", min_value=7, value=st.session_state.cd_wk, label_visibility="collapsed", key="cdin_wk")
-        
-        opts_wk_base = ['⚪ BTC', '🟢 Crypto', '🔵 ETH', '🟣 Satoshi', '🟡 Blockchain', '🔴 NFT', '🟤 DOGE']
-        colors_wk = {'⚪ BTC': ('#ffffff', 'Wiki BTC'), '🟢 Crypto': ('#00cc66', 'Wiki Crypto'), '🔵 ETH': ('#4da6ff', 'Wiki ETH'), '🟣 Satoshi': ('#cc33ff', 'Wiki Satoshi'), '🟡 Blockchain': ('#eab308', 'Wiki Blockchain'), '🔴 NFT': ('#ff4d4d', 'Wiki NFT'), '🟤 DOGE': ('#cc9966', 'Wiki DOGE')}
-        
-        all_opts_wk = opts_wk_base.copy()
-        if w_wk > 1: all_opts_wk.extend([f"{m} (SMA {w_wk})" for m in opts_wk_base])
-            
-        try: sel_wk = st.pills("Wiki Metrics", all_opts_wk, default=['⚪ BTC', '🟢 Crypto'], selection_mode="multi", label_visibility="collapsed", key="pills_wiki")
-        except: sel_wk = st.multiselect("Wiki Metrics", all_opts_wk, default=['⚪ BTC', '🟢 Crypto'], label_visibility="collapsed", key="ms_wiki")
-
-        chart_opts_wk = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 850 if focus_wk else 650, "rightPriceScale": {"visible": True}, "leftPriceScale": {"visible": True}}
-        series_wk = [{"type": 'Line', "data": get_s(df_wk, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
-
-        active_cols_wk = []
-        for m in sel_wk:
-            base_m = m.split(" (SMA")[0]
-            if base_m in colors_wk:
-                c_name = colors_wk[base_m][1]
-                actual_col = f"{c_name}_SMA" if "(SMA" in m else c_name
-                active_cols_wk.append((base_m, actual_col))
-
-        if st.session_state.mode_wk == "Stacked Area":
-            current_sum_wk = pd.Series(0.0, index=df_wk.index)
-            for base_m, actual_col in active_cols_wk:
-                current_sum_wk = current_sum_wk + df_wk[actual_col].fillna(0)
-                df_wk[actual_col + "_stacked"] = current_sum_wk
-            for base_m, actual_col in reversed(active_cols_wk):
-                c_col = colors_wk[base_m][0]
-                series_wk.append({"type": 'Area', "data": get_s(df_wk, actual_col + "_stacked"), "options": {"lineColor": c_col, "topColor": c_col + "66", "bottomColor": c_col + "0D", "lineWidth": 1, "priceScaleId": 'left', "title": actual_col}})
-        else:
-            for base_m, actual_col in active_cols_wk:
-                c_col = colors_wk[base_m][0]
-                series_wk.append({"type": 'Line', "data": get_s(df_wk, actual_col), "options": {"color": c_col, "lineWidth": 1, "priceScaleId": 'left', "title": actual_col}})
-
-        renderLightweightCharts([{"chart": chart_opts_wk, "series": series_wk}], 'chart_wiki')
-        st.markdown("<br><br>", unsafe_allow_html=True)
-
-        # CHART 3: FEAR & GREED INDEX
+        # ==========================================
+        # CHART 1: FEAR & GREED INDEX (MOVED TO TOP)
+        # ==========================================
         if not df_fg_raw.empty:
             last_fg = df_fg_raw.iloc[-1]
             prev_fg = df_fg_raw.iloc[-2] if len(df_fg_raw) > 1 else last_fg
@@ -1296,6 +1181,127 @@ elif selected_menu == "Social Sentiment":
                 series_fg[0]['markers'] = markers
                 
             renderLightweightCharts([{"chart": chart_opts_fg, "series": series_fg}], 'chart_fg')
+            st.markdown("<br><br>", unsafe_allow_html=True)
+
+        # ==========================================
+        # CHART 2: GOOGLE TRENDS
+        # ==========================================
+        col_title_gt, k1_gt, k2_gt, k3_gt, k4_gt, k5_gt = st.columns([1.5, 1, 1, 1, 1, 1], vertical_alignment="center")
+        with col_title_gt: st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.4rem;'>Social Sentiment<br><span style='font-size: 1rem; color: #d1d4dc;'>Google Trends (Global)</span></h3></div>", unsafe_allow_html=True)
+        with k1_gt: st.markdown(btc_html_ss, unsafe_allow_html=True)
+        with k2_gt: render_kpi_ss("BTC", last_ss.get('GTrend BTC', 0), prev_ss.get('GTrend BTC', 0))
+        with k3_gt: render_kpi_ss("Crypto", last_ss.get('GTrend Crypto', 0), prev_ss.get('GTrend Crypto', 0))
+        with k4_gt: render_kpi_ss("Binance", last_ss.get('GTrend Binance', 0), prev_ss.get('GTrend Binance', 0))
+        st.markdown("---")
+
+        df_gt, w_gt = apply_filters(df_sentiment_raw, st.session_state.tf_gt, st.session_state.sma_gt, st.session_state.cs_gt, st.session_state.tr_gt, st.session_state.cd_gt, ['GTrend BTC', 'GTrend Crypto', 'GTrend ETH', 'GTrend NFT', 'GTrend Binance', 'GTrend SOL', 'GTrend DOGE'])
+
+        col_fs_gt, col_tf_gt, col_sma_gt, col_mode_gt, col_radio_gt, col_custom_gt = st.columns([1, 1.2, 1.2, 1.2, 5.5, 1.2], vertical_alignment="bottom", gap="small")
+        with col_fs_gt: focus_gt = st.toggle("Full Screen", key="tg_gt")
+        with col_tf_gt: st.session_state.tf_gt = st.selectbox("Timeframe", ["Daily", "3 Days", "Weekly", "Monthly"], index=["Daily", "3 Days", "Weekly", "Monthly"].index(st.session_state.tf_gt), key="tfs_gt")
+        with col_sma_gt: st.session_state.sma_gt = st.selectbox("SMA", ["0d", "7d", "14d", "30d", "Custom"], index=["0d", "7d", "14d", "30d", "Custom"].index(st.session_state.sma_gt), key="smas_gt")
+        with col_mode_gt: st.session_state.mode_gt = st.selectbox("Chart Type", ["Line", "Stacked Area"], index=["Line", "Stacked Area"].index(st.session_state.mode_gt), key="md_gt")
+        with col_radio_gt:
+            c_idx_gt = t_opts.index(st.session_state.tr_gt) if st.session_state.tr_gt in t_opts else 5
+            st.session_state.tr_gt = st.radio("Range:", t_opts, index=c_idx_gt, horizontal=True, label_visibility="collapsed", key="rg_gt")
+        with col_custom_gt:
+            if st.session_state.tr_gt == "Custom": st.session_state.cd_gt = st.number_input("Days back", min_value=7, value=st.session_state.cd_gt, label_visibility="collapsed", key="cdin_gt")
+        
+        opts_gt_base = ['🔵 BTC', '🟢 ETH', '🟣 Crypto', '🟡 NFT', '🟠 Binance', '🔴 SOL', '🟤 DOGE']
+        colors_gt = {'🔵 BTC': ('#4da6ff', 'GTrend BTC'), '🟢 ETH': ('#00cc66', 'GTrend ETH'), '🟣 Crypto': ('#cc33ff', 'GTrend Crypto'), '🟡 NFT': ('#eab308', 'GTrend NFT'), '🟠 Binance': ('#ff9933', 'GTrend Binance'), '🔴 SOL': ('#ff4d4d', 'GTrend SOL'), '🟤 DOGE': ('#cc9966', 'GTrend DOGE')}
+        
+        all_opts_gt = opts_gt_base.copy()
+        if w_gt > 1: all_opts_gt.extend([f"{m} (SMA {w_gt})" for m in opts_gt_base])
+            
+        try: sel_gt = st.pills("GTrend Metrics", all_opts_gt, default=['🔵 BTC', '🟣 Crypto'], selection_mode="multi", label_visibility="collapsed", key="pills_gtrend")
+        except: sel_gt = st.multiselect("GTrend Metrics", all_opts_gt, default=['🔵 BTC', '🟣 Crypto'], label_visibility="collapsed", key="ms_gtrend")
+
+        chart_opts_gt = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 850 if focus_gt else 650, "rightPriceScale": {"visible": True}, "leftPriceScale": {"visible": True}}
+        series_gt = [{"type": 'Line', "data": get_s(df_gt, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
+
+        active_cols_gt = []
+        for m in sel_gt:
+            base_m = m.split(" (SMA")[0]
+            if base_m in colors_gt:
+                c_name = colors_gt[base_m][1]
+                actual_col = f"{c_name}_SMA" if "(SMA" in m else c_name
+                active_cols_gt.append((base_m, actual_col))
+
+        if st.session_state.mode_gt == "Stacked Area":
+            current_sum = pd.Series(0.0, index=df_gt.index)
+            for base_m, actual_col in active_cols_gt:
+                current_sum = current_sum + df_gt[actual_col].fillna(0)
+                df_gt[actual_col + "_stacked"] = current_sum
+            for base_m, actual_col in reversed(active_cols_gt):
+                c_col = colors_gt[base_m][0]
+                series_gt.append({"type": 'Area', "data": get_s(df_gt, actual_col + "_stacked"), "options": {"lineColor": c_col, "topColor": c_col + "66", "bottomColor": c_col + "0D", "lineWidth": 1, "priceScaleId": 'left', "title": actual_col}})
+        else:
+            for base_m, actual_col in active_cols_gt:
+                c_col = colors_gt[base_m][0]
+                series_gt.append({"type": 'Line', "data": get_s(df_gt, actual_col), "options": {"color": c_col, "lineWidth": 1, "priceScaleId": 'left', "title": actual_col}})
+
+        renderLightweightCharts([{"chart": chart_opts_gt, "series": series_gt}], 'chart_gtrend')
+        st.markdown("<br><br>", unsafe_allow_html=True)
+        
+        # ==========================================
+        # CHART 3: WIKIPEDIA PAGEVIEWS
+        # ==========================================
+        col_title_wk, k1_wk, k2_wk, k3_wk, k4_wk, k5_wk = st.columns([1.5, 1, 1, 1, 1, 1], vertical_alignment="center")
+        with col_title_wk: st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.4rem;'>Social Sentiment<br><span style='font-size: 1rem; color: #d1d4dc;'>Wikipedia Pageviews</span></h3></div>", unsafe_allow_html=True)
+        with k1_wk: st.markdown(btc_html_ss, unsafe_allow_html=True)
+        with k2_wk: render_kpi_ss("BTC", last_ss.get('Wiki BTC', 0), prev_ss.get('Wiki BTC', 0))
+        with k3_wk: render_kpi_ss("Crypto", last_ss.get('Wiki Crypto', 0), prev_ss.get('Wiki Crypto', 0))
+        with k4_wk: render_kpi_ss("Satoshi", last_ss.get('Wiki Satoshi', 0), prev_ss.get('Wiki Satoshi', 0))
+        with k5_wk: render_kpi_ss("Blockchain", last_ss.get('Wiki Blockchain', 0), prev_ss.get('Wiki Blockchain', 0))
+        st.markdown("---")
+
+        df_wk, w_wk = apply_filters(df_sentiment_raw, st.session_state.tf_wk, st.session_state.sma_wk, st.session_state.cs_wk, st.session_state.tr_wk, st.session_state.cd_wk, ['Wiki BTC', 'Wiki Crypto', 'Wiki ETH', 'Wiki Satoshi', 'Wiki Blockchain', 'Wiki NFT', 'Wiki DOGE'])
+
+        col_fs_wk, col_tf_wk, col_sma_wk, col_mode_wk, col_radio_wk, col_custom_wk = st.columns([1, 1.2, 1.2, 1.2, 5.5, 1.2], vertical_alignment="bottom", gap="small")
+        with col_fs_wk: focus_wk = st.toggle("Full Screen", key="tg_wk")
+        with col_tf_wk: st.session_state.tf_wk = st.selectbox("Timeframe", ["Daily", "3 Days", "Weekly", "Monthly"], index=["Daily", "3 Days", "Weekly", "Monthly"].index(st.session_state.tf_wk), key="tfs_wk")
+        with col_sma_wk: st.session_state.sma_wk = st.selectbox("SMA", ["0d", "7d", "14d", "30d", "Custom"], index=["0d", "7d", "14d", "30d", "Custom"].index(st.session_state.sma_wk), key="smas_wk")
+        with col_mode_wk: st.session_state.mode_wk = st.selectbox("Chart Type", ["Line", "Stacked Area"], index=["Line", "Stacked Area"].index(st.session_state.mode_wk), key="md_wk")
+        with col_radio_wk:
+            c_idx_wk = t_opts.index(st.session_state.tr_wk) if st.session_state.tr_wk in t_opts else 5
+            st.session_state.tr_wk = st.radio("Range:", t_opts, index=c_idx_wk, horizontal=True, label_visibility="collapsed", key="rg_wk")
+        with col_custom_wk:
+            if st.session_state.tr_wk == "Custom": st.session_state.cd_wk = st.number_input("Days back", min_value=7, value=st.session_state.cd_wk, label_visibility="collapsed", key="cdin_wk")
+        
+        opts_wk_base = ['⚪ BTC', '🟢 Crypto', '🔵 ETH', '🟣 Satoshi', '🟡 Blockchain', '🔴 NFT', '🟤 DOGE']
+        colors_wk = {'⚪ BTC': ('#ffffff', 'Wiki BTC'), '🟢 Crypto': ('#00cc66', 'Wiki Crypto'), '🔵 ETH': ('#4da6ff', 'Wiki ETH'), '🟣 Satoshi': ('#cc33ff', 'Wiki Satoshi'), '🟡 Blockchain': ('#eab308', 'Wiki Blockchain'), '🔴 NFT': ('#ff4d4d', 'Wiki NFT'), '🟤 DOGE': ('#cc9966', 'Wiki DOGE')}
+        
+        all_opts_wk = opts_wk_base.copy()
+        if w_wk > 1: all_opts_wk.extend([f"{m} (SMA {w_wk})" for m in opts_wk_base])
+            
+        try: sel_wk = st.pills("Wiki Metrics", all_opts_wk, default=['⚪ BTC', '🟢 Crypto'], selection_mode="multi", label_visibility="collapsed", key="pills_wiki")
+        except: sel_wk = st.multiselect("Wiki Metrics", all_opts_wk, default=['⚪ BTC', '🟢 Crypto'], label_visibility="collapsed", key="ms_wiki")
+
+        chart_opts_wk = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 850 if focus_wk else 650, "rightPriceScale": {"visible": True}, "leftPriceScale": {"visible": True}}
+        series_wk = [{"type": 'Line', "data": get_s(df_wk, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
+
+        active_cols_wk = []
+        for m in sel_wk:
+            base_m = m.split(" (SMA")[0]
+            if base_m in colors_wk:
+                c_name = colors_wk[base_m][1]
+                actual_col = f"{c_name}_SMA" if "(SMA" in m else c_name
+                active_cols_wk.append((base_m, actual_col))
+
+        if st.session_state.mode_wk == "Stacked Area":
+            current_sum_wk = pd.Series(0.0, index=df_wk.index)
+            for base_m, actual_col in active_cols_wk:
+                current_sum_wk = current_sum_wk + df_wk[actual_col].fillna(0)
+                df_wk[actual_col + "_stacked"] = current_sum_wk
+            for base_m, actual_col in reversed(active_cols_wk):
+                c_col = colors_wk[base_m][0]
+                series_wk.append({"type": 'Area', "data": get_s(df_wk, actual_col + "_stacked"), "options": {"lineColor": c_col, "topColor": c_col + "66", "bottomColor": c_col + "0D", "lineWidth": 1, "priceScaleId": 'left', "title": actual_col}})
+        else:
+            for base_m, actual_col in active_cols_wk:
+                c_col = colors_wk[base_m][0]
+                series_wk.append({"type": 'Line', "data": get_s(df_wk, actual_col), "options": {"color": c_col, "lineWidth": 1, "priceScaleId": 'left', "title": actual_col}})
+
+        renderLightweightCharts([{"chart": chart_opts_wk, "series": series_wk}], 'chart_wiki')
 
 # ------------------------------------------------------------------------------
 # TAB 8: MARKET SIGNALS (RSI IMPLEMENTED NATIVELY)
