@@ -34,22 +34,9 @@ def fetch_data(url, columns_to_keep=None):
 # 1. PIPELINE: PRICE LEVELS & MOVING AVERAGES
 # ==========================================
 print("\n[1/9] Menarik data Price Levels...")
-df_price = fetch_data("https://chartinspect.com/api/onchain/onchain-price-levels?timeframe=all&isProUser=false", ['date', 'btc_price', 'sth_cost_basis', 'lth_cost_basis', 'realized_price', 'cvdd'])
+# 🟢 FIX: Tambahkan active_realized_price dan mvrv_avg_price (MVRV 0σ)
+df_price = fetch_data("https://chartinspect.com/api/onchain/onchain-price-levels?timeframe=all&isProUser=false", ['date', 'btc_price', 'sth_cost_basis', 'lth_cost_basis', 'realized_price', 'cvdd', 'active_realized_price', 'mvrv_avg_price'])
 df_tmm = fetch_data("https://chartinspect.com/api/onchain/true-market-mean?timeframe=all&isProUser=false", ['date', 'true_market_mean_price'])
-
-if not df_price.empty and not df_tmm.empty:
-    df_master_price = pd.merge(df_price, df_tmm, on='date', how='outer')
-    df_master_price['date'] = pd.to_datetime(df_master_price['date'])
-    df_master_price = df_master_price.sort_values('date').reset_index(drop=True)
-    
-    # Kalkulasi Moving Averages
-    df_master_price['200_dma'] = df_master_price['btc_price'].rolling(window=200, min_periods=1).mean()
-    df_master_price['50_wma'] = df_master_price['btc_price'].rolling(window=350, min_periods=1).mean()
-    df_master_price['200_wma'] = df_master_price['btc_price'].rolling(window=1400, min_periods=1).mean()
-
-    df_master_price.to_csv("data_price_level.csv", index=False)
-    print("✅ data_price_level.csv berhasil diperbarui.")
-    print(df_master_price.tail(3).to_string(index=False))
 
 # ==========================================
 # 2. PIPELINE: MOMENTUM & P/L
@@ -223,6 +210,17 @@ try:
             df_cum_final = df_cum[['date', 'cum_pl_price', 'pl_price_ratio']]
             df_cum_final.to_csv("data_cum_pl.csv", index=False)
             print("✅ data_cum_pl.csv berhasil diperbarui dengan akurasi 100%.")
+            
+            # 🟢 REKAP DATA: Masukkan juga hasilnya ke data_price_level.csv
+            df_p_rekap = pd.read_csv("data_price_level.csv")
+            # Hindari duplikasi kolom (x_ dan y_) jika dijalankan ulang
+            cols_to_drop = [c for c in ['cum_pl_price', 'pl_price_ratio'] if c in df_p_rekap.columns]
+            if cols_to_drop:
+                df_p_rekap.drop(columns=cols_to_drop, inplace=True)
+            
+            df_p_rekap = pd.merge(df_p_rekap, df_cum_final, on='date', how='left')
+            df_p_rekap.to_csv("data_price_level.csv", index=False)
+            print("✅ data_cum_pl.csv berhasil direkap ke data_price_level.csv.")
         else:
             print("❌ GAGAL: Data kosong setelah digabungkan (merge error).")
     else:
