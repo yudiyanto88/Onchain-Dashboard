@@ -185,48 +185,27 @@ if not df_ex.empty:
 # ==========================================
 # 9. PIPELINE: CUMULATIVE P/L PRICE & RATIO
 # ==========================================
+# FIX: cum_pl_price = lth_cost_basis langsung dari ChartInspect.
+# Formula kustom sebelumnya (initial_price + cum_net_pl / lth_supply) menghasilkan
+# nilai yang drift jauh karena lth_supply berubah setiap hari sebagai denominator.
+# lth_cost_basis di ChartInspect sudah merepresentasikan average realized price
+# semua coin yang dipegang LTH saat ini — ini yang dimaksud "cumulative LTH P/L price".
 print("\n[9/14] Mengkalkulasi Cumulative P/L Price...")
 try:
-    df_age_raw = fetch_data("https://chartinspect.com/api/onchain/realized-profit-by-age?timeframe=all&isProUser=false")
-    
-    if not df_age_raw.empty:
-        df_age_raw['date'] = pd.to_datetime(df_age_raw['date'], utc=True, errors='coerce').dt.strftime('%Y-%m-%d')
-        df_age_raw = df_age_raw.sort_values('date').reset_index(drop=True)
-        
-        # 🟢 FIX MUTLAK: LTH murni adalah 155+ Hari (Bands 5 sampai 11)
-        # Menghapus Band 3 dan 4 (STH) yang sebelumnya menyeret Cum Sum turun karena realized loss masif
-        lth_prof_raw = df_age_raw[[f'band_{i}_profit_usd' for i in range(5, 12)]].sum(axis=1)
-        lth_loss_raw = df_age_raw[[f'band_{i}_loss_usd' for i in range(5, 12)]].sum(axis=1)
-        
-        df_cum = pd.DataFrame({'date': df_age_raw['date'], 'lth_net_pl_usd': lth_prof_raw - lth_loss_raw})
-        
-        # 🟢 FIX MUTLAK 2: CumSum HARUS dieksekusi SEBELUM merge agar data historis 2010 utuh
-        df_cum['cum_net_pl'] = df_cum['lth_net_pl_usd'].cumsum()
+    df_p = pd.read_csv("data_price_level.csv")
+    df_p['date'] = pd.to_datetime(df_p['date'], errors='coerce').dt.strftime('%Y-%m-%d')
+    df_p = df_p.sort_values('date').dropna(subset=['lth_cost_basis']).reset_index(drop=True)
 
-        df_p = pd.read_csv("data_price_level.csv")
-        df_s = pd.read_csv("data_supply.csv")
-        df_p['date'] = pd.to_datetime(df_p['date'], errors='coerce').dt.strftime('%Y-%m-%d')
-        df_s['date'] = pd.to_datetime(df_s['date'], errors='coerce').dt.strftime('%Y-%m-%d')
-        
-        df_cum = pd.merge(df_cum, df_p[['date', 'btc_price', 'lth_cost_basis']], on='date', how='inner')
-        df_cum = pd.merge(df_cum, df_s[['date', 'lth_supply_btc']], on='date', how='inner')
-        df_cum = df_cum.sort_values('date').dropna(subset=['lth_cost_basis']).reset_index(drop=True)
-        
-        if not df_cum.empty:
-            initial_lth_price = df_cum['lth_cost_basis'].iloc[0]
-            safe_supply = df_cum['lth_supply_btc'].replace(0, np.nan)
-            
-            # Rumus Asli: Baseline Awal + (Total Akumulasi Net P/L / Pasokan LTH saat ini)
-            df_cum['cum_pl_price'] = initial_lth_price + (df_cum['cum_net_pl'] / safe_supply)
-            df_cum['pl_price_ratio'] = df_cum['btc_price'] / df_cum['cum_pl_price']
-            
-            df_cum_final = df_cum[['date', 'cum_pl_price', 'pl_price_ratio']]
-            df_cum_final.to_csv("data_cum_pl.csv", index=False)
-            print("✅ data_cum_pl.csv berhasil diperbarui dengan akurasi 100%.")
-        else:
-            print("❌ GAGAL: Data kosong setelah digabungkan (merge error).")
+    if not df_p.empty:
+        df_p['cum_pl_price'] = df_p['lth_cost_basis']
+        df_p['pl_price_ratio'] = df_p['btc_price'] / df_p['cum_pl_price']
+
+        df_cum_final = df_p[['date', 'cum_pl_price', 'pl_price_ratio']]
+        df_cum_final.to_csv("data_cum_pl.csv", index=False)
+        print("✅ data_cum_pl.csv berhasil diperbarui (cum_pl_price = lth_cost_basis).")
+        print(df_cum_final.tail(3).to_string(index=False))
     else:
-        print("❌ GAGAL: Endpoint API realized-profit-by-age tidak merespons.")
+        print("❌ GAGAL: data_price_level.csv kosong atau lth_cost_basis tidak tersedia.")
 except Exception as e:
     print(f"❌ Error Sistem Pipeline 9: {e}")
 
@@ -365,4 +344,3 @@ except Exception as e:
     print(f"❌ Error kalkulasi LTH Flow: {e}")
 
 print("\n🎉 Semua proses selesai! CSV tersimpan rapi.")
-
