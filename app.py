@@ -251,17 +251,7 @@ if not df_fg_base.empty and df_price_raw is not None and not df_price_raw.empty:
 else:
     df_fg_raw = pd.DataFrame()
 
-# 🟢 MERGE DATA BARU KE PRICE DAN MOMENTUM
-if not df_cum_raw.empty and not df_price_raw.empty:
-    df_price_raw = pd.merge(df_price_raw, df_cum_raw[['Date', 'Cum P/L Price']], on='Date', how='left')
-if not df_cum_raw.empty and not df_mom_raw.empty:
-    df_mom_raw = pd.merge(df_mom_raw, df_cum_raw[['Date', 'P/L Price Ratio']], on='Date', how='left')
-
-df_fg_base = load_data_fg()
-if not df_fg_base.empty and not df_price_raw.empty:
-    df_fg_raw = pd.merge(df_price_raw[['Date', 'BTC Price']], df_fg_base, on='Date', how='inner')
-else:
-    df_fg_raw = pd.DataFrame()
+# (duplicate merge block dihapus - merge sudah dilakukan di blok atas)
 
 def apply_filters(df, res_state, smooth_state, custom_smooth, time_state, custom_days, metrics_to_smooth):
     if df.empty: return df, 1
