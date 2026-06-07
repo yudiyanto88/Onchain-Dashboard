@@ -208,16 +208,16 @@ try:
         df_p['date'] = pd.to_datetime(df_p['date'], errors='coerce').dt.strftime('%Y-%m-%d')
         df_s['date'] = pd.to_datetime(df_s['date'], errors='coerce').dt.strftime('%Y-%m-%d')
         
-        df_cum = pd.merge(df_cum, df_p[['date', 'btc_price', 'lth_cost_basis']], on='date', how='inner')
+        df_cum = pd.merge(df_cum, df_p[['date', 'btc_price', 'realized_price']], on='date', how='inner')
         df_cum = pd.merge(df_cum, df_s[['date', 'lth_supply_btc']], on='date', how='inner')
-        df_cum = df_cum.sort_values('date').dropna(subset=['lth_cost_basis']).reset_index(drop=True)
+        df_cum = df_cum.sort_values('date').dropna(subset=['realized_price']).reset_index(drop=True)
         
         if not df_cum.empty:
             safe_supply = df_cum['lth_supply_btc'].replace(0, np.nan)
             
-            # FIX: Baseline = LTH Cost Basis harian (bukan fixed dari titik awal 2010)
-            # Sesuai formula ChartInspect: Cum P/L Price = Baseline(t) + ∑Net P/L / Supply(t)
-            df_cum['cum_pl_price'] = df_cum['lth_cost_basis'] + (df_cum['cum_net_pl'] / safe_supply)
+            # Formula ChartInspect: Cum P/L Price = Realized Price + ∑(Net P/L bands 5-11) / LTH Supply
+            # Baseline = Realized Price (total market), bukan LTH Cost Basis
+            df_cum['cum_pl_price'] = df_cum['realized_price'] + (df_cum['cum_net_pl'] / safe_supply)
             df_cum['pl_price_ratio'] = df_cum['btc_price'] / df_cum['cum_pl_price']
             
             df_cum_final = df_cum[['date', 'cum_pl_price', 'pl_price_ratio']]
