@@ -1118,7 +1118,7 @@ elif selected_menu == "Social Sentiment":
         btc_html_ss = f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:#f7931a; font-size:0.95rem; font-weight:600;'>Current BTC Price</span><br><span style='color:#f7931a; font-size:1.4rem; font-weight:700;'>${btc_ss:,.2f}</span>{d_btc_ss}</div>"
 
         # ==========================================
-        # CHART 1: FEAR & GREED INDEX (MOVED TO TOP)
+        # CHART 1: FEAR & GREED INDEX
         # ==========================================
         if not df_fg_raw.empty:
             last_fg = df_fg_raw.iloc[-1]
@@ -1137,48 +1137,46 @@ elif selected_menu == "Social Sentiment":
             with k2_fg: st.markdown(f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:{fg_color}; font-size:0.95rem; font-weight:600;'>Index Value</span><br><span style='color:{fg_color}; font-size:1.4rem; font-weight:700;'>{fg_val:,.0f}</span><div style='margin-top:4px;'><span style='color:{fg_color}; font-size:0.85rem; background-color:{fg_color}20; padding:2px 6px; border-radius:4px;'>{fg_status}</span></div></div>", unsafe_allow_html=True)
             st.markdown("---")
 
-            df_fg, w_fg = apply_filters(df_fg_raw, "Daily", "0d", 0, st.session_state.tr_fg, st.session_state.cd_fg, ['Fear & Greed'])
+            # 🟢 FIX: Sekarang mendukung filter Timeframe dan SMA secara dinamis
+            df_fg, w_fg = apply_filters(df_fg_raw, st.session_state.tf_fg, st.session_state.sma_fg, st.session_state.cs_fg, st.session_state.tr_fg, st.session_state.cd_fg, ['Fear & Greed'])
 
-            col_fs_fg, col_empty1, col_empty2, col_empty3, col_radio_fg, col_custom_fg = st.columns([1, 1.2, 1.2, 1.2, 5.5, 1.2], vertical_alignment="bottom", gap="small")
+            col_fs_fg, col_tf_fg, col_sma_fg, col_sma_cst_fg, col_radio_fg, col_custom_fg = st.columns([1, 1.2, 1.2, 1, 6, 1.2], vertical_alignment="bottom", gap="small")
             with col_fs_fg: focus_fg = st.toggle("Full Screen", key="tg_fg")
+            with col_tf_fg: st.session_state.tf_fg = st.selectbox("Timeframe", ["Daily", "3 Days", "Weekly", "Monthly"], index=["Daily", "3 Days", "Weekly", "Monthly"].index(st.session_state.tf_fg), key="tfs_fg")
+            with col_sma_fg: st.session_state.sma_fg = st.selectbox("SMA", ["0d", "7d", "14d", "30d", "Custom"], index=["0d", "7d", "14d", "30d", "Custom"].index(st.session_state.sma_fg), key="smas_fg")
+            with col_sma_cst_fg:
+                if st.session_state.sma_fg == "Custom": st.session_state.cs_fg = st.number_input("Days", min_value=1, value=st.session_state.cs_fg, label_visibility="collapsed", key="cst_fg")
             with col_radio_fg:
                 c_idx_fg = t_opts.index(st.session_state.tr_fg) if st.session_state.tr_fg in t_opts else 5
                 st.session_state.tr_fg = st.radio("Range:", t_opts, index=c_idx_fg, horizontal=True, label_visibility="collapsed", key="rg_fg")
             with col_custom_fg:
                 if st.session_state.tr_fg == "Custom": st.session_state.cd_fg = st.number_input("Days back", min_value=7, value=st.session_state.cd_fg, label_visibility="collapsed", key="cdin_fg")
             
-            opts_fg_base = ['📊 Fear & Greed Dots']
+            opts_fg_base = ['📊 Fear & Greed']
             all_opts_fg = opts_fg_base.copy()
+            if w_fg > 1: all_opts_fg.extend([f"{m} (SMA {w_fg})" for m in opts_fg_base])
                 
-            try: sel_fg = st.pills("F&G Metrics", all_opts_fg, default=['📊 Fear & Greed Dots'], selection_mode="multi", label_visibility="collapsed", key="pills_fg")
-            except: sel_fg = st.multiselect("F&G Metrics", all_opts_fg, default=['📊 Fear & Greed Dots'], label_visibility="collapsed", key="ms_fg")
+            try: sel_fg = st.pills("F&G Metrics", all_opts_fg, default=['📊 Fear & Greed'], selection_mode="multi", label_visibility="collapsed", key="pills_fg")
+            except: sel_fg = st.multiselect("F&G Metrics", all_opts_fg, default=['📊 Fear & Greed'], label_visibility="collapsed", key="ms_fg")
 
-            chart_opts_fg = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 850 if focus_fg else 650, "rightPriceScale": {"visible": True}, "leftPriceScale": {"visible": False}}
+            # 🟢 FIX: Mengaktifkan skala kiri (leftPriceScale) agar grafik garis dapat dirender sejajar dengan BTC
+            chart_opts_fg = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 850 if focus_fg else 650, "rightPriceScale": {"visible": True}, "leftPriceScale": {"visible": True}}
             
-            btc_series_options = {"color": '#ffffff', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}
-            series_fg = [{"type": 'Line', "data": get_s(df_fg, 'BTC Price'), "options": btc_series_options}]
+            series_fg = [{"type": 'Line', "data": get_s(df_fg, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
 
+            # Garis Referensi Statis (75 & 25)
+            df_fg['Greed_Line'] = 75.0
+            df_fg['Fear_Line'] = 25.0
+            series_fg.append({"type": 'Line', "data": get_s(df_fg, 'Greed_Line'), "options": {"color": 'rgba(0, 204, 102, 0.4)', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": 'Greed Area (75)'}})
+            series_fg.append({"type": 'Line', "data": get_s(df_fg, 'Fear_Line'), "options": {"color": 'rgba(255, 77, 77, 0.4)', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": 'Fear Area (25)'}})
+
+            # Render Garis Fear & Greed
             for m in sel_fg:
-                fg_raw = get_s(df_fg, 'Fear & Greed')
-                markers = []
-                
-                for d in fg_raw: 
-                    v = d['value']
-                    if v < 25: marker_col = '#ff4d4d'
-                    elif v < 45: marker_col = '#ff9933'
-                    elif v <= 55: marker_col = '#eab308'
-                    elif v <= 75: marker_col = '#00cc66'
-                    else: marker_col = '#006600'
-                    
-                    markers.append({
-                        "time": d['time'],
-                        "position": 'inBar',
-                        "color": marker_col,
-                        "shape": 'circle',
-                        "size": 1
-                    })
-                
-                series_fg[0]['markers'] = markers
+                is_sma = "(SMA" in m
+                if is_sma: 
+                    series_fg.append({"type": 'Line', "data": get_s(df_fg, 'Fear & Greed_SMA'), "options": {"color": '#4da6ff', "lineWidth": 1.5, "lineStyle": 2, "priceScaleId": 'left', "title": "F&G SMA"}})
+                else: 
+                    series_fg.append({"type": 'Line', "data": get_s(df_fg, 'Fear & Greed'), "options": {"color": '#ffffff', "lineWidth": 1.5, "priceScaleId": 'left', "title": 'Fear & Greed'}})
                 
             renderLightweightCharts([{"chart": chart_opts_fg, "series": series_fg}], 'chart_fg')
             st.markdown("<br><br>", unsafe_allow_html=True)
