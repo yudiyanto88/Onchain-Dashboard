@@ -138,8 +138,6 @@ def load_data_momentum():
         }, inplace=True)
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
         df = df.dropna(subset=['Date']).sort_values('Date').drop_duplicates(subset=['Date'], keep='last')
-        
-        # 🟢 PERBAIKAN VISUAL: Menambal chart putus-putus dengan mewariskan nilai sebelumnya (ffill)
         df['LTH P/L Ratio'] = df['LTH P/L Ratio'].ffill().fillna(1.0)
         df['STH P/L Ratio'] = df['STH P/L Ratio'].ffill().fillna(1.0)
         return df
@@ -213,25 +211,17 @@ def load_data_cum():
         return df.dropna(subset=['Date']).sort_values('Date').drop_duplicates(subset=['Date'], keep='last')
     except: return pd.DataFrame()
 
+# 🟢 METRIK BARU: LTH P/L Flow Loader
 @st.cache_data(ttl=3600)
 def load_data_lth_flow():
     try:
         df = pd.read_csv("data_lth_flow.csv")
-        df.rename(columns={'date': 'Date', 'lth_price': 'LTH P/L Price', 'lth_pl_flow_btc': 'LTH P/L Flow'}, inplace=True)
+        df.rename(columns={'date': 'Date', 'lth_pl_price': 'LTH P/L Price', 'lth_pl_flow_btc': 'LTH P/L Flow'}, inplace=True)
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
         return df.dropna(subset=['Date']).sort_values('Date').drop_duplicates(subset=['Date'], keep='last')
     except: return pd.DataFrame()
 
-# Panggil fungsinya di bawah
-df_lth_flow_raw = load_data_lth_flow()
-
-# Satukan (Merge) ke dalam Dataframe utama yang sudah ada
-if not df_lth_flow_raw.empty:
-    if not df_price_raw.empty:
-        df_price_raw = pd.merge(df_price_raw, df_lth_flow_raw[['Date', 'LTH P/L Price']], on='Date', how='left')
-    if not df_mom_raw.empty:
-        df_mom_raw = pd.merge(df_mom_raw, df_lth_flow_raw[['Date', 'LTH P/L Flow']], on='Date', how='left')
-
+# ⚡ EKSEKUSI DEKLARASI VARIABEL (URUTAN WAJIB KONSISTEN)
 df_price_raw = load_data_price()
 df_mvrv_raw = load_data_mvrv()
 df_mom_raw = load_data_momentum()
@@ -240,6 +230,26 @@ df_ex_raw = load_data_exchange()
 df_sentiment_raw = load_data_sentiment()
 df_supply_raw = load_data_supply()
 df_cum_raw = load_data_cum()
+df_lth_flow_raw = load_data_lth_flow()
+
+# ⚡ PROSES MERGE AMAN (Mengecek keberadaan variabel hulu terlebih dahulu)
+if not df_cum_raw.empty:
+    if df_price_raw is not None and not df_price_raw.empty:
+        df_price_raw = pd.merge(df_price_raw, df_cum_raw[['Date', 'Cum P/L Price']], on='Date', how='left')
+    if df_mom_raw is not None and not df_mom_raw.empty:
+        df_mom_raw = pd.merge(df_mom_raw, df_cum_raw[['Date', 'P/L Price Ratio']], on='Date', how='left')
+
+if df_lth_flow_raw is not None and not df_lth_flow_raw.empty:
+    if df_price_raw is not None and not df_price_raw.empty:
+        df_price_raw = pd.merge(df_price_raw, df_lth_flow_raw[['Date', 'LTH P/L Price']], on='Date', how='left')
+    if df_mom_raw is not None and not df_mom_raw.empty:
+        df_mom_raw = pd.merge(df_mom_raw, df_lth_flow_raw[['Date', 'LTH P/L Flow']], on='Date', how='left')
+
+df_fg_base = load_data_fg()
+if not df_fg_base.empty and df_price_raw is not None and not df_price_raw.empty:
+    df_fg_raw = pd.merge(df_price_raw[['Date', 'BTC Price']], df_fg_base, on='Date', how='inner')
+else:
+    df_fg_raw = pd.DataFrame()
 
 # 🟢 MERGE DATA BARU KE PRICE DAN MOMENTUM
 if not df_cum_raw.empty and not df_price_raw.empty:
