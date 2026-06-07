@@ -30,6 +30,15 @@ lth_strict_net = (
 )
 df['cum_net_pl_6_11'] = lth_strict_net.cumsum()
 
+# Cek beberapa titik waktu untuk lihat drift pattern
+checkpoints = ['2017-12-17', '2019-01-01', '2021-11-09', '2022-11-01', '2024-01-01', '2026-06-07']
+print("\n=== Drift check across time ===")
+for d in checkpoints:
+    row = df[df['date'] == d]
+    if not row.empty:
+        r = row.iloc[0]
+        print(f"{d}: cum_net_pl(5-11)={r['cum_net_pl_5_11']/1e9:.1f}B, cum(0-11)={r['cum_net_pl_0_11']/1e9:.1f}B")
+
 print("\n=== STEP 3: Merge supply dan price ===")
 df_s = pd.read_csv("data_supply.csv")
 df_p = pd.read_csv("data_price_level.csv")
