@@ -213,6 +213,25 @@ def load_data_cum():
         return df.dropna(subset=['Date']).sort_values('Date').drop_duplicates(subset=['Date'], keep='last')
     except: return pd.DataFrame()
 
+@st.cache_data(ttl=3600)
+def load_data_lth_flow():
+    try:
+        df = pd.read_csv("data_lth_flow.csv")
+        df.rename(columns={'date': 'Date', 'lth_price': 'LTH P/L Price', 'lth_pl_flow_btc': 'LTH P/L Flow'}, inplace=True)
+        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        return df.dropna(subset=['Date']).sort_values('Date').drop_duplicates(subset=['Date'], keep='last')
+    except: return pd.DataFrame()
+
+# Panggil fungsinya di bawah
+df_lth_flow_raw = load_data_lth_flow()
+
+# Satukan (Merge) ke dalam Dataframe utama yang sudah ada
+if not df_lth_flow_raw.empty:
+    if not df_price_raw.empty:
+        df_price_raw = pd.merge(df_price_raw, df_lth_flow_raw[['Date', 'LTH P/L Price']], on='Date', how='left')
+    if not df_mom_raw.empty:
+        df_mom_raw = pd.merge(df_mom_raw, df_lth_flow_raw[['Date', 'LTH P/L Flow']], on='Date', how='left')
+
 df_price_raw = load_data_price()
 df_mvrv_raw = load_data_mvrv()
 df_mom_raw = load_data_momentum()
@@ -345,7 +364,7 @@ if selected_menu == "Price Levels":
         with col_custom:
             if st.session_state.tr_p == "Custom": st.session_state.cd_p = st.number_input("Days back", min_value=7, value=st.session_state.cd_p, label_visibility="collapsed", key="cdin_p")
         
-        opts_p_base = ['🔴 STH Cost Basis', '🔵 LTH Cost Basis', '⚪ Realized Price', '🟣 True Market Mean', '🟢 CVDD', '🟤 Cum P/L Price', '🟨 200 DMA', '🟦 50 WMA', '🟪 200 WMA']
+        opts_p_base = ['🔴 STH Cost Basis', '🔵 LTH Cost Basis', '⚪ Realized Price', '🟣 True Market Mean', '🟢 CVDD', '🟤 Cum P/L Price', '🟡 LTH P/L Price','🟨 200 DMA', '🟦 50 WMA', '🟪 200 WMA']
         all_opts_p = opts_p_base.copy()
         if w_p > 1: all_opts_p.extend([f"{m} (SMA {w_p})" for m in opts_p_base])
             
@@ -363,6 +382,7 @@ if selected_menu == "Price Levels":
             '🟣 True Market Mean': ('#00ffff', 'True Market Mean', 0), 
             '🟢 CVDD': ('#00cc66', 'CVDD', 0),
             '🟤 Cum P/L Price': ('#cc9966', 'Cum P/L Price', 0),
+            '🟡 LTH P/L Price'] = ('#eab308', 'LTH P/L Price', 0)
             '🟨 200 DMA': ('#ffe119', '200 DMA', 2), 
             '🟦 50 WMA': ('#4363d8', '50 WMA', 2), 
             '🟪 200 WMA': ('#f032e6', '200 WMA', 2)
