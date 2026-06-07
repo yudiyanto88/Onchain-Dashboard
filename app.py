@@ -390,7 +390,7 @@ if selected_menu == "Price Levels":
             '🟢 CVDD': ('#00cc66', 'CVDD', 0),
             '🔵 LTH P/L Price': ('#00ffff', 'LTH P/L Price', 0),
             '🔴 Active Realized Price': ('#fffff', 'Active Realized Price', 0),
-            '🟢 MVRV 0σ': ('#00cc66', 'MVRV 0σ', 0),
+            '🟢 MVRV 0σ': ('#059669', 'MVRV 0σ', 0),
             '🟨 200 DMA': ('#ffe119', '200 DMA', 2), 
             '🟦 50 WMA': ('#4363d8', '50 WMA', 2), 
             '🟪 200 WMA': ('#f032e6', '200 WMA', 2)
