@@ -315,10 +315,9 @@ with st.sidebar:
 # ------------------------------------------------------------------------------
 # TAB 1: PRICE LEVELS
 # ------------------------------------------------------------------------------
-if selected_menu == "Price Levels":
-    if not df_price_raw.empty:
-        df_p, w_p = apply_filters(df_price_raw, st.session_state.tf_p, st.session_state.sma_p, st.session_state.cs_p, st.session_state.tr_p, st.session_state.cd_p, ['STH Cost Basis', 'LTH Cost Basis', 'Realized Price', 'True Market Mean', 'CVDD', 'LTH P/L Price', 'Active Realized Price', 'MVRV 0σ'] + custom_smas)
-        df_p, w_p = apply_filters(df_price_temp, st.session_state.tf_p, "0d", 0, st.session_state.tr_p, st.session_state.cd_p, metrics_to_filter)
+# 1. Terapkan filter (HAPUS 'Cum P/L Price', TAMBAH 'Active Realized Price', 'MVRV 0σ', 'LTH P/L Price')
+        metrics_to_filter = ['STH Cost Basis', 'LTH Cost Basis', 'Realized Price', 'True Market Mean', 'CVDD', 'LTH P/L Price', 'Active Realized Price', 'MVRV 0σ']
+        df_p, w_p = apply_filters(df_price_raw, st.session_state.tf_p, st.session_state.sma_p, st.session_state.cs_p, st.session_state.tr_p, st.session_state.cd_p, metrics_to_filter)
 
         last_p = df_p.iloc[-1]
         prev_p = df_p.iloc[-2] if len(df_p) > 1 else last_p
@@ -367,20 +366,19 @@ if selected_menu == "Price Levels":
         with col_custom:
             if st.session_state.tr_p == "Custom": st.session_state.cd_p = st.number_input("Days back", min_value=7, value=st.session_state.cd_p, label_visibility="collapsed", key="cdin_p")
         
-        # 5. Injeksi Opsi (Buang 🟤 Cum P/L Price, masukkan metrik baru)
+        # 2. Injeksi Opsi (Buang Cum P/L Price warna coklat, masukkan metrik baru)
         opts_p_base = ['🔴 STH Cost Basis', '🔵 LTH Cost Basis', '⚪ Realized Price', '🟣 True Market Mean', '🟢 CVDD', '🟡 LTH P/L Price', '💖 Active Realized Price', '🔥 MVRV 0σ', '🟨 200 DMA', '🟦 50 WMA', '🟪 200 WMA']
-        for c in custom_smas:
-            opts_p_base.append(f'⚙️ {c}')
-            
         all_opts_p = opts_p_base.copy()
+        if w_p > 1: all_opts_p.extend([f"{m} (SMA {w_p})" for m in opts_p_base])
             
         try: active_metrics_p = st.pills("Metrics", all_opts_p, default=['🔴 STH Cost Basis', '🔵 LTH Cost Basis', '⚪ Realized Price'], selection_mode="multi", label_visibility="collapsed")
         except: active_metrics_p = st.multiselect("Metrics", all_opts_p, default=['🔴 STH Cost Basis', '🔵 LTH Cost Basis', '⚪ Realized Price'], label_visibility="collapsed")
 
+        # SKALA DISATUKAN (Semua di Kanan)
         chart_p_opts = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 850 if focus_p else 650, "rightPriceScale": {"visible": True}, "leftPriceScale": {"visible": False}}
         series_p = [{"type": 'Line', "data": get_s(df_p, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
         
-        # Mapping Warna (Buang coklat, beri warna merah muda/oranye api)
+        # 3. Mapping Warna
         colors_p = {
             '🔴 STH Cost Basis': ('#ff4d4d', 'STH Cost Basis', 0), 
             '🔵 LTH Cost Basis': ('#4da6ff', 'LTH Cost Basis', 0), 
