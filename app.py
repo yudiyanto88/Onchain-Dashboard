@@ -317,7 +317,7 @@ with st.sidebar:
 # ------------------------------------------------------------------------------
 if selected_menu == "Price Levels":
     if not df_price_raw.empty:
-        df_p, w_p = apply_filters(df_price_raw, st.session_state.tf_p, st.session_state.sma_p, st.session_state.cs_p, st.session_state.tr_p, st.session_state.cd_p, ['STH Cost Basis', 'LTH Cost Basis', 'Realized Price', 'True Market Mean', 'CVDD', 'LTH P/L Price', 'Active Realized Price', 'MVRV 0σ'] + custom_smas
+        df_p, w_p = apply_filters(df_price_raw, st.session_state.tf_p, st.session_state.sma_p, st.session_state.cs_p, st.session_state.tr_p, st.session_state.cd_p, ['STH Cost Basis', 'LTH Cost Basis', 'Realized Price', 'True Market Mean', 'CVDD', 'LTH P/L Price', 'Active Realized Price', 'MVRV 0σ'] + custom_smas)
         df_p, w_p = apply_filters(df_price_temp, st.session_state.tf_p, "0d", 0, st.session_state.tr_p, st.session_state.cd_p, metrics_to_filter)
 
         last_p = df_p.iloc[-1]
