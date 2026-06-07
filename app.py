@@ -316,8 +316,11 @@ with st.sidebar:
 # TAB 1: PRICE LEVELS
 # ------------------------------------------------------------------------------
 # 1. Terapkan filter (HAPUS 'Cum P/L Price', TAMBAH 'Active Realized Price', 'MVRV 0σ', 'LTH P/L Price')
+if selected_menu == "Price Levels":
+    if not df_price_raw.empty:
         metrics_to_filter = ['STH Cost Basis', 'LTH Cost Basis', 'Realized Price', 'True Market Mean', 'CVDD', 'LTH P/L Price', 'Active Realized Price', 'MVRV 0σ']
         df_p, w_p = apply_filters(df_price_raw, st.session_state.tf_p, st.session_state.sma_p, st.session_state.cs_p, st.session_state.tr_p, st.session_state.cd_p, metrics_to_filter)
+    
 
         last_p = df_p.iloc[-1]
         prev_p = df_p.iloc[-2] if len(df_p) > 1 else last_p
