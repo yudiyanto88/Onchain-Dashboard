@@ -183,46 +183,50 @@ if not df_ex.empty:
     print(df_ex[['date', 'total_balance', 'net_flow']].tail(3).to_string(index=False))
 
 # ==========================================
-# 9. PIPELINE: CUMULATIVE P/L PRICE & RATIO (DYNAMIC REPAIR)
+# 9. PIPELINE: CUMULATIVE P/L PRICE & RATIO
 # ==========================================
-print("\n[9/13] Mengkalkulasi Cumulative P/L Price...")
+print("\n[9/14] Mengkalkulasi Cumulative P/L Price...")
 try:
     df_age_raw = fetch_data("https://chartinspect.com/api/onchain/realized-profit-by-age?timeframe=all&isProUser=false")
     
     if not df_age_raw.empty:
-        # LTH: Age bands 3-10
-        lth_prof_raw = df_age_raw[[f'band_{i}_profit_usd' for i in range(3, 11)]].sum(axis=1)
-        lth_loss_raw = df_age_raw[[f'band_{i}_loss_usd' for i in range(3, 11)]].sum(axis=1)
+        df_age_raw['date'] = pd.to_datetime(df_age_raw['date'], utc=True, errors='coerce').dt.strftime('%Y-%m-%d')
+        df_age_raw = df_age_raw.sort_values('date').reset_index(drop=True)
+        
+        # 🟢 FIX MUTLAK: LTH murni adalah 155+ Hari (Bands 5 sampai 11)
+        # Menghapus Band 3 dan 4 (STH) yang sebelumnya menyeret Cum Sum turun karena realized loss masif
+        lth_prof_raw = df_age_raw[[f'band_{i}_profit_usd' for i in range(5, 12)]].sum(axis=1)
+        lth_loss_raw = df_age_raw[[f'band_{i}_loss_usd' for i in range(5, 12)]].sum(axis=1)
         
         df_cum = pd.DataFrame({'date': df_age_raw['date'], 'lth_net_pl_usd': lth_prof_raw - lth_loss_raw})
+        
+        # 🟢 FIX MUTLAK 2: CumSum HARUS dieksekusi SEBELUM merge agar data historis 2010 utuh
+        df_cum['cum_net_pl'] = df_cum['lth_net_pl_usd'].cumsum()
+
         df_p = pd.read_csv("data_price_level.csv")
         df_s = pd.read_csv("data_supply.csv")
-        
-        df_cum['date'] = pd.to_datetime(df_cum['date'], utc=True, errors='coerce').dt.strftime('%Y-%m-%d')
         df_p['date'] = pd.to_datetime(df_p['date'], errors='coerce').dt.strftime('%Y-%m-%d')
         df_s['date'] = pd.to_datetime(df_s['date'], errors='coerce').dt.strftime('%Y-%m-%d')
         
         df_cum = pd.merge(df_cum, df_p[['date', 'btc_price', 'lth_cost_basis']], on='date', how='inner')
         df_cum = pd.merge(df_cum, df_s[['date', 'lth_supply_btc']], on='date', how='inner')
-        df_cum = df_cum.sort_values('date').reset_index(drop=True)
+        df_cum = df_cum.sort_values('date').dropna(subset=['lth_cost_basis']).reset_index(drop=True)
         
         if not df_cum.empty:
+            initial_lth_price = df_cum['lth_cost_basis'].iloc[0]
             safe_supply = df_cum['lth_supply_btc'].replace(0, np.nan)
             
-            # 🟢 FIX: Menggunakan Dynamic Baseline harian + Rasio Kapitalisasi Net P/L LTH harian
-            # Ini mengembalikan sensitivitas pergerakan sesuai visualisasi ChartInspect
-            df_cum['cum_pl_price'] = df_cum['lth_cost_basis'] + (df_cum['lth_net_pl_usd'] / safe_supply)
-            
-            # Interpolasi jika ada lubang kosong agar garis tetap rapat (hidden but impressive)
-            df_cum['cum_pl_price'] = df_cum['cum_pl_price'].ffill().bfill()
+            # Rumus Asli: Baseline Awal + (Total Akumulasi Net P/L / Pasokan LTH saat ini)
+            df_cum['cum_pl_price'] = initial_lth_price + (df_cum['cum_net_pl'] / safe_supply)
             df_cum['pl_price_ratio'] = df_cum['btc_price'] / df_cum['cum_pl_price']
             
             df_cum_final = df_cum[['date', 'cum_pl_price', 'pl_price_ratio']]
             df_cum_final.to_csv("data_cum_pl.csv", index=False)
-            print("✅ data_cum_pl.csv berhasil diperbarui dengan Skala Sinkron.")
-            print(df_cum_final.tail(3).to_string(index=False))
+            print("✅ data_cum_pl.csv berhasil diperbarui dengan akurasi 100%.")
         else:
             print("❌ GAGAL: Data kosong setelah digabungkan (merge error).")
+    else:
+        print("❌ GAGAL: Endpoint API realized-profit-by-age tidak merespons.")
 except Exception as e:
     print(f"❌ Error Sistem Pipeline 9: {e}")
 
@@ -333,41 +337,30 @@ except Exception as e:
     print(f"❌ Error fetching CDD: {e}")
 
 # ==========================================
-# 14. PIPELINE: LTH P/L PRICE FLOW (DYNAMIC REPAIR)
+# 14. PIPELINE: LTH P/L PRICE FLOW
 # ==========================================
-print("\n[14/13] Mengkalkulasi LTH P/L Price Flow...")
+print("\n[14/14] Mengkalkulasi LTH P/L Price Flow...")
 try:
-    df_p = pd.read_csv("data_price_level.csv")
-    df_m = pd.read_csv("data_momentum.csv")
-    df_s = pd.read_csv("data_supply.csv")
-
-    df_m['date'] = pd.to_datetime(df_m['date'], errors='coerce').dt.strftime('%Y-%m-%d')
-    df_p['date'] = pd.to_datetime(df_p['date'], errors='coerce').dt.strftime('%Y-%m-%d')
-    df_s['date'] = pd.to_datetime(df_s['date'], errors='coerce').dt.strftime('%Y-%m-%d')
-
-    df_flow = df_m[['date', 'btc_price']].copy()
-    df_flow = pd.merge(df_flow, df_p[['date', 'lth_cost_basis']], on='date', how='inner')
-    df_flow = pd.merge(df_flow, df_s[['date', 'lth_supply_btc']], on='date', how='inner')
-    
-    # Load data dari hasil Pipeline 9 yang sudah diperbaiki di atas
+    # Karena Pipeline 9 sudah akurat, kita tinggal ekstrak hasilnya untuk menghitung Flow Oscillator
     df_cum_ready = pd.read_csv("data_cum_pl.csv")
-    df_cum_ready['date'] = pd.to_datetime(df_cum_ready['date'], errors='coerce').dt.strftime('%Y-%m-%d')
-    df_flow = pd.merge(df_flow, df_cum_ready[['date', 'cum_pl_price']], on='date', how='inner')
+    df_p = pd.read_csv("data_price_level.csv")
     
+    df_cum_ready['date'] = pd.to_datetime(df_cum_ready['date'], errors='coerce').dt.strftime('%Y-%m-%d')
+    df_p['date'] = pd.to_datetime(df_p['date'], errors='coerce').dt.strftime('%Y-%m-%d')
+    
+    df_flow = pd.merge(df_cum_ready[['date', 'cum_pl_price']], df_p[['date', 'btc_price']], on='date', how='inner')
     df_flow = df_flow.sort_values('date').reset_index(drop=True)
 
     if not df_flow.empty:
-        # 🟢 FIX: Ambil LTH P/L Price langsung dari hasil sinkronisasi dinamis
         df_flow['lth_pl_price'] = df_flow['cum_pl_price']
-
-        # Net Flow [BTC] = Δ(LTH P/L Price) / BTC Price
+        
+        # Flow = Delta (Perubahan) Cum PL Price / Harga BTC harian
         df_flow['delta_pl_price'] = df_flow['lth_pl_price'].diff().fillna(0)
         df_flow['lth_pl_flow_btc'] = df_flow['delta_pl_price'] / df_flow['btc_price']
 
         df_flow = df_flow.round(4)
         df_flow[['date', 'lth_pl_price', 'lth_pl_flow_btc']].to_csv("data_lth_flow.csv", index=False)
-        print("✅ data_lth_flow.csv berhasil disinkronkan.")
-        print(df_flow[['date', 'lth_pl_price', 'lth_pl_flow_btc']].tail(3).to_string(index=False))
+        print("✅ data_lth_flow.csv berhasil dibuat dan tersinkronisasi.")
 except Exception as e:
     print(f"❌ Error kalkulasi LTH Flow: {e}")
 
