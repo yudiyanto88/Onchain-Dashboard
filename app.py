@@ -382,7 +382,7 @@ if selected_menu == "Price Levels":
             '🟣 True Market Mean': ('#00ffff', 'True Market Mean', 0), 
             '🟢 CVDD': ('#00cc66', 'CVDD', 0),
             '🟤 Cum P/L Price': ('#cc9966', 'Cum P/L Price', 0),
-            '🟡 LTH P/L Price'] = ('#eab308', 'LTH P/L Price', 0),
+            '🟡 LTH P/L Price': ('#eab308', 'LTH P/L Price', 0),
             '🟨 200 DMA': ('#ffe119', '200 DMA', 2), 
             '🟦 50 WMA': ('#4363d8', '50 WMA', 2), 
             '🟪 200 WMA': ('#f032e6', '200 WMA', 2)
