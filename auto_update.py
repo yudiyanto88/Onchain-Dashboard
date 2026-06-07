@@ -331,5 +331,55 @@ try:
 except Exception as e:
     print(f"❌ Error fetching CDD: {e}")
 
+# ==========================================
+# 14. PIPELINE: LTH P/L PRICE FLOW (CUSTOM)
+# ==========================================
+print("\nMengkalkulasi LTH P/L Price Flow...")
+try:
+    df_p = pd.read_csv("data_price_level.csv")
+    df_m = pd.read_csv("data_momentum.csv")
+    df_s = pd.read_csv("data_supply.csv")
+
+    # Ambil data esensial & samakan format tanggal string (YYYY-MM-DD)
+    df_m['date'] = pd.to_datetime(df_m['date'], errors='coerce').dt.strftime('%Y-%m-%d')
+    df_p['date'] = pd.to_datetime(df_p['date'], errors='coerce').dt.strftime('%Y-%m-%d')
+    df_s['date'] = pd.to_datetime(df_s['date'], errors='coerce').dt.strftime('%Y-%m-%d')
+
+    # Ekstrak Net P/L LTH (Bands 3-10) dari df_m
+    df_age_raw = fetch_data("https://chartinspect.com/api/onchain/realized-profit-by-age?timeframe=all&isProUser=false")
+    if not df_age_raw.empty:
+        lth_prof = df_age_raw[[f'band_{i}_profit_usd' for i in range(3, 11)]].sum(axis=1)
+        lth_loss = df_age_raw[[f'band_{i}_loss_usd' for i in range(3, 11)]].sum(axis=1)
+        df_m['lth_net_pl_usd'] = lth_prof - lth_loss
+
+    # Merge Data
+    df_flow = df_m[['date', 'btc_price', 'lth_net_pl_usd']].copy()
+    df_flow = pd.merge(df_flow, df_p[['date', 'lth_cost_basis']], on='date', how='inner')
+    df_flow = pd.merge(df_flow, df_s[['date', 'lth_supply_btc']], on='date', how='inner')
+    df_flow = df_flow.sort_values('date').dropna(subset=['lth_cost_basis', 'lth_supply_btc']).reset_index(drop=True)
+
+    if not df_flow.empty:
+        # Rumus 1: Baseline awal diambil dari LTH Realized Price hari pertama yang valid
+        baseline = df_flow['lth_cost_basis'].iloc[0]
+        df_flow['cum_net_pl'] = df_flow['lth_net_pl_usd'].cumsum()
+        
+        # Cegah pembagian dengan nol menggunakan pasokan LTH asli
+        safe_lth_supply = df_flow['lth_supply_btc'].replace(0, np.nan)
+        df_flow['lth_pl_price'] = baseline + (df_flow['cum_net_pl'] / safe_lth_supply)
+
+        # Rumus 2: Net Flow [BTC] = Δ(LTH P/L Price) / BTC Price
+        df_flow['delta_pl_price'] = df_flow['lth_pl_price'].diff().fillna(0)
+        df_flow['lth_pl_flow_btc'] = df_flow['delta_pl_price'] / df_flow['btc_price']
+
+        # Bulatkan demi efisiensi token Claude saat dibaca nanti
+        df_flow = df_flow.round(4)
+
+        # Simpan berkas hulu terpisah
+        df_flow[['date', 'lth_pl_price', 'lth_pl_flow_btc']].to_csv("data_lth_flow.csv", index=False)
+        print("✅ data_lth_flow.csv berhasil dibuat.")
+        print(df_flow[['date', 'lth_pl_price', 'lth_pl_flow_btc']].tail(3).to_string(index=False))
+except Exception as e:
+    print(f"❌ Error kalkulasi LTH Flow: {e}")
+
 print("\n🎉 Semua proses selesai! CSV tersimpan rapi.")
 
