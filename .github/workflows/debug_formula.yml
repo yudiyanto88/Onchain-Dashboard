@@ -1,0 +1,22 @@
+name: Debug Formula Cum PL Price
+
+on:
+  workflow_dispatch:  # jalankan manual dari tab Actions
+
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install pandas numpy requests
+
+      - name: Run debug script
+        run: python debug_formula.py
