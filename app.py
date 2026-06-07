@@ -370,7 +370,7 @@ if selected_menu == "Price Levels":
             if st.session_state.tr_p == "Custom": st.session_state.cd_p = st.number_input("Days back", min_value=7, value=st.session_state.cd_p, label_visibility="collapsed", key="cdin_p")
         
         # 2. Injeksi Opsi (Buang Cum P/L Price warna coklat, masukkan metrik baru)
-        opts_p_base = ['🔴 STH Cost Basis', '🔵 LTH Cost Basis', '⚪ Realized Price', '🟣 True Market Mean', '🟢 CVDD', '🟡 LTH P/L Price', '💖 Active Realized Price', '🔥 MVRV 0σ', '🟨 200 DMA', '🟦 50 WMA', '🟪 200 WMA']
+        opts_p_base = ['🔴 STH Cost Basis', '🔵 LTH Cost Basis', '⚪ Realized Price', '🟣 True Market Mean', '🟢 CVDD', '🔵 LTH P/L Price', '🔴 Active Realized Price', '⚫ MVRV 0σ', '🟨 200 DMA', '🟦 50 WMA', '🟪 200 WMA']
         all_opts_p = opts_p_base.copy()
         if w_p > 1: all_opts_p.extend([f"{m} (SMA {w_p})" for m in opts_p_base])
             
