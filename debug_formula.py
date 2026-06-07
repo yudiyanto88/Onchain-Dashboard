@@ -76,3 +76,11 @@ for date_str, ci_target in checkpoints:
     print(line)
 
 print("\nKeterangan: ✅ = dalam 5% dari target CI")
+
+# Cek nilai realized_price dan lth_cost_basis di 2013
+for date_str in ['2013-11-30', '2013-06-01', '2013-01-01', '2012-01-01', '2011-01-01']:
+    rows = df[df['date'] == date_str]
+    if not rows.empty:
+        row = rows.iloc[0]
+        print(f"{date_str}: btc_price=${row['btc_price']:,.2f}  realized_price=${row['realized_price']:,.2f}  lth_cost_basis=${row['lth_cost_basis']:,.2f}")
+        
