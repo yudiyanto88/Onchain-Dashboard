@@ -102,8 +102,11 @@ def load_data_price():
             'date': 'Date', 'btc_price': 'BTC Price', 'sth_cost_basis': 'STH Cost Basis', 
             'lth_cost_basis': 'LTH Cost Basis', 'realized_price': 'Realized Price', 
             'cvdd': 'CVDD', 'true_market_mean_price': 'True Market Mean',
+            'active_realized_price': 'Active Realized Price', 'mvrv_avg_price': 'MVRV 0σ',
+            'cum_pl_price': 'Cum P/L Price', 'pl_price_ratio': 'P/L Price Ratio',
             '200_dma': '200 DMA', '50_wma': '50 WMA', '200_wma': '200 WMA'
         }, inplace=True)
+        # ... (sisa kodenya biarkan sama)
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
         df = df.dropna(subset=['Date']).sort_values('Date').drop_duplicates(subset=['Date'], keep='last')
         
@@ -234,8 +237,7 @@ df_lth_flow_raw = load_data_lth_flow()
 
 # ⚡ PROSES MERGE AMAN (Mengecek keberadaan variabel hulu terlebih dahulu)
 if not df_cum_raw.empty:
-    if df_price_raw is not None and not df_price_raw.empty:
-        df_price_raw = pd.merge(df_price_raw, df_cum_raw[['Date', 'Cum P/L Price']], on='Date', how='left')
+    # HANYA merge ke df_mom_raw (Price_raw sudah punya datanya dari CSV)
     if df_mom_raw is not None and not df_mom_raw.empty:
         df_mom_raw = pd.merge(df_mom_raw, df_cum_raw[['Date', 'P/L Price Ratio']], on='Date', how='left')
 
@@ -315,7 +317,8 @@ with st.sidebar:
 # ------------------------------------------------------------------------------
 if selected_menu == "Price Levels":
     if not df_price_raw.empty:
-        df_p, w_p = apply_filters(df_price_raw, st.session_state.tf_p, st.session_state.sma_p, st.session_state.cs_p, st.session_state.tr_p, st.session_state.cd_p, ['STH Cost Basis', 'LTH Cost Basis', 'Realized Price', 'True Market Mean', 'CVDD'])
+        df_p, w_p = apply_filters(df_price_raw, st.session_state.tf_p, st.session_state.sma_p, st.session_state.cs_p, st.session_state.tr_p, st.session_state.cd_p, ['STH Cost Basis', 'LTH Cost Basis', 'Realized Price', 'True Market Mean', 'CVDD', 'LTH P/L Price', 'Active Realized Price', 'MVRV 0σ'] + custom_smas
+        df_p, w_p = apply_filters(df_price_temp, st.session_state.tf_p, "0d", 0, st.session_state.tr_p, st.session_state.cd_p, metrics_to_filter)])
 
         last_p = df_p.iloc[-1]
         prev_p = df_p.iloc[-2] if len(df_p) > 1 else last_p
@@ -364,25 +367,29 @@ if selected_menu == "Price Levels":
         with col_custom:
             if st.session_state.tr_p == "Custom": st.session_state.cd_p = st.number_input("Days back", min_value=7, value=st.session_state.cd_p, label_visibility="collapsed", key="cdin_p")
         
-        opts_p_base = ['🔴 STH Cost Basis', '🔵 LTH Cost Basis', '⚪ Realized Price', '🟣 True Market Mean', '🟢 CVDD', '🟤 Cum P/L Price', '🟡 LTH P/L Price','🟨 200 DMA', '🟦 50 WMA', '🟪 200 WMA']
+        # 5. Injeksi Opsi (Buang 🟤 Cum P/L Price, masukkan metrik baru)
+        opts_p_base = ['🔴 STH Cost Basis', '🔵 LTH Cost Basis', '⚪ Realized Price', '🟣 True Market Mean', '🟢 CVDD', '🟡 LTH P/L Price', '💖 Active Realized Price', '🔥 MVRV 0σ', '🟨 200 DMA', '🟦 50 WMA', '🟪 200 WMA']
+        for c in custom_smas:
+            opts_p_base.append(f'⚙️ {c}')
+            
         all_opts_p = opts_p_base.copy()
-        if w_p > 1: all_opts_p.extend([f"{m} (SMA {w_p})" for m in opts_p_base])
             
         try: active_metrics_p = st.pills("Metrics", all_opts_p, default=['🔴 STH Cost Basis', '🔵 LTH Cost Basis', '⚪ Realized Price'], selection_mode="multi", label_visibility="collapsed")
         except: active_metrics_p = st.multiselect("Metrics", all_opts_p, default=['🔴 STH Cost Basis', '🔵 LTH Cost Basis', '⚪ Realized Price'], label_visibility="collapsed")
 
-        # SKALA DISATUKAN (Semua di Kanan)
         chart_p_opts = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 850 if focus_p else 650, "rightPriceScale": {"visible": True}, "leftPriceScale": {"visible": False}}
         series_p = [{"type": 'Line', "data": get_s(df_p, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
         
+        # Mapping Warna (Buang coklat, beri warna merah muda/oranye api)
         colors_p = {
             '🔴 STH Cost Basis': ('#ff4d4d', 'STH Cost Basis', 0), 
             '🔵 LTH Cost Basis': ('#4da6ff', 'LTH Cost Basis', 0), 
             '⚪ Realized Price': ('#ffffff', 'Realized Price', 0), 
             '🟣 True Market Mean': ('#00ffff', 'True Market Mean', 0), 
             '🟢 CVDD': ('#00cc66', 'CVDD', 0),
-            '🟤 Cum P/L Price': ('#cc9966', 'Cum P/L Price', 0),
             '🟡 LTH P/L Price': ('#eab308', 'LTH P/L Price', 0),
+            '💖 Active Realized Price': ('#ff66b2', 'Active Realized Price', 0),
+            '🔥 MVRV 0σ': ('#ff4500', 'MVRV 0σ', 0),
             '🟨 200 DMA': ('#ffe119', '200 DMA', 2), 
             '🟦 50 WMA': ('#4363d8', '50 WMA', 2), 
             '🟪 200 WMA': ('#f032e6', '200 WMA', 2)
