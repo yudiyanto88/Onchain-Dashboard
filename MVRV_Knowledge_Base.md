@@ -1,5 +1,5 @@
 # MVRV FAMILY KNOWLEDGE BASE
-## MVRV Z-Score, LTH-MVRV, STH-MVRV — Historical Behavior, Rule Ranges & Failure Modes
+## MVRV Ratio, LTH-MVRV, STH-MVRV — Historical Behavior, Rule Ranges & Failure Modes
 
 **Version:** 1.0  
 **Data Source:** ChartInspect.com (Glassnode-sourced)  
@@ -10,12 +10,13 @@
 
 ## 1. MEKANIK DASAR — APA YANG DIUKUR DAN KENAPA PENTING
 
-### MVRV Z-Score
-Membandingkan Market Value (market cap berdasarkan harga spot) dengan Realized Value (market cap berdasarkan harga terakhir setiap coin bergerak on-chain). Z-Score menstandarisasi deviasi ini.
+### MVRV Ratio
+Market Value dibagi Realized Value. Market Value = harga spot × supply beredar. Realized Value = setiap coin divaluasi pada harga terakhir kali coin itu berpindah on-chain, lalu dijumlahkan seluruh supply.
 
-- **Di atas 1.0:** Market secara agregat dalam profit — setiap koin rata-rata bernilai lebih dari harga terakhir pemindahannya.
-- **Di bawah 1.0:** Market secara agregat dalam kerugian unrealized.
+- **Di atas 1.0:** Market secara agregat dalam profit — rata-rata setiap coin bernilai lebih dari harga terakhir pemindahannya.
+- **Di bawah 1.0:** Market secara agregat rugi unrealized — rata-rata holder underwater.
 - **Kenapa penting:** Ini proxy paling langsung untuk "seberapa overvalued atau undervalued market relatif terhadap cost basis agregat semua holder."
+- **Bukan Z-Score:** MVRV Ratio adalah angka sederhana (pembagian), bukan standarisasi statistik. Z-Score adalah varian berbeda yang menggunakan standard deviation sebagai denominator — nilainya berbeda dan tidak bisa dipakai interchanably. Data di knowledge base ini adalah **MVRV Ratio**.
 
 ### LTH-MVRV (Long-Term Holder MVRV)
 Sama seperti MVRV, tapi hanya mengukur coin yang dipegang >155 hari. Mewakili "smart money" atau holder yang sudah melewati satu siklus volatilitas.
@@ -28,7 +29,7 @@ Hanya mengukur coin yang dipegang <155 hari. Mewakili new money, spekulan, dan l
 - **Kenapa penting:** STH paling rentan terhadap panic selling karena cost basis mereka dekat dengan harga spot. STH-MVRV < 1.0 berarti short-term buyer rata-rata rugi — ini kondisi yang historically trigger capitulation ATAU buying opportunity, tergantung konteks cycle.
 
 ### Hubungan Ketiganya
-MVRV Z-Score = weighted average dari keduanya. Ketika STH-MVRV dan LTH-MVRV diverge (satu naik, satu turun), MVRV Z-Score bisa terlihat "normal" padahal ada tekanan besar di bawah permukaan.
+MVRV Ratio = weighted average dari keduanya. Ketika STH-MVRV dan LTH-MVRV diverge (satu naik, satu turun), MVRV Ratio bisa terlihat "normal" padahal ada tekanan besar di bawah permukaan.
 
 ---
 
@@ -42,7 +43,7 @@ MVRV Z-Score = weighted average dari keduanya. Ketika STH-MVRV dan LTH-MVRV dive
 | Cycle Peak 2021 (Okt 20 – Nov 9) | $58,544–$67,525 | 2.56–2.92 | 1.22–1.43 | 3.70–4.24 |
 | Cycle Peak 2025 (Okt 5-7) | $121,430–$124,715 | 2.22–2.28 | 1.07–1.10 | 3.30–3.39 |
 
-**Pola konsisten:** MVRV Z-Score selalu di atas 2.0 di semua cycle peak. STH-MVRV selalu di atas 1.0. LTH-MVRV selalu di atas 3.0.
+**Pola konsisten:** MVRV Ratio selalu di atas 2.0 di semua cycle peak. STH-MVRV selalu di atas 1.0. LTH-MVRV selalu di atas 3.0.
 
 **Perubahan antar cycle (CRITICAL — DIMINISHING RETURNS):**
 - MVRV peak: 4.39 → 2.92 → 2.28. Setiap cycle, peak MVRV turun ~35%.
@@ -135,7 +136,7 @@ Di 2021, Local Top Apr (ATH $63.5K, MVRV 3.43) punya MVRV lebih rendah dari Loca
 | Bear Bottom Final Low (Des 19, 2022) | $16,442 | 0.82 | 0.90 | 0.81 |
 
 **Pola paling konsisten di seluruh dataset — "Both Below 1.0" Rule:**
-Ketika MVRV Z-Score < 1.0 DAN STH-MVRV < 1.0 DAN LTH-MVRV < 1.0 secara bersamaan, ini adalah sinyal bear bottom paling kuat. Ini terjadi di:
+Ketika MVRV Ratio < 1.0 DAN STH-MVRV < 1.0 DAN LTH-MVRV < 1.0 secara bersamaan, ini adalah sinyal bear bottom paling kuat. Ini terjadi di:
 - Bear Bottom 2018: ✅ (MVRV 0.70, STH 0.64, LTH 0.73)
 - Bear Bottom Window End 2019: ✅ (MVRV 0.77, STH 0.79, LTH 0.77)
 - Pre Detection 2019: ✅ (MVRV 0.90, STH 0.97, LTH 0.88)
@@ -159,7 +160,7 @@ Ketika MVRV Z-Score < 1.0 DAN STH-MVRV < 1.0 DAN LTH-MVRV < 1.0 secara bersamaan
 | Start of Bull 2023 (Feb 10-12) | $21,632–$21,863 | 1.09–1.10 | 1.12–1.13 | 1.08–1.09 |
 
 **Pola kunci — STH-MVRV leads:**
-Di kedua pre-detection events, STH-MVRV mendekati atau menembus 1.0 SEBELUM MVRV Z-Score dan LTH-MVRV. Ini karena short-term buyers yang masuk di dekat bottom menjadi profitable duluan ketika harga mulai naik — cost basis mereka rendah dan fresh.
+Di kedua pre-detection events, STH-MVRV mendekati atau menembus 1.0 SEBELUM MVRV Ratio dan LTH-MVRV. Ini karena short-term buyers yang masuk di dekat bottom menjadi profitable duluan ketika harga mulai naik — cost basis mereka rendah dan fresh.
 
 - Pre Detection 2019: STH 0.97-0.99, sudah hampir 1.0, sementara LTH masih 0.87-0.90.
 - Pre Detection 2023: STH 0.98-1.06, sudah menembus 1.0 duluan, LTH masih 0.86-0.93.
@@ -242,7 +243,7 @@ MVRV 2.55 dan STH 1.74 di Upper Range 2019 terlihat sangat overheated untuk fase
 
 ## 3. RULE RANGES — SELL SIGNALS
 
-### Rule S1: "Cycle Peak Warning" — MVRV Z-Score > 2.2 + STH-MVRV > 1.05 + bearish divergence (harga ATH tapi MVRV lebih rendah dari ATH sebelumnya)
+### Rule S1: "Cycle Peak Warning" — MVRV Ratio > 2.2 + STH-MVRV > 1.05 + bearish divergence (harga ATH tapi MVRV lebih rendah dari ATH sebelumnya)
 
 **Trigger history:**
 - 2017: MVRV peaked di 4.39, STH 2.19 — triggered, tapi threshold 2.2 sudah jauh terlampaui. Sell di 2.2 = sell di ~$6,600 (awal Nov 2017), missed 196% upside ke $19.5K. Threshold terlalu dini di 2017.
@@ -405,7 +406,7 @@ Tier system tetap valid sebagai framework gradasi risk, tapi tier apapun hanya a
 
 **Added 1 Jun 2026. Grid search result: SMA30 dengan filter STH < 1.10.**
 
-**Mekanik:** Hitung SMA 30 hari dari MVRV Z-Score. Signal trigger ketika STH-MVRV cross dari bawah ke atas SMA30 tersebut, DAN nilai STH-MVRV saat crossing < 1.10.
+**Mekanik:** Hitung SMA 30 hari dari MVRV Ratio. Signal trigger ketika STH-MVRV cross dari bawah ke atas SMA30 tersebut, DAN nilai STH-MVRV saat crossing < 1.10.
 
 **Logika:** STH-MVRV lebih responsif dari MVRV karena pool-nya lebih kecil dan turnover lebih cepat. Di bear market dalam, STH jatuh lebih cepat dari MVRV. Ketika STH mulai recover dan cross di atas SMA MVRV, ini menandakan STH — cohort yang paling tertekan — mulai outperform rata-rata 30 hari. Filter STH < 1.10 memastikan cross ini terjadi di zona bear/recovery, bukan di bull market yang sudah berjalan.
 
@@ -488,7 +489,7 @@ Kalau harga membuat higher low tapi STH-MVRV membuat equal/lower low, short-term
 
 ## 5. FAILURE MODES — KAPAN METRIK INI GAGAL ATAU MISLEADING
 
-### 5.1 MVRV Z-Score Failures
+### 5.1 MVRV Ratio Failures
 
 **Failure Mode 1: Diminishing cycle peaks membuat fixed thresholds obsolete.**
 MVRV peak: 4.39 → 2.92 → 2.28. Threshold yang benar di satu cycle terlalu tinggi atau rendah di cycle berikutnya. "MVRV > 3.0 = overheated" benar di 2017 dan 2021, tapi kalau diterapkan ke 2025, sinyal TIDAK PERNAH trigger dan kamu miss seluruh cycle peak.
@@ -532,7 +533,7 @@ Di Bear Market Decline Mid 2022 (Mar-Apr), LTH-MVRV masih 2.52-2.64. Ini terliha
 
 **STH-MVRV paling sering memberikan ambiguous signals** (12 instances di data di mana STH < 1.0 tapi outcome sangat berbeda — kadang buy, kadang bear). Ini bukan karena metric-nya buruk — justru karena STH-MVRV responsive, dia react ke semua dips termasuk yang tidak meaningful.
 
-**MVRV Z-Score paling terpengaruh diminishing returns** — fixed thresholds dari cycle lalu hampir pasti salah di cycle baru. Ini membuatnya unreliable JIKA dipakai dengan fixed numbers tanpa adjustment.
+**MVRV Ratio paling terpengaruh diminishing returns** — fixed thresholds dari cycle lalu hampir pasti salah di cycle baru. Ini membuatnya unreliable JIKA dipakai dengan fixed numbers tanpa adjustment.
 
 **LTH-MVRV paling lagging** — rarely wrong tapi sering terlambat. Useful sebagai confirmer dan context-setter, kurang useful sebagai primary signal.
 
@@ -792,7 +793,7 @@ Yang paling mirip overall: antara Halving 2020 context dan late-2023 bull dip te
 
 ## 7. MAPPING KE REGIME CATEGORIES
 
-| Regime | MVRV Z-Score | STH-MVRV | LTH-MVRV | Confidence |
+| Regime | MVRV Ratio | STH-MVRV | LTH-MVRV | Confidence |
 |--------|-------------|----------|----------|------------|
 | 1. Cycle Peak | > 2.2 + divergence | > 1.05 (tapi turun) | > 3.0 (tapi turun) | Medium — thresholds terus turun |
 | 2. Local Top | > 2.4 | > 1.15 | > 3.0 | Medium — 2025 peak terlalu rendah untuk trigger |
@@ -869,4 +870,5 @@ LTH-MVRV 1.59 — LTH masih profitable tapi sudah compressed signifikan dari 3.4
 - v1.1 (31 Mei 2026): Section 6A (Velocity Analysis) ditambahkan — cycle peak asymmetry inversion, LTH leadership pattern, recovery velocity threshold, lower high front-loaded decline.
 - v1.1 (31 Mei 2026): Section 6B (LTH/STH Ratio Deep Dive) ditambahkan — ratio lifecycle mapping, ratio < 1.0 sebagai bear bottom marker, ratio direction sebagai bull dip quality filter (100% precision saat rising, 29% saat falling).
 - v1.3 (1 Jun 2026): Rule B5 ditambahkan — grid search STH-MVRV cross above MVRV SMA(N). SMA30 dengan filter STH < 1.10 optimal: 100% precision, 0 false signals, lead 14–76d sebelum Pre Detection / Start of Bull. Two-cross pattern documented (cross 1 = alert, cross 2 = confirm). Current state: STH 0.991 vs SMA30 1.452, gap -31.8%, no crossing imminent.
+- v1.3 (1 Jun 2026): KOREKSI — seluruh referensi "MVRV Z-Score" diganti ke "MVRV Ratio." Data CSV menggunakan MVRV Ratio (Market Value / Realized Value), bukan Z-Score. Semua angka dan rules tidak berubah — hanya label dan deskripsi mekanik yang dikoreksi. Section 1 ditambahkan klarifikasi eksplisit perbedaan Ratio vs Z-Score.
 - v1.3 (1 Jun 2026): B4 exceptions table dihapus — bukan bullish divergence dari awal, tidak relevan dibahas sebagai failure case. "No peak in 120d" di B2 dikoreksi: bukan filter teknikal, itu definisi regime. Kesimpulan yang lebih jujur: B2 dan B4 tidak bisa membedakan bull dip dari bear onset menggunakan MVRV family saja — butuh regime confirmation dari indikator lain.
