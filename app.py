@@ -205,14 +205,6 @@ def load_data_fg():
         return df.dropna(subset=['Date']).sort_values('Date').drop_duplicates(subset=['Date'], keep='last')
     except: return pd.DataFrame()
 
-@st.cache_data(ttl=3600)
-def load_data_cum():
-    try:
-        df = pd.read_csv("data_cum_pl.csv")
-        df.rename(columns={'date': 'Date', 'cum_pl_price': 'Cum P/L Price', 'pl_price_ratio': 'P/L Price Ratio'}, inplace=True)
-        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
-        return df.dropna(subset=['Date']).sort_values('Date').drop_duplicates(subset=['Date'], keep='last')
-    except: return pd.DataFrame()
 
 # 🟢 METRIK BARU: LTH P/L Flow Loader
 @st.cache_data(ttl=3600)
@@ -232,14 +224,7 @@ df_deriv_raw = load_data_derivatives()
 df_ex_raw = load_data_exchange()
 df_sentiment_raw = load_data_sentiment()
 df_supply_raw = load_data_supply()
-df_cum_raw = load_data_cum()
 df_lth_flow_raw = load_data_lth_flow()
-
-# ⚡ PROSES MERGE AMAN (Mengecek keberadaan variabel hulu terlebih dahulu)
-if not df_cum_raw.empty:
-    # HANYA merge ke df_mom_raw (Price_raw sudah punya datanya dari CSV)
-    if df_mom_raw is not None and not df_mom_raw.empty:
-        df_mom_raw = pd.merge(df_mom_raw, df_cum_raw[['Date', 'P/L Price Ratio']], on='Date', how='left')
 
 if df_lth_flow_raw is not None and not df_lth_flow_raw.empty:
     if df_price_raw is not None and not df_price_raw.empty:
