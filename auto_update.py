@@ -35,7 +35,7 @@ def fetch_data(url, columns_to_keep=None):
 # 1. PIPELINE: PRICE LEVELS & MOVING AVERAGES
 # ==========================================
 print("\n[1/15] Menarik data Price Levels...")
-# 🟢 FIX: Tambahkan 'active_realized_price' dan 'mvrv_avg_price' ke dalam whitelist kolom hulu
+# 🟢 FIX: Tambahkan 'active_realized_price' dan 'mvrv_avg_price' ke dalam whitelist kolom hulu (akan di-rename ke 'MVRV 0σ' sebelum disimpan)
 df_price = fetch_data("https://chartinspect.com/api/onchain/onchain-price-levels?timeframe=all&isProUser=false", 
                       ['date', 'btc_price', 'sth_cost_basis', 'lth_cost_basis', 'realized_price', 'cvdd', 'active_realized_price', 'mvrv_avg_price'])
 df_tmm = fetch_data("https://chartinspect.com/api/onchain/true-market-mean?timeframe=all&isProUser=false", ['date', 'true_market_mean_price'])
@@ -49,6 +49,9 @@ if not df_price.empty and not df_tmm.empty:
     df_master_price['200_dma'] = df_master_price['btc_price'].rolling(window=200, min_periods=1).mean()
     df_master_price['50_wma'] = df_master_price['btc_price'].rolling(window=350, min_periods=1).mean()
     df_master_price['200_wma'] = df_master_price['btc_price'].rolling(window=1400, min_periods=1).mean()
+
+    # Rename kolom API ke nama display sebelum disimpan ke CSV
+    df_master_price.rename(columns={'mvrv_avg_price': 'MVRV 0σ'}, inplace=True)
 
     df_master_price.to_csv("data_price_level.csv", index=False)
     print("✅ data_price_level.csv berhasil diperbarui.")
