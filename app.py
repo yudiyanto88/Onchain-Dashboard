@@ -619,29 +619,6 @@ elif selected_menu == "Profit & Loss":
             {"chart": chart_opts_bottom, "series": series_bottom}
         ], 'chart_sopr_dual')
         
-        #chart_opts_sopr = {
-         #   "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, 
-          #  "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, 
-           # "crosshair": {"mode": 0}, "height": 850 if focus_ms else 650, 
-            #"rightPriceScale": {"visible": True}, "leftPriceScale": {"visible": True}, "scale3": {"visible": False} 
-        #}
-        #series_sopr = [{"type": 'Line', "data": get_s(df_ms, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
-        #df_ms['Neutral_Line'] = 1.0
-        #series_sopr.append({"type": 'Line', "data": get_s(df_ms, 'Neutral_Line'), "options": {"color": '#ffffff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": 'Neutral (1.0)'}})
-
-        #for m in sel_sopr:
-          #  is_sma = "(SMA" in m
-           # base_m = m.split(" (SMA")[0]
-            #target_scale = "scale3" if base_m == '🟢 LTH SOPR' else "left"
-            #if base_m == '🔵 aSOPR': c_col, c_col_raw, c_name = '#00e6e6', 'rgba(0, 230, 230, 0.7)', 'aSOPR'
-            #elif base_m == '🔴 STH SOPR': c_col, c_col_raw, c_name = '#ff4d4d', 'rgba(255, 77, 77, 0.7)', 'STH SOPR'
-            #elif base_m == '🟢 LTH SOPR': c_col, c_col_raw, c_name = '#00cc66', 'rgba(0, 204, 102, 0.7)', 'LTH SOPR'
-            #else: continue
-            
-            #if is_sma: series_sopr.append({"type": 'Line', "data": get_s(df_ms, f"{c_name}_SMA"), "options": {"color": c_col, "lineWidth": 1, "lineStyle": 2, "priceScaleId": target_scale, "title": f"{c_name} SMA"}})
-            #else: series_sopr.append({"type": 'Line', "data": get_s(df_ms, c_name), "options": {"color": c_col_raw, "lineWidth": 1, "priceScaleId": target_scale, "title": c_name}})
-        #renderLightweightCharts([{"chart": chart_opts_sopr, "series": series_sopr}], 'chart_sopr')
-        #st.markdown("<br><br>", unsafe_allow_html=True)
 
         # CHART 2: REALIZED P/L
         col_title_2, k1_2, k2_2, k3_2, k4_2, k5_2 = st.columns([1.5, 1, 1, 1, 1, 1], vertical_alignment="center")
