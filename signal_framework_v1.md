@@ -159,6 +159,8 @@ Kalau harga membuat ATH baru tapi SOPR MA90-MA60 gap sudah negatif (MA90 < MA90-
 
 Kalau kondisi ini terjadi: treat sebagai potential cycle peak. Fokus pada S1 trigger count dan siapkan transisi ke S2. Pattern ini baru n=1 — monitor apakah repeat di cycle berikutnya.
 
+**Catatan terminologi — MVRV 0σ:** Sepanjang framework ini, MVRV 0σ merujuk ke `mvrv_avg_price` — yaitu price level dimana MVRV Ratio = long-term historical average-nya. Bukan MVRV Z-Score. Semua trigger conditions yang menyebut angka MVRV (> 2.2, ≈ 1.0, < 1.0, dll) mengacu ke MVRV Ratio, bukan Z-Score.
+
 **Confidence:** MEDIUM — n=2 untuk cycle peaks yang applicable (2021, 2025). Trigger #6 menambah coverage (6/6 hit rate) tapi juga menambah lead time yang bisa terlalu early. Threshold MVRV > 2.2 mungkin terlalu tinggi di cycle berikutnya (diminishing returns). Recalibrate setiap cycle.
 
 **Cost of being wrong:** Sell di local top bukan cycle peak → miss 10-30% upside yang masih bisa re-enter setelah koreksi. Asymmetry favors partial selling.
@@ -381,7 +383,7 @@ ZONA: [MERAH / KUNING ATAS / HIJAU / KUNING BAWAH / BIRU / HIJAU TUA]
 === PER-INDICATOR STATUS ===
 
 MVRV Family:
-- MVRV Z-Score: [value] | Trajectory: [rising/falling/flat]
+- MVRV Ratio: [value] | Trajectory: [rising/falling/flat]
 - STH-MVRV: [value] | vs 1.0: [above/below]
 - LTH-MVRV: [value] | vs 1.0: [above/below]
 - LTH/STH Ratio: [value] | Direction: [rising/falling]
