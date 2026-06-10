@@ -222,9 +222,7 @@ try:
             df_cum['pl_price_ratio'] = df_cum['btc_price'] / df_cum['cum_pl_price']
             
             df_cum_final = df_cum[['date', 'cum_pl_price', 'pl_price_ratio']]
-            df_cum_final.to_csv("data_cum_pl.csv", index=False)
-            print("✅ data_cum_pl.csv berhasil diperbarui.")
-            
+
             # 🟢 REKAP DATA MUTLAK: Amankan struktur file data_price_level.csv
             df_p_rekap = pd.read_csv("data_price_level.csv")
             df_p_rekap['date'] = pd.to_datetime(df_p_rekap['date'], errors='coerce').dt.strftime('%Y-%m-%d')
@@ -235,7 +233,7 @@ try:
             
             df_p_rekap = pd.merge(df_p_rekap, df_cum_final, on='date', how='left')
             df_p_rekap.to_csv("data_price_level.csv", index=False)
-            print("✅ Rekap data_cum_pl ke data_price_level.csv BERHASIL.")
+            print("✅ cum_pl_price & pl_price_ratio berhasil dimerge ke data_price_level.csv.")
         else:
             print("❌ GAGAL: Data kosong setelah digabungkan (merge error).")
     else:
@@ -341,13 +339,10 @@ except Exception as e:
 # ==========================================
 print("\n[14/15] Mengkalkulasi LTH P/L Price Flow...")
 try:
-    df_cum_ready = pd.read_csv("data_cum_pl.csv")
     df_p = pd.read_csv("data_price_level.csv")
-    
-    df_cum_ready['date'] = pd.to_datetime(df_cum_ready['date'], errors='coerce').dt.strftime('%Y-%m-%d')
     df_p['date'] = pd.to_datetime(df_p['date'], errors='coerce').dt.strftime('%Y-%m-%d')
     
-    df_flow = pd.merge(df_cum_ready[['date', 'cum_pl_price']], df_p[['date', 'btc_price']], on='date', how='inner')
+    df_flow = df_p[['date', 'cum_pl_price', 'btc_price']].dropna(subset=['cum_pl_price']).copy()
     df_flow = df_flow.sort_values('date').reset_index(drop=True)
 
     if not df_flow.empty:
@@ -372,7 +367,7 @@ try:
     csv_files = [
         "data_price_level.csv", "data_momentum.csv", "data_derivatives.csv",
         "data_sentiment.csv", "data_supply.csv", "data_mvrv.csv", "data_fg.csv",
-        "data_exchange.csv", "data_cum_pl.csv", "data_rhodl.csv", "data_hodl_waves.csv",
+        "data_exchange.csv", "data_rhodl.csv", "data_hodl_waves.csv",
         "data_realized_cap.csv", "data_cdd.csv", "data_lth_flow.csv"
     ]
     
