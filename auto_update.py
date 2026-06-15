@@ -152,12 +152,20 @@ if not df_sth_lth.empty and not df_profit_loss.empty:
 # 6. PIPELINE: MARKET VALUATION
 # ==========================================
 print("\n[6/15] Menarik data Market Valuation...")
-df_mvrv = fetch_data("https://chartinspect.com/api/onchain/mvrv?timeframe=all&isProUser=false", 
+df_mvrv = fetch_data("https://chartinspect.com/api/onchain/mvrv?timeframe=all&isProUser=false",
                      ['date', 'btc_price', 'mvrv', 'sth_mvrv', 'lth_mvrv'])
+df_mvrv_z = fetch_data("https://chartinspect.com/api/onchain/mvrv-z-score?timeframe=all&isProUser=false",
+                       ['date', 'mvrv_zscore'])
 
 if not df_mvrv.empty:
+    df_mvrv.rename(columns={'mvrv': 'mvrv_ratio'}, inplace=True)
     df_mvrv['date'] = pd.to_datetime(df_mvrv['date']).dt.strftime('%Y-%m-%d')
     df_mvrv = df_mvrv.sort_values('date').reset_index(drop=True)
+
+    if not df_mvrv_z.empty:
+        df_mvrv_z['date'] = pd.to_datetime(df_mvrv_z['date']).dt.strftime('%Y-%m-%d')
+        df_mvrv = pd.merge(df_mvrv, df_mvrv_z, on='date', how='left')
+
     df_mvrv.to_csv("data_mvrv.csv", index=False)
     print("✅ data_mvrv.csv berhasil diperbarui.")
     print(df_mvrv.tail(3).to_string(index=False))
