@@ -49,14 +49,12 @@ div[data-testid="stPill"] button { font-size: 0.85rem !important; padding: 2px 1
 """, unsafe_allow_html=True)
 
 # State initialization (Termasuk ex untuk Exchange Flow)
-for key in ['tr_p', 'tr_mv', 'tr_ms', 'tr_mpl', 'tr_nupl', 'tr_d', 'tr_ex', 'tr_gt', 'tr_wk', 'tr_sd', 'tr_fg', 'tr_msig', 'tr_bt', 'tr_sl']:
+for key in ['tr_p', 'tr_mv', 'tr_ms', 'tr_mpl', 'tr_nupl', 'tr_d', 'tr_ex', 'tr_gt', 'tr_wk', 'tr_sd', 'tr_fg', 'tr_msig', 'tr_bt']:
     if key not in st.session_state: st.session_state[key] = "All Time"
-for key in ['cd_p', 'cd_mv', 'cd_ms', 'cd_mpl', 'cd_nupl', 'cd_d', 'cd_ex', 'cd_gt', 'cd_wk', 'cd_sd', 'cd_fg', 'cd_msig', 'cd_bt', 'cd_sl']:
+for key in ['cd_p', 'cd_mv', 'cd_ms', 'cd_mpl', 'cd_nupl', 'cd_d', 'cd_ex', 'cd_gt', 'cd_wk', 'cd_sd', 'cd_fg', 'cd_msig', 'cd_bt']:
     if key not in st.session_state: st.session_state[key] = 120
-for key in ['tf_p', 'tf_mv', 'tf_ms', 'tf_mpl', 'tf_nupl', 'tf_d', 'tf_ex', 'tf_gt', 'tf_wk', 'tf_sd', 'tf_fg', 'tf_msig', 'tf_bt', 'tf_sl']:
+for key in ['tf_p', 'tf_mv', 'tf_ms', 'tf_mpl', 'tf_nupl', 'tf_d', 'tf_ex', 'tf_gt', 'tf_wk', 'tf_sd', 'tf_fg', 'tf_msig', 'tf_bt']:
     if key not in st.session_state: st.session_state[key] = "Daily"
-for key, val in [('sl_sma_a', 14), ('sl_sma_b', 30), ('sl_sma_c', 60), ('sl_b5_thresh', 1.10)]:
-    if key not in st.session_state: st.session_state[key] = val
 for key in ['sma_p', 'sma_mv', 'sma_ms', 'sma_mpl', 'sma_nupl', 'sma_d', 'sma_ex', 'sma_sd', 'sma_fg', 'sma_msig']:
     if key not in st.session_state: st.session_state[key] = "0d"
 for key in ['sma_gt', 'sma_wk']:
@@ -305,7 +303,7 @@ with st.sidebar:
     # Menambahkan "Exchange Flow" ke dalam urutan menu
     selected_menu = st.radio(
         "Menu Navigasi",
-        ["Price Levels", "Market Valuation", "Profit & Loss", "Supply Dynamics", "Exchange Flow", "Derivatives", "Social Sentiment", "Market Signals", "Backtesting", "MVRV Signal Lab"],
+        ["Price Levels", "Market Valuation", "Profit & Loss", "Supply Dynamics", "Exchange Flow", "Derivatives", "Social Sentiment", "Market Signals", "Backtesting", "⚡ Backtesting Engine"],
         label_visibility="collapsed"
     )
     st.markdown("---")
@@ -1574,261 +1572,209 @@ elif selected_menu == "Backtesting":
         ], 'chart_backtesting')
 
 # ------------------------------------------------------------------------------
-# TAB: MVRV SIGNAL LAB
+# TAB 10: BACKTESTING ENGINE
 # ------------------------------------------------------------------------------
-elif selected_menu == "MVRV Signal Lab":
-    if df_mvrv_raw.empty:
-        st.warning("Data MVRV tidak tersedia.")
-    else:
-        # Full dataset (no time filter) — needed for B5 scan + forward return computation
-        df_sl_full = df_mvrv_raw.copy().sort_values('Date').reset_index(drop=True)
+elif selected_menu == "⚡ Backtesting Engine":
+    import traceback
 
-        last_sl  = df_sl_full.iloc[-1]
-        prev_sl  = df_sl_full.iloc[-2] if len(df_sl_full) > 1 else last_sl
-        btc_sl   = last_sl.get('BTC Price', 0)
-        btc_prev_sl = prev_sl.get('BTC Price', 0)
+    # Gabung semua data
+    df_eng = df_mvrv_raw.copy() if not df_mvrv_raw.empty else pd.DataFrame()
+    for src_df, cols in [
+        (df_mom_raw,    ['aSOPR','LTH SOPR','STH SOPR','NUPL','STH NUPL','LTH NUPL','Net Realized PL','STH P/L Ratio','LTH P/L Ratio']),
+        (df_supply_raw, ['LTH Supply','STH Supply','LTH % Profit','STH % Profit','Total % Profit']),
+        (df_ex_raw,     ['Net Flow','Total Balance']),
+        (df_deriv_raw,  ['Open Interest','Funding Rate']),
+        (df_price_raw,  ['STH Cost Basis','LTH Cost Basis','Realized Price','CVDD','True Market Mean']),
+    ]:
+        if not src_df.empty and not df_eng.empty:
+            df_eng = pd.merge(df_eng, src_df[['Date'] + [c for c in cols if c in src_df.columns]], on='Date', how='left')
 
-        sth_now  = last_sl.get('STH MVRV', 0)
-        lth_now  = last_sl.get('LTH MVRV', 0)
-        sth_prev = prev_sl.get('STH MVRV', 0)
-        lth_prev = prev_sl.get('LTH MVRV', 0)
-        ratio_now  = lth_now / sth_now  if sth_now  > 0 else 0
-        ratio_prev = lth_prev / sth_prev if sth_prev > 0 else 0
+    st.markdown("<h3 style='color:#a855f7; margin-bottom:0;'>⚡ Backtesting Engine</h3>", unsafe_allow_html=True)
+    st.markdown("<p style='color:#a3a8b8; font-size:0.9rem; margin-top:4px;'>Tulis signal rules dalam Python. Variabel <code>df</code> sudah tersedia dengan semua kolom onchain.</p>", unsafe_allow_html=True)
+    st.markdown("---")
 
-        _sma30_s  = df_sl_full['MVRV'].rolling(30, min_periods=1).mean()
-        sma30_now  = _sma30_s.iloc[-1]
-        sma30_prev = _sma30_s.iloc[-2]
-        gap_now    = sth_now  - sma30_now
-        gap_prev   = sth_prev - sma30_prev
+    col_left, col_right = st.columns([1.8, 1], gap="large")
 
-        # KPI row
-        dp_sl = ((btc_sl - btc_prev_sl) / btc_prev_sl * 100) if btc_prev_sl else 0
-        dc_sl = "#00cc66" if dp_sl >= 0 else "#ff4d4d"
-        ar_sl = "↑" if dp_sl >= 0 else "↓"
-        d_sl_btc = f"<div style='margin-top:4px;'><span style='color:{dc_sl}; font-size:0.85rem; background-color:{dc_sl}20; padding:2px 6px; border-radius:4px;'>{ar_sl} {abs(dp_sl):.2f}%</span></div>"
-
-        def _kpi_sl(col, title, val, prev, thresh=None):
-            diff = val - prev
-            dc = "#00cc66" if diff >= 0 else "#ff4d4d"
-            ar = "↑" if diff >= 0 else "↓"
-            c  = ("#00cc66" if val >= thresh else "#ff4d4d") if thresh is not None else "#ffffff"
-            d  = f"<div style='margin-top:4px;'><span style='color:{dc}; font-size:0.85rem; background-color:{dc}20; padding:2px 6px; border-radius:4px;'>{ar} {abs(diff):.4f}</span></div>"
-            col.markdown(f"<div style='line-height:1.4; padding:5px 0;'><span style='color:#a3a8b8; font-size:0.95rem; font-weight:600;'>{title}</span><br><span style='color:{c}; font-size:1.4rem; font-weight:700;'>{val:.4f}</span>{d}</div>", unsafe_allow_html=True)
-
-        col_t_sl, k1_sl, k2_sl, k3_sl, k4_sl, k5_sl = st.columns([1.5, 1, 1, 1, 1, 1], vertical_alignment="center")
-        with col_t_sl:
-            st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.4rem;'>MVRV Signal Lab<br><span style='font-size: 1rem; color: #d1d4dc;'>B5 Cross + LTH/STH Ratio</span></h3></div>", unsafe_allow_html=True)
-        with k1_sl:
-            st.markdown(f"<div style='line-height:1.4; padding:5px 0;'><span style='color:#f7931a; font-size:0.95rem; font-weight:600;'>BTC Price</span><br><span style='color:#f7931a; font-size:1.4rem; font-weight:700;'>${btc_sl:,.2f}</span>{d_sl_btc}</div>", unsafe_allow_html=True)
-        _kpi_sl(k2_sl, "STH MVRV",     sth_now,    sth_prev,    1.0)
-        _kpi_sl(k3_sl, "LTH MVRV",     lth_now,    lth_prev,    1.0)
-        _kpi_sl(k4_sl, "LTH/STH Ratio",ratio_now,  ratio_prev,  1.0)
-        _kpi_sl(k5_sl, "STH vs SMA30", gap_now,    gap_prev,    0.0)
-
-        st.markdown("---")
-
-        # Controls row
-        col_fs_sl, col_sa, col_sb, col_sc, col_b5f, col_rg_sl, col_cd_sl = st.columns(
-            [1, 0.7, 0.7, 0.7, 0.9, 5, 1], vertical_alignment="bottom", gap="small"
+    with col_left:
+        st.markdown("**📝 Signal Rules**")
+        code_input = st.text_area(
+            "Signal code",
+            value=st.session_state.bt_code,
+            height=340,
+            label_visibility="collapsed",
+            key="bt_code_input",
+            help="Assign boolean Series ke variabel 'buy' dan 'sell'"
         )
-        with col_fs_sl: focus_sl = st.toggle("Full Screen", key="tg_sl")
-        with col_sa:    sma_a = st.number_input("SMA A", min_value=2, max_value=200, value=st.session_state.sl_sma_a, key="sl_in_a")
-        with col_sb:    sma_b = st.number_input("SMA B", min_value=2, max_value=200, value=st.session_state.sl_sma_b, key="sl_in_b")
-        with col_sc:    sma_c = st.number_input("SMA C", min_value=2, max_value=200, value=st.session_state.sl_sma_c, key="sl_in_c")
-        with col_b5f:   b5_thr = st.number_input("B5 STH<", min_value=0.5, max_value=2.0, value=float(st.session_state.sl_b5_thresh), step=0.05, format="%.2f", key="sl_in_b5")
-        with col_rg_sl:
-            c_idx_sl = t_opts.index(st.session_state.tr_sl) if st.session_state.tr_sl in t_opts else 5
-            st.session_state.tr_sl = st.radio("Range:", t_opts, index=c_idx_sl, horizontal=True, label_visibility="collapsed", key="rg_sl")
-        with col_cd_sl:
-            if st.session_state.tr_sl == "Custom":
-                st.session_state.cd_sl = st.number_input("Days back", min_value=7, value=st.session_state.cd_sl, label_visibility="collapsed", key="cdin_sl")
+        st.session_state.bt_code = code_input
 
-        st.session_state.sl_sma_a = sma_a
-        st.session_state.sl_sma_b = sma_b
-        st.session_state.sl_sma_c = sma_c
-        st.session_state.sl_b5_thresh = b5_thr
+        col_cap, col_run = st.columns([1, 1], gap="small")
+        with col_cap:
+            capital = st.number_input("Modal awal (USD)", min_value=100.0, value=st.session_state.bt_capital, step=1000.0, key="bt_capital_input")
+            st.session_state.bt_capital = capital
+        with col_run:
+            st.markdown("<div style='height:28px'></div>", unsafe_allow_html=True)
+            run_bt = st.button("▶ Run Backtest", type="primary", use_container_width=True)
 
-        # Compute all derived columns on full dataset
-        df_sl_full['LTH/STH Ratio'] = df_sl_full['LTH MVRV'] / df_sl_full['STH MVRV'].replace(0, float('nan'))
-        sma_col_a = f'MVRV SMA{sma_a}'
-        sma_col_b = f'MVRV SMA{sma_b}'
-        sma_col_c = f'MVRV SMA{sma_c}'
-        df_sl_full[sma_col_a] = df_sl_full['MVRV'].rolling(sma_a, min_periods=1).mean()
-        df_sl_full[sma_col_b] = df_sl_full['MVRV'].rolling(sma_b, min_periods=1).mean()
-        df_sl_full[sma_col_c] = df_sl_full['MVRV'].rolling(sma_c, min_periods=1).mean()
-        df_sl_full['Date_str'] = df_sl_full['Date'].dt.strftime('%Y-%m-%d')
-
-        # Apply time filter for chart display only
-        t_max_sl = df_sl_full['Date'].max()
-        if   st.session_state.tr_sl == "1 Month":         t_min_sl = t_max_sl - timedelta(days=30)
-        elif st.session_state.tr_sl == "3 Months":        t_min_sl = t_max_sl - timedelta(days=90)
-        elif st.session_state.tr_sl == "6 Months":        t_min_sl = t_max_sl - timedelta(days=180)
-        elif st.session_state.tr_sl == "1 Year":          t_min_sl = t_max_sl - timedelta(days=365)
-        elif st.session_state.tr_sl == "4 Years (Cycle)": t_min_sl = t_max_sl - timedelta(days=365*4)
-        elif st.session_state.tr_sl == "Custom":          t_min_sl = t_max_sl - timedelta(days=st.session_state.cd_sl)
-        else:                                              t_min_sl = df_sl_full['Date'].min()
-        df_sl = df_sl_full[df_sl_full['Date'] >= t_min_sl].copy()
-
-        # Historical event markers from KB (only shown if date is within chart range)
-        _EVENTS = [
-            ("2018-12-14", "Bear Bot '18",  "belowBar", "arrowUp",   "#00cc66"),
-            ("2019-01-30", "BB Window",     "belowBar", "arrowUp",   "#00cc66"),
-            ("2019-03-21", "Pre-Det '19",   "belowBar", "arrowUp",   "#4da6ff"),
-            ("2019-04-25", "SoB '19",       "belowBar", "circle",    "#00ff88"),
-            ("2021-11-09", "Peak '21",      "aboveBar", "arrowDown", "#ff4d4d"),
-            ("2021-11-30", "LH '21",        "aboveBar", "arrowDown", "#ff9933"),
-            ("2022-11-08", "FTX Bot",       "belowBar", "arrowUp",   "#00cc66"),
-            ("2022-11-21", "Bear Bot '22",  "belowBar", "arrowUp",   "#00cc66"),
-            ("2023-01-10", "Pre-Det '23",   "belowBar", "arrowUp",   "#4da6ff"),
-            ("2023-02-10", "SoB '23",       "belowBar", "circle",    "#00ff88"),
-            ("2025-10-05", "Peak '25",      "aboveBar", "arrowDown", "#ff4d4d"),
-            ("2025-10-26", "LH '25",        "aboveBar", "arrowDown", "#ff9933"),
-        ]
-        _date_set = set(df_sl['Date_str'].tolist())
-        _markers  = sorted(
-            [{"time": d, "position": pos, "color": col, "shape": shp, "text": lbl, "size": 1}
-             for d, lbl, pos, shp, col in _EVENTS if d in _date_set],
-            key=lambda x: x["time"]
+    with col_right:
+        st.markdown("**📋 Kolom tersedia**")
+        avail_cols = [c for c in df_eng.columns if c not in ['Date','Date_str']]
+        st.markdown(
+            "<div style='background:#1a1d24; border-radius:8px; padding:10px 14px; font-size:0.78rem; color:#a3a8b8; line-height:1.9; max-height:380px; overflow-y:auto;'>"
+            + "<br>".join(f"<code style='color:#a855f7'>{c}</code>" for c in avail_cols)
+            + "</div>",
+            unsafe_allow_html=True
         )
 
-        # Helper constant columns for chart reference lines
-        df_sl['_1.0']  = 1.0
-        df_sl['_3.0']  = 3.0
-        df_sl['_1.0b'] = 1.0
-        df_sl['_b5']   = b5_thr
+    # ── RUN ENGINE ──
+    if run_bt:
+        st.session_state.bt_result = None
+        with st.spinner("Menghitung sinyal & simulasi..."):
+            try:
+                df = df_eng.copy().sort_values('Date').reset_index(drop=True)
 
-        h_total_sl = 1000 if focus_sl else 800
-        h_top_sl   = int(h_total_sl * 0.33)
-        h_bot_sl   = h_total_sl - h_top_sl
+                # Jalankan user code dalam namespace terbatas
+                local_ns = {"df": df, "pd": pd, "np": __import__("numpy")}
+                try:
+                    import pandas_ta as _pta
+                    local_ns["ta"] = _pta
+                except ImportError:
+                    pass
+                exec(compile(code_input, "<bt_signal>", "exec"), local_ns)
 
-        _BASE_SL = {
-            "layout":    {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}},
-            "grid":      {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}},
-            "crosshair": {"mode": 0},
-            "rightPriceScale": {"visible": True},
-            "leftPriceScale":  {"visible": False},
-        }
+                buy_sig  = local_ns.get("buy")
+                sell_sig = local_ns.get("sell")
 
-        # ── CHART 1: BTC Price + LTH/STH Ratio ──────────────────────────────────
-        st.markdown("<span style='color:#a3a8b8; font-size:0.82rem; font-weight:600;'>CHART 1 — LTH/STH Ratio Lifecycle</span>", unsafe_allow_html=True)
-        renderLightweightCharts([
-            {
-                "chart": {**_BASE_SL, "height": h_top_sl, "timeScale": {"borderVisible": False, "ticksVisible": False, "visible": True}},
-                "series": [{"type": "Line", "data": get_s(df_sl, 'BTC Price'), "markers": _markers,
-                            "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}],
-            },
-            {
-                "chart": {**_BASE_SL, "height": h_bot_sl},
-                "series": [
-                    {"type": 'Line', "data": get_s(df_sl, 'LTH/STH Ratio'),
-                     "options": {"color": '#a855f7', "lineWidth": 1.5, "priceScaleId": 'right', "title": 'LTH/STH Ratio'}},
-                    {"type": 'Line', "data": get_s(df_sl, '_1.0'),
-                     "options": {"color": 'rgba(255,255,255,0.25)', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'right', "title": '1.0 — Bear Bottom Zone'}},
-                    {"type": 'Line', "data": get_s(df_sl, '_3.0'),
-                     "options": {"color": 'rgba(255,77,77,0.25)', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'right', "title": '3.0 — Late Bull Zone'}},
-                ],
-            },
-        ], 'chart_sl_1')
-
-        st.markdown("<br>", unsafe_allow_html=True)
-
-        # ── CHART 2: BTC Price + STH MVRV + 3 custom SMA lines (Rule B5) ────────
-        st.markdown(f"<span style='color:#a3a8b8; font-size:0.82rem; font-weight:600;'>CHART 2 — Rule B5: STH MVRV vs MVRV SMA {sma_a} / {sma_b} / {sma_c}</span>", unsafe_allow_html=True)
-        renderLightweightCharts([
-            {
-                "chart": {**_BASE_SL, "height": h_top_sl, "timeScale": {"borderVisible": False, "ticksVisible": False, "visible": True}},
-                "series": [{"type": "Line", "data": get_s(df_sl, 'BTC Price'), "markers": _markers,
-                            "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}],
-            },
-            {
-                "chart": {**_BASE_SL, "height": h_bot_sl},
-                "series": [
-                    {"type": 'Line', "data": get_s(df_sl, 'STH MVRV'),
-                     "options": {"color": '#ff4d4d', "lineWidth": 2, "priceScaleId": 'right', "title": 'STH MVRV'}},
-                    {"type": 'Line', "data": get_s(df_sl, sma_col_a),
-                     "options": {"color": '#4da6ff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'right', "title": f'MVRV SMA{sma_a}'}},
-                    {"type": 'Line', "data": get_s(df_sl, sma_col_b),
-                     "options": {"color": '#00cc66', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'right', "title": f'MVRV SMA{sma_b}'}},
-                    {"type": 'Line', "data": get_s(df_sl, sma_col_c),
-                     "options": {"color": '#ffe119', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'right', "title": f'MVRV SMA{sma_c}'}},
-                    {"type": 'Line', "data": get_s(df_sl, '_1.0b'),
-                     "options": {"color": 'rgba(255,255,255,0.25)', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'right', "title": '1.0'}},
-                    {"type": 'Line', "data": get_s(df_sl, '_b5'),
-                     "options": {"color": 'rgba(255,170,0,0.4)', "lineWidth": 1, "lineStyle": 3, "priceScaleId": 'right', "title": f'B5 filter ({b5_thr:.2f})'}},
-                ],
-            },
-        ], 'chart_sl_2')
-
-        st.markdown("<br>", unsafe_allow_html=True)
-
-        # ── B5 SIGNAL SCAN TABLE ─────────────────────────────────────────────────
-        st.markdown(f"**B5 Signal Log** — STH MVRV cross above MVRV SMA{sma_b}  |  filter: STH < {b5_thr:.2f}")
-
-        # Scan on full (unfiltered) dataset so forward returns can be computed
-        _sth  = df_sl_full['STH MVRV']
-        _sref = df_sl_full[sma_col_b]
-        _cross_up = (_sth > _sref) & (_sth.shift(1) <= _sref.shift(1)) & (_sth < b5_thr)
-        cross_rows = df_sl_full[_cross_up].copy()
-
-        if cross_rows.empty:
-            st.info(f"Tidak ada B5 crossing ditemukan pada SMA{sma_b} dengan filter STH < {b5_thr:.2f}.")
-        else:
-            cross_list = cross_rows.reset_index()  # original df_sl_full index preserved in 'index' col
-
-            # Classify ALERT / CONFIRM (pairs within 90 days = same bear recovery event)
-            types = []
-            prev_d_c  = None
-            pair_num  = 0
-            in_pair   = False
-            for _, r in cross_list.iterrows():
-                d = r['Date']
-                if prev_d_c is None or (d - prev_d_c).days > 90:
-                    pair_num += 1
-                    types.append(f"#{pair_num} ALERT")
-                    in_pair = True
-                elif in_pair:
-                    types.append(f"#{pair_num} CONFIRM")
-                    in_pair = False
+                if buy_sig is None or sell_sig is None:
+                    st.error("❌ Variabel `buy` atau `sell` tidak ditemukan. Pastikan keduanya di-assign di code.")
                 else:
-                    pair_num += 1
-                    types.append(f"#{pair_num} ALERT")
-                    in_pair = True
-                prev_d_c = d
-            cross_list['Type'] = types
+                    buy_sig  = buy_sig.fillna(False).astype(bool)
+                    sell_sig = sell_sig.fillna(False).astype(bool)
 
-            # Forward returns (index-based lookup on df_sl_full)
-            rows_out = []
-            for _, r in cross_list.iterrows():
-                orig_idx = r['index']
-                ep = r['BTC Price']
+                    # ── Simulasi posisi: 100% masuk saat buy, keluar saat sell ──
+                    trades = []
+                    in_trade = False
+                    entry_date = entry_price = None
 
-                def fwd(n, _idx=orig_idx, _ep=ep):
-                    fi = _idx + n
-                    if fi >= len(df_sl_full) or _ep <= 0: return None
-                    return (df_sl_full.loc[fi, 'BTC Price'] - _ep) / _ep * 100
+                    for i, row in df.iterrows():
+                        price = row['BTC Price']
+                        if pd.isna(price): continue
+                        if not in_trade and buy_sig.iloc[i]:
+                            in_trade = True
+                            entry_date  = row['Date']
+                            entry_price = price
+                        elif in_trade and sell_sig.iloc[i]:
+                            pnl_pct = (price - entry_price) / entry_price * 100
+                            hold_days = (row['Date'] - entry_date).days
+                            trades.append({
+                                'Entry Date':  entry_date,
+                                'Exit Date':   row['Date'],
+                                'Entry Price': entry_price,
+                                'Exit Price':  price,
+                                'PnL %':       pnl_pct,
+                                'Hold Days':   hold_days,
+                            })
+                            in_trade = False
 
-                r7, r30, r90 = fwd(7), fwd(30), fwd(90)
-                rows_out.append({
-                    'Tanggal':       r['Date'].strftime('%Y-%m-%d'),
-                    'BTC Price':     f"${ep:,.0f}",
-                    'STH MVRV':      f"{r['STH MVRV']:.4f}",
-                    f'SMA{sma_b}':   f"{r[sma_col_b]:.4f}",
-                    'Type':          r['Type'],
-                    '7d %':          f"{r7:+.1f}%" if r7 is not None else "—",
-                    '30d %':         f"{r30:+.1f}%" if r30 is not None else "—",
-                    '90d %':         f"{r90:+.1f}%" if r90 is not None else "—",
-                })
+                    if not trades:
+                        st.warning("⚠️ Tidak ada trade yang terbentuk. Coba periksa logika sinyal atau perluas time range data.")
+                    else:
+                        tr_df = pd.DataFrame(trades)
 
-            st.dataframe(pd.DataFrame(rows_out), use_container_width=True, hide_index=True)
+                        # ── Equity curve ──
+                        equity = [capital]
+                        for _, t in tr_df.iterrows():
+                            equity.append(equity[-1] * (1 + t['PnL %'] / 100))
+                        tr_df['Equity'] = equity[1:]
 
-            def _pos_rate(col):
-                vals = [r[col] for r in rows_out if r[col] != "—"]
-                if not vals: return "—"
-                pos = sum(1 for v in vals if float(v.replace('%','').replace('+','')) > 0)
-                return f"{pos}/{len(vals)}"
+                        # ── Metrics ──
+                        total_return  = (equity[-1] - capital) / capital * 100
+                        winrate       = (tr_df['PnL %'] > 0).mean() * 100
+                        avg_win       = tr_df.loc[tr_df['PnL %'] > 0, 'PnL %'].mean() if (tr_df['PnL %'] > 0).any() else 0
+                        avg_loss      = tr_df.loc[tr_df['PnL %'] <= 0, 'PnL %'].mean() if (tr_df['PnL %'] <= 0).any() else 0
+                        rr_ratio      = abs(avg_win / avg_loss) if avg_loss != 0 else float('inf')
+                        avg_hold      = tr_df['Hold Days'].mean()
+                        n_trades      = len(tr_df)
+                        peak          = pd.Series(equity).cummax()
+                        drawdown      = ((pd.Series(equity) - peak) / peak * 100)
+                        max_dd        = drawdown.min()
+                        final_equity  = equity[-1]
 
-            sc1, sc2, sc3, sc4 = st.columns(4)
-            sc1.metric("Total Crossings",   len(cross_list))
-            sc2.metric("7d Positive",        _pos_rate('7d %'))
-            sc3.metric("30d Positive",       _pos_rate('30d %'))
-            sc4.metric("90d Positive",       _pos_rate('90d %'))
+                        st.session_state.bt_result = {
+                            'tr_df': tr_df, 'equity': equity,
+                            'total_return': total_return, 'winrate': winrate,
+                            'avg_win': avg_win, 'avg_loss': avg_loss, 'rr_ratio': rr_ratio,
+                            'avg_hold': avg_hold, 'n_trades': n_trades,
+                            'max_dd': max_dd, 'final_equity': final_equity,
+                            'buy_sig': buy_sig, 'sell_sig': sell_sig,
+                        }
+
+            except Exception as e:
+                st.error(f"❌ Error saat eksekusi:\n```\n{traceback.format_exc()}\n```")
+
+    # ── TAMPILKAN HASIL ──
+    if st.session_state.bt_result:
+        r = st.session_state.bt_result
+        st.markdown("---")
+        st.markdown("### 📊 Hasil Backtest")
+
+        # KPI metrics
+        mc1, mc2, mc3, mc4, mc5, mc6 = st.columns(6)
+        def kpi_card(col, label, value, color="#ffffff", suffix=""):
+            col.markdown(
+                f"<div style='background:#1a1d24; border-radius:10px; padding:12px 10px; text-align:center;'>"
+                f"<div style='font-size:0.75rem; color:#a3a8b8; margin-bottom:4px;'>{label}</div>"
+                f"<div style='font-size:1.3rem; font-weight:700; color:{color};'>{value}{suffix}</div>"
+                f"</div>",
+                unsafe_allow_html=True
+            )
+        kpi_card(mc1, "Total Return",  f"{r['total_return']:+.1f}", "#00cc66" if r['total_return'] >= 0 else "#ff4d4d", "%")
+        kpi_card(mc2, "Win Rate",       f"{r['winrate']:.1f}",      "#4da6ff", "%")
+        kpi_card(mc3, "Max Drawdown",  f"{r['max_dd']:.1f}",        "#ff4d4d", "%")
+        kpi_card(mc4, "Jumlah Trade",  f"{r['n_trades']}",          "#ffffff")
+        kpi_card(mc5, "Avg Hold",      f"{r['avg_hold']:.0f}",      "#a3a8b8", " hari")
+        kpi_card(mc6, "Risk/Reward",   f"{r['rr_ratio']:.2f}",      "#ffe119", "x")
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        col_eq, col_tr = st.columns([1.2, 1], gap="large")
+
+        with col_eq:
+            st.markdown("**📈 Equity Curve**")
+            eq_dates = [capital] + r['equity'][1:]
+            tr_df = r['tr_df']
+            eq_data = [{"time": tr_df.iloc[i]['Exit Date'].strftime('%Y-%m-%d'), "value": round(r['equity'][i+1], 2)} for i in range(len(tr_df))]
+            chart_eq = {
+                "layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}},
+                "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}},
+                "height": 280,
+                "rightPriceScale": {"visible": True},
+                "leftPriceScale": {"visible": False},
+                "crosshair": {"mode": 0},
+            }
+            series_eq = [{"type": "Area", "data": eq_data, "options": {
+                "lineColor": "#a855f7", "topColor": "rgba(168,85,247,0.3)",
+                "bottomColor": "rgba(168,85,247,0.0)", "lineWidth": 2,
+                "priceScaleId": "right", "title": "Equity"
+            }}]
+            renderLightweightCharts([{"chart": chart_eq, "series": series_eq}], 'chart_equity')
+
+        with col_tr:
+            st.markdown("**📋 Trade Log**")
+            display_df = tr_df[['Entry Date','Exit Date','Entry Price','Exit Price','PnL %','Hold Days']].copy()
+            display_df['Entry Date'] = display_df['Entry Date'].dt.strftime('%Y-%m-%d')
+            display_df['Exit Date']  = display_df['Exit Date'].dt.strftime('%Y-%m-%d')
+            display_df['Entry Price'] = display_df['Entry Price'].apply(lambda x: f"${x:,.0f}")
+            display_df['Exit Price']  = display_df['Exit Price'].apply(lambda x: f"${x:,.0f}")
+            display_df['PnL %'] = display_df['PnL %'].apply(lambda x: f"{x:+.2f}%")
+            st.dataframe(
+                display_df.rename(columns={'Entry Date':'Entry','Exit Date':'Exit','Entry Price':'Buy','Exit Price':'Sell','Hold Days':'Days'}),
+                use_container_width=True, height=280,
+                hide_index=True
+            )
+
+        # Win/Loss summary
+        st.markdown("<br>", unsafe_allow_html=True)
+        wl1, wl2, wl3 = st.columns(3)
+        wl1.metric("Avg Win", f"{r['avg_win']:+.2f}%")
+        wl2.metric("Avg Loss", f"{r['avg_loss']:+.2f}%")
+        wl3.metric("Final Equity", f"${r['final_equity']:,.0f}")
