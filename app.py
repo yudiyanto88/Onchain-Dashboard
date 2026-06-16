@@ -1709,23 +1709,21 @@ elif selected_menu == "MVRV Signal Lab":
             "leftPriceScale":  {"visible": False},
         }
 
-        # ── CHART 1: BTC Price + LTH/STH Ratio ──────────────────────────────────
+        # ── CHART 1: BTC Price + LTH/STH Ratio (single pane, dual axis) ──────────
         st.markdown("<span style='color:#a3a8b8; font-size:0.82rem; font-weight:600;'>CHART 1 — LTH/STH Ratio Lifecycle</span>", unsafe_allow_html=True)
+        _BASE_SL_DUAL = {**_BASE_SL, "leftPriceScale": {"visible": True}}
         renderLightweightCharts([
             {
-                "chart": {**_BASE_SL, "height": h_top_sl, "timeScale": {"borderVisible": False, "ticksVisible": False, "visible": True}},
-                "series": [{"type": "Line", "data": get_s(df_sl, 'BTC Price'), "markers": _markers,
-                            "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}],
-            },
-            {
-                "chart": {**_BASE_SL, "height": h_bot_sl},
+                "chart": {**_BASE_SL_DUAL, "height": int(h_total_sl * 0.5)},
                 "series": [
+                    {"type": "Line", "data": get_s(df_sl, 'BTC Price'), "markers": _markers,
+                     "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}},
                     {"type": 'Line', "data": get_s(df_sl, 'LTH/STH Ratio'),
-                     "options": {"color": '#a855f7', "lineWidth": 1.5, "priceScaleId": 'right', "title": 'LTH/STH Ratio'}},
+                     "options": {"color": '#a855f7', "lineWidth": 1.5, "priceScaleId": 'left', "title": 'LTH/STH Ratio'}},
                     {"type": 'Line', "data": get_s(df_sl, '_1.0'),
-                     "options": {"color": 'rgba(255,255,255,0.25)', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'right', "title": '1.0 — Bear Bottom Zone'}},
+                     "options": {"color": 'rgba(255,255,255,0.25)', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": '1.0 — Bear Bottom Zone'}},
                     {"type": 'Line', "data": get_s(df_sl, '_3.0'),
-                     "options": {"color": 'rgba(255,77,77,0.25)', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'right', "title": '3.0 — Late Bull Zone'}},
+                     "options": {"color": 'rgba(255,77,77,0.25)', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": '3.0 — Late Bull Zone'}},
                 ],
             },
         ], 'chart_sl_1')
@@ -1734,14 +1732,17 @@ elif selected_menu == "MVRV Signal Lab":
 
         # ── CHART 2: BTC Price + STH MVRV + 3 custom SMA lines (Rule B5) ────────
         st.markdown(f"<span style='color:#a3a8b8; font-size:0.82rem; font-weight:600;'>CHART 2 — Rule B5: STH MVRV vs MVRV SMA {sma_a} / {sma_b} / {sma_c}</span>", unsafe_allow_html=True)
+        # minimumWidth pada kedua pane supaya lebar label harga sejajar (BTC besar, MVRV kecil)
+        _rps_wide = {"visible": True, "minimumWidth": 80}
         renderLightweightCharts([
             {
-                "chart": {**_BASE_SL, "height": h_top_sl, "timeScale": {"borderVisible": False, "ticksVisible": False, "visible": True}},
+                "chart": {**_BASE_SL, "height": h_top_sl, "rightPriceScale": _rps_wide,
+                          "timeScale": {"borderVisible": False, "ticksVisible": False, "visible": True}},
                 "series": [{"type": "Line", "data": get_s(df_sl, 'BTC Price'), "markers": _markers,
                             "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}],
             },
             {
-                "chart": {**_BASE_SL, "height": h_bot_sl},
+                "chart": {**_BASE_SL, "height": h_bot_sl, "rightPriceScale": _rps_wide},
                 "series": [
                     {"type": 'Line', "data": get_s(df_sl, 'STH MVRV'),
                      "options": {"color": '#ff4d4d', "lineWidth": 2, "priceScaleId": 'right', "title": 'STH MVRV'}},
