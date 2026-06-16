@@ -127,7 +127,7 @@ def load_data_price():
 def load_data_mvrv():
     try:
         df = pd.read_csv("data_mvrv.csv")
-        df.rename(columns={'date': 'Date', 'btc_price': 'BTC Price', 'mvrv': 'MVRV', 'sth_mvrv': 'STH MVRV', 'lth_mvrv': 'LTH MVRV'}, inplace=True)
+        df.rename(columns={'date': 'Date', 'btc_price': 'BTC Price', 'mvrv': 'MVRV', 'mvrv_ratio': 'MVRV', 'sth_mvrv': 'STH MVRV', 'lth_mvrv': 'LTH MVRV'}, inplace=True)
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
         return df.dropna(subset=['Date']).sort_values('Date').drop_duplicates(subset=['Date'], keep='last')
     except: return pd.DataFrame()
