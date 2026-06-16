@@ -1733,32 +1733,35 @@ elif selected_menu == "MVRV Signal Lab":
         # ── CHART 2: BTC Price + STH MVRV + 3 custom SMA lines (Rule B5) ────────
         st.markdown(f"<span style='color:#a3a8b8; font-size:0.82rem; font-weight:600;'>CHART 2 — Rule B5: STH MVRV vs MVRV SMA {sma_a} / {sma_b} / {sma_c}</span>", unsafe_allow_html=True)
         # minimumWidth pada kedua pane supaya lebar label harga sejajar (BTC besar, MVRV kecil)
-        _rps_wide = {"visible": True, "minimumWidth": 80}
         renderLightweightCharts([
             {
-                "chart": {**_BASE_SL, "height": h_top_sl, "rightPriceScale": _rps_wide,
+                "chart": {**_BASE_SL, "height": h_top_sl,
                           "timeScale": {"borderVisible": False, "ticksVisible": False, "visible": True}},
                 "series": [{"type": "Line", "data": get_s(df_sl, 'BTC Price'), "markers": _markers,
                             "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}],
             },
-            {
-                "chart": {**_BASE_SL, "height": h_bot_sl, "rightPriceScale": _rps_wide},
-                "series": [
-                    {"type": 'Line', "data": get_s(df_sl, 'STH MVRV'),
-                     "options": {"color": '#ff4d4d', "lineWidth": 2, "priceScaleId": 'right', "title": 'STH MVRV'}},
-                    {"type": 'Line', "data": get_s(df_sl, sma_col_a),
-                     "options": {"color": '#4da6ff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'right', "title": f'MVRV SMA{sma_a}'}},
-                    {"type": 'Line', "data": get_s(df_sl, sma_col_b),
-                     "options": {"color": '#00cc66', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'right', "title": f'MVRV SMA{sma_b}'}},
-                    {"type": 'Line', "data": get_s(df_sl, sma_col_c),
-                     "options": {"color": '#ffe119', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'right', "title": f'MVRV SMA{sma_c}'}},
-                    {"type": 'Line', "data": get_s(df_sl, '_1.0b'),
-                     "options": {"color": 'rgba(255,255,255,0.25)', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'right', "title": '1.0'}},
-                    {"type": 'Line', "data": get_s(df_sl, '_b5'),
-                     "options": {"color": 'rgba(255,170,0,0.4)', "lineWidth": 1, "lineStyle": 3, "priceScaleId": 'right', "title": f'B5 filter ({b5_thr:.2f})'}},
-                ],
-            },
-        ], 'chart_sl_2')
+        ], 'chart_sl_2_top')
+        _col_bot, _ = st.columns([0.965, 0.035])
+        with _col_bot:
+            renderLightweightCharts([
+                {
+                    "chart": {**_BASE_SL, "height": h_bot_sl},
+                    "series": [
+                        {"type": 'Line', "data": get_s(df_sl, 'STH MVRV'),
+                         "options": {"color": '#ff4d4d', "lineWidth": 2, "priceScaleId": 'right', "title": 'STH MVRV'}},
+                        {"type": 'Line', "data": get_s(df_sl, sma_col_a),
+                         "options": {"color": '#4da6ff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'right', "title": f'MVRV SMA{sma_a}'}},
+                        {"type": 'Line', "data": get_s(df_sl, sma_col_b),
+                         "options": {"color": '#00cc66', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'right', "title": f'MVRV SMA{sma_b}'}},
+                        {"type": 'Line', "data": get_s(df_sl, sma_col_c),
+                         "options": {"color": '#ffe119', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'right', "title": f'MVRV SMA{sma_c}'}},
+                        {"type": 'Line', "data": get_s(df_sl, '_1.0b'),
+                         "options": {"color": 'rgba(255,255,255,0.25)', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'right', "title": '1.0'}},
+                        {"type": 'Line', "data": get_s(df_sl, '_b5'),
+                         "options": {"color": 'rgba(255,170,0,0.4)', "lineWidth": 1, "lineStyle": 3, "priceScaleId": 'right', "title": f'B5 filter ({b5_thr:.2f})'}},
+                    ],
+                },
+            ], 'chart_sl_2_bot')
 
         st.markdown("<br>", unsafe_allow_html=True)
 
