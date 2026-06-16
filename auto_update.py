@@ -4,6 +4,19 @@ from datetime import datetime
 import numpy as np
 import os
 
+# Load event labels dari data_claude.csv — dipakai ulang di semua pipeline agar tidak hilang saat auto-update
+_df_claude = pd.read_csv("data_claude.csv") if os.path.exists("data_claude.csv") else pd.DataFrame(columns=['date','event'])
+_df_claude['date'] = pd.to_datetime(_df_claude['date'], errors='coerce').dt.strftime('%Y-%m-%d')
+_EVENT_MAP = (_df_claude[_df_claude['event'].notna() & (_df_claude['event'].str.strip() != '')]
+              .drop_duplicates('date').set_index('date')['event'])
+
+def add_events(df):
+    """Tambahkan kolom event ke dataframe berdasarkan tanggal, kolom diletakkan setelah date."""
+    df = df.copy()
+    df['event'] = df['date'].map(_EVENT_MAP).fillna('')
+    cols = ['date', 'event'] + [c for c in df.columns if c not in ('date', 'event')]
+    return df[cols]
+
 print(f"\n[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] 🚀 Memulai proses automasi On-Chain Data...")
 print("="*60)
 
@@ -53,6 +66,7 @@ if not df_price.empty and not df_tmm.empty:
     # Rename kolom API ke nama display sebelum disimpan ke CSV
     df_master_price.rename(columns={'mvrv_avg_price': 'MVRV 0σ'}, inplace=True)
 
+    df_master_price = add_events(df_master_price)
     df_master_price.to_csv("data_price_level.csv", index=False)
     print("✅ data_price_level.csv berhasil diperbarui.")
     print(df_master_price.tail(3).to_string(index=False))
@@ -92,6 +106,7 @@ for d in dfs[1:]:
 if not df_master_mom.empty:
     df_master_mom['date'] = pd.to_datetime(df_master_mom['date']).dt.strftime('%Y-%m-%d')
     df_master_mom = df_master_mom.sort_values('date').reset_index(drop=True)
+    df_master_mom = add_events(df_master_mom)
     df_master_mom.to_csv("data_momentum.csv", index=False)
     print("✅ data_momentum.csv berhasil diperbarui.")
     print(df_master_mom[['date', 'btc_price', 'sth_pl_ratio', 'lth_pl_ratio']].tail(3).to_string(index=False))
@@ -144,6 +159,7 @@ if not df_sth_lth.empty and not df_profit_loss.empty:
     df_supply = pd.merge(df_sth_lth, df_profit_loss_clean, on='date', how='outer')
     df_supply['date'] = pd.to_datetime(df_supply['date']).dt.strftime('%Y-%m-%d')
     df_supply = df_supply.sort_values('date').reset_index(drop=True)
+    df_supply = add_events(df_supply)
     df_supply.to_csv("data_supply.csv", index=False)
     print("✅ data_supply.csv berhasil diperbarui.")
     print(df_supply[['date', 'lth_supply_btc', 'sth_supply_btc']].tail(3).to_string(index=False))
@@ -166,6 +182,7 @@ if not df_mvrv.empty:
         df_mvrv_z['date'] = pd.to_datetime(df_mvrv_z['date']).dt.strftime('%Y-%m-%d')
         df_mvrv = pd.merge(df_mvrv, df_mvrv_z, on='date', how='left')
 
+    df_mvrv = add_events(df_mvrv)
     df_mvrv.to_csv("data_mvrv.csv", index=False)
     print("✅ data_mvrv.csv berhasil diperbarui.")
     print(df_mvrv.tail(3).to_string(index=False))
@@ -392,6 +409,8 @@ try:
                 df_temp['date'] = pd.to_datetime(df_temp['date'], errors='coerce').dt.strftime('%Y-%m-%d')
                 df_temp = df_temp.dropna(subset=['date']).drop_duplicates(subset=['date'], keep='last')
                 
+                # Hapus event agar tidak muncul event_x/event_y/event_z saat merge antar file
+                df_temp = df_temp.drop(columns=['event'], errors='ignore')
                 # Jika ada kolom btc_price di file pecahan, hapus agar tidak melahirkan duplikat btc_price_x / btc_price_y
                 if df_master is not None and 'btc_price' in df_temp.columns:
                     df_temp = df_temp.drop(columns=['btc_price'], errors='ignore')
@@ -409,7 +428,10 @@ try:
         # Susun tata letak urutan kolom: 'date' selalu berada di paling kiri
         cols = ['date'] + [col for col in df_master.columns if col != 'date']
         df_master = df_master[cols]
-        
+
+        # Tambahkan kembali event column (satu kali) setelah semua file digabungkan
+        df_master = add_events(df_master)
+
         # Simpan ke dalam satu file master final
         df_master.to_csv("data_master_all_metrics.csv", index=False)
         print("📊 --------------------------------------------------------")
