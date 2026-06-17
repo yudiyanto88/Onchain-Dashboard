@@ -1711,6 +1711,17 @@ elif selected_menu == "MVRV Signal Lab":
 
         # ── CHART 1: BTC Price + LTH/STH Ratio (single pane, dual axis) ──────────
         st.markdown("<span style='color:#a3a8b8; font-size:0.82rem; font-weight:600;'>CHART 1 — LTH/STH Ratio Lifecycle</span>", unsafe_allow_html=True)
+
+        def _ratio_color(v):
+            if v < 1.0:  return '#00cc66'
+            if v >= 3.0: return '#ff4d4d'
+            return '#a855f7'
+
+        ratio_hist_data = [
+            {"time": row['Date_str'], "value": row['LTH/STH Ratio'], "color": _ratio_color(row['LTH/STH Ratio'])}
+            for _, row in df_sl[['Date_str', 'LTH/STH Ratio']].dropna().iterrows()
+        ]
+
         _BASE_SL_DUAL = {**_BASE_SL, "leftPriceScale": {"visible": True}}
         renderLightweightCharts([
             {
@@ -1718,8 +1729,8 @@ elif selected_menu == "MVRV Signal Lab":
                 "series": [
                     {"type": "Line", "data": get_s(df_sl, 'BTC Price'), "markers": _markers,
                      "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}},
-                    {"type": 'Line', "data": get_s(df_sl, 'LTH/STH Ratio'),
-                     "options": {"color": '#a855f7', "lineWidth": 1.5, "priceScaleId": 'left', "title": 'LTH/STH Ratio'}},
+                    {"type": 'Histogram', "data": ratio_hist_data,
+                     "options": {"priceScaleId": 'left', "title": 'LTH/STH Ratio'}},
                     {"type": 'Line', "data": get_s(df_sl, '_1.0'),
                      "options": {"color": 'rgba(255,255,255,0.25)', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": '1.0 — Bear Bottom Zone'}},
                     {"type": 'Line', "data": get_s(df_sl, '_3.0'),
