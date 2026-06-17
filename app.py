@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 from datetime import timedelta
 from streamlit_lightweight_charts_ntf import renderLightweightCharts
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 # ==============================================================================
 # 1. PAGE CONFIGURATION, SESSION STATE & CSS
@@ -1709,70 +1711,106 @@ elif selected_menu == "MVRV Signal Lab":
             "leftPriceScale":  {"visible": False},
         }
 
-        # ── CHART 1: BTC Price + LTH/STH Ratio (single pane, dual axis) ──────────
-        st.markdown("<span style='color:#a3a8b8; font-size:0.82rem; font-weight:600;'>CHART 1 — LTH/STH Ratio Lifecycle</span>", unsafe_allow_html=True)
+        # ── PLOTLY CHART: BTC Price + Rule B5 (top) / LTH/STH Ratio histogram (bottom) ──
+        _date_price = df_sl.set_index('Date_str')['BTC Price']
+        _ev_buy  = [(d, lbl) for d, lbl, pos, shp, col in _EVENTS if pos == "belowBar"  and d in _date_set]
+        _ev_sell = [(d, lbl) for d, lbl, pos, shp, col in _EVENTS if pos == "aboveBar" and d in _date_set]
 
-        def _ratio_color(v):
-            if v < 1.0:  return '#00cc66'
-            if v >= 3.0: return '#ff4d4d'
-            return '#a855f7'
+        def _ratio_color_plotly(v):
+            if v < 1.0:  return 'rgba(0,204,102,0.40)'
+            if v >= 3.0: return 'rgba(255,77,77,0.40)'
+            return 'rgba(168,85,247,0.40)'
 
-        ratio_hist_data = [
-            {"time": row['Date_str'], "value": row['LTH/STH Ratio'], "color": _ratio_color(row['LTH/STH Ratio'])}
-            for _, row in df_sl[['Date_str', 'LTH/STH Ratio']].dropna().iterrows()
-        ]
+        _ratio_df  = df_sl[['Date_str', 'LTH/STH Ratio']].dropna()
+        _x0, _x1   = df_sl['Date_str'].iloc[0], df_sl['Date_str'].iloc[-1]
 
-        _BASE_SL_DUAL = {**_BASE_SL, "leftPriceScale": {"visible": True}}
-        renderLightweightCharts([
-            {
-                "chart": {**_BASE_SL_DUAL, "height": int(h_total_sl * 0.5)},
-                "series": [
-                    {"type": "Line", "data": get_s(df_sl, 'BTC Price'), "markers": _markers,
-                     "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}},
-                    {"type": 'Histogram', "data": ratio_hist_data,
-                     "options": {"priceScaleId": 'left', "title": 'LTH/STH Ratio'}},
-                    {"type": 'Line', "data": get_s(df_sl, '_1.0'),
-                     "options": {"color": 'rgba(255,255,255,0.25)', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": '1.0 — Bear Bottom Zone'}},
-                    {"type": 'Line', "data": get_s(df_sl, '_3.0'),
-                     "options": {"color": 'rgba(255,77,77,0.25)', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": '3.0 — Late Bull Zone'}},
-                ],
-            },
-        ], 'chart_sl_1')
+        fig_sl = make_subplots(
+            rows=2, cols=1,
+            shared_xaxes=True,
+            specs=[[{"secondary_y": True}], [{"secondary_y": False}]],
+            row_heights=[0.62, 0.38],
+            vertical_spacing=0.02,
+        )
 
-        st.markdown("<br>", unsafe_allow_html=True)
+        # Row 1 — BTC Price (left axis)
+        fig_sl.add_trace(go.Scatter(
+            x=df_sl['Date_str'], y=df_sl['BTC Price'],
+            name='BTC Price', line=dict(color='#f7931a', width=2),
+            hovertemplate='$%{y:,.0f}<extra>BTC</extra>',
+        ), row=1, col=1, secondary_y=False)
 
-        # ── CHART 2: BTC Price + STH MVRV + 3 custom SMA lines (Rule B5) ────────
-        st.markdown(f"<span style='color:#a3a8b8; font-size:0.82rem; font-weight:600;'>CHART 2 — Rule B5: STH MVRV vs MVRV SMA {sma_a} / {sma_b} / {sma_c}</span>", unsafe_allow_html=True)
-        # minimumWidth pada kedua pane supaya lebar label harga sejajar (BTC besar, MVRV kecil)
-        renderLightweightCharts([
-            {
-                "chart": {**_BASE_SL, "height": h_top_sl,
-                          "timeScale": {"borderVisible": False, "ticksVisible": False, "visible": True}},
-                "series": [{"type": "Line", "data": get_s(df_sl, 'BTC Price'), "markers": _markers,
-                            "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}],
-            },
-        ], 'chart_sl_2_top')
-        _col_bot, _ = st.columns([0.965, 0.035])
-        with _col_bot:
-            renderLightweightCharts([
-                {
-                    "chart": {**_BASE_SL, "height": h_bot_sl},
-                    "series": [
-                        {"type": 'Line', "data": get_s(df_sl, 'STH MVRV'),
-                         "options": {"color": '#ff4d4d', "lineWidth": 2, "priceScaleId": 'right', "title": 'STH MVRV'}},
-                        {"type": 'Line', "data": get_s(df_sl, sma_col_a),
-                         "options": {"color": '#4da6ff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'right', "title": f'MVRV SMA{sma_a}'}},
-                        {"type": 'Line', "data": get_s(df_sl, sma_col_b),
-                         "options": {"color": '#00cc66', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'right', "title": f'MVRV SMA{sma_b}'}},
-                        {"type": 'Line', "data": get_s(df_sl, sma_col_c),
-                         "options": {"color": '#ffe119', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'right', "title": f'MVRV SMA{sma_c}'}},
-                        {"type": 'Line', "data": get_s(df_sl, '_1.0b'),
-                         "options": {"color": 'rgba(255,255,255,0.25)', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'right', "title": '1.0'}},
-                        {"type": 'Line', "data": get_s(df_sl, '_b5'),
-                         "options": {"color": 'rgba(255,170,0,0.4)', "lineWidth": 1, "lineStyle": 3, "priceScaleId": 'right', "title": f'B5 filter ({b5_thr:.2f})'}},
-                    ],
-                },
-            ], 'chart_sl_2_bot')
+        # Event markers on BTC Price
+        if _ev_buy:
+            fig_sl.add_trace(go.Scatter(
+                x=[d for d, _ in _ev_buy], y=[_date_price.get(d) for d, _ in _ev_buy],
+                text=[lbl for _, lbl in _ev_buy], mode='markers+text',
+                textposition='bottom center', textfont=dict(size=8, color='#00cc66'),
+                marker=dict(symbol='triangle-up', size=9, color='#00cc66'),
+                showlegend=False, hovertemplate='%{text}<extra></extra>',
+            ), row=1, col=1, secondary_y=False)
+        if _ev_sell:
+            fig_sl.add_trace(go.Scatter(
+                x=[d for d, _ in _ev_sell], y=[_date_price.get(d) for d, _ in _ev_sell],
+                text=[lbl for _, lbl in _ev_sell], mode='markers+text',
+                textposition='top center', textfont=dict(size=8, color='#ff9933'),
+                marker=dict(symbol='triangle-down', size=9, color='#ff9933'),
+                showlegend=False, hovertemplate='%{text}<extra></extra>',
+            ), row=1, col=1, secondary_y=False)
+
+        # Row 1 — STH MVRV + SMAs + reference lines (right axis)
+        fig_sl.add_trace(go.Scatter(
+            x=df_sl['Date_str'], y=df_sl['STH MVRV'],
+            name='STH MVRV', line=dict(color='#ff4d4d', width=2),
+            hovertemplate='%{y:.4f}<extra>STH MVRV</extra>',
+        ), row=1, col=1, secondary_y=True)
+        for col_name, color, label in [
+            (sma_col_a, '#4da6ff', f'SMA{sma_a}'),
+            (sma_col_b, '#00cc66', f'SMA{sma_b}'),
+            (sma_col_c, '#ffe119', f'SMA{sma_c}'),
+        ]:
+            fig_sl.add_trace(go.Scatter(
+                x=df_sl['Date_str'], y=df_sl[col_name],
+                name=label, line=dict(color=color, width=1, dash='dot'),
+                hovertemplate='%{y:.4f}<extra>' + label + '</extra>',
+            ), row=1, col=1, secondary_y=True)
+        for ref_y, ref_c in [(1.0, 'rgba(255,255,255,0.18)'), (b5_thr, 'rgba(255,170,0,0.28)')]:
+            fig_sl.add_trace(go.Scatter(
+                x=[_x0, _x1], y=[ref_y, ref_y],
+                line=dict(color=ref_c, width=1, dash='dash'),
+                showlegend=False, hoverinfo='skip', mode='lines',
+            ), row=1, col=1, secondary_y=True)
+
+        # Row 2 — LTH/STH Ratio histogram
+        fig_sl.add_trace(go.Bar(
+            x=_ratio_df['Date_str'], y=_ratio_df['LTH/STH Ratio'],
+            marker_color=[_ratio_color_plotly(v) for v in _ratio_df['LTH/STH Ratio']],
+            marker_line_width=0, name='LTH/STH Ratio',
+            hovertemplate='%{y:.3f}<extra>LTH/STH</extra>',
+        ), row=2, col=1)
+        for ref_y, ref_c in [(1.0, 'rgba(255,255,255,0.18)'), (3.0, 'rgba(255,77,77,0.18)')]:
+            fig_sl.add_trace(go.Scatter(
+                x=[_x0, _x1], y=[ref_y, ref_y],
+                line=dict(color=ref_c, width=1, dash='dash'),
+                showlegend=False, hoverinfo='skip', mode='lines',
+            ), row=2, col=1)
+
+        _h_plotly = 1000 if focus_sl else 750
+        fig_sl.update_layout(
+            height=_h_plotly,
+            paper_bgcolor='#131722', plot_bgcolor='#131722',
+            font=dict(color='#d1d4dc', size=11),
+            legend=dict(orientation='h', yanchor='bottom', y=1.01, xanchor='left', x=0,
+                        bgcolor='rgba(0,0,0,0)', bordercolor='rgba(0,0,0,0)', font=dict(size=10)),
+            margin=dict(l=10, r=10, t=30, b=10),
+            hovermode='x unified', barmode='overlay',
+        )
+        fig_sl.update_xaxes(showgrid=True, gridcolor='rgba(42,46,57,0.4)', zeroline=False)
+        fig_sl.update_yaxes(showgrid=True, gridcolor='rgba(42,46,57,0.4)', zeroline=False)
+        fig_sl.update_yaxes(title_text='BTC Price ($)', secondary_y=False, row=1, col=1, tickformat='$,.0f')
+        fig_sl.update_yaxes(title_text='MVRV', secondary_y=True, row=1, col=1, showgrid=False)
+        fig_sl.update_yaxes(title_text='LTH/STH Ratio', row=2, col=1)
+
+        st.plotly_chart(fig_sl, use_container_width=True)
 
         st.markdown("<br>", unsafe_allow_html=True)
 
@@ -1847,3 +1885,4 @@ elif selected_menu == "MVRV Signal Lab":
             sc2.metric("7d Positive",        _pos_rate('7d %'))
             sc3.metric("30d Positive",       _pos_rate('30d %'))
             sc4.metric("90d Positive",       _pos_rate('90d %'))
+
