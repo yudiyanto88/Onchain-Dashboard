@@ -223,7 +223,7 @@ def load_data_cum():
 def load_data_lth_flow():
     try:
         df = pd.read_csv("data_lth_flow.csv")
-        df.rename(columns={'date': 'Date', 'lth_pl_price': 'LTH P/L Price', 'lth_pl_flow_btc': 'LTH P/L Flow'}, inplace=True)
+        df.rename(columns={'date': 'Date', 'lth_pl_price': 'LTH Cum P/L Price', 'lth_pl_flow_btc': 'LTH P/L Flow'}, inplace=True)
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
         return df.dropna(subset=['Date']).sort_values('Date').drop_duplicates(subset=['Date'], keep='last')
     except: return pd.DataFrame()
@@ -247,7 +247,7 @@ if not df_cum_raw.empty:
 
 if df_lth_flow_raw is not None and not df_lth_flow_raw.empty:
     if df_price_raw is not None and not df_price_raw.empty:
-        df_price_raw = pd.merge(df_price_raw, df_lth_flow_raw[['Date', 'LTH P/L Price']], on='Date', how='left')
+        df_price_raw = pd.merge(df_price_raw, df_lth_flow_raw[['Date', 'LTH Cum P/L Price']], on='Date', how='left')
     if df_mom_raw is not None and not df_mom_raw.empty:
         df_mom_raw = pd.merge(df_mom_raw, df_lth_flow_raw[['Date', 'LTH P/L Flow']], on='Date', how='left')
 
@@ -322,7 +322,7 @@ with st.sidebar:
 # 1. Terapkan filter (HAPUS 'Cum P/L Price', TAMBAH 'Active Realized Price', 'MVRV 0σ', 'LTH P/L Price')
 if selected_menu == "Price Levels":
     if not df_price_raw.empty:
-        metrics_to_filter = ['STH Cost Basis', 'LTH Cost Basis', 'Realized Price', 'True Market Mean', 'CVDD', 'LTH P/L Price', 'Active Realized Price', 'MVRV 0σ']
+        metrics_to_filter = ['STH Cost Basis', 'LTH Cost Basis', 'Realized Price', 'True Market Mean', 'CVDD', 'LTH Cum P/L Price', 'Active Realized Price', 'MVRV 0σ']
         df_p, w_p = apply_filters(df_price_raw, st.session_state.tf_p, st.session_state.sma_p, st.session_state.cs_p, st.session_state.tr_p, st.session_state.cd_p, metrics_to_filter)
     
 
@@ -374,7 +374,7 @@ if selected_menu == "Price Levels":
             if st.session_state.tr_p == "Custom": st.session_state.cd_p = st.number_input("Days back", min_value=7, value=st.session_state.cd_p, label_visibility="collapsed", key="cdin_p")
         
         # 2. Injeksi Opsi (Buang Cum P/L Price warna coklat, masukkan metrik baru)
-        opts_p_base = ['🔴 STH Cost Basis', '🔵 LTH Cost Basis', '⚪ Realized Price', '🟣 True Market Mean', '🟢 CVDD', '🔵 LTH P/L Price', '🔴 Active Realized Price', '🟢 MVRV 0σ', '🟨 200 DMA', '🟦 50 WMA', '🟪 200 WMA']
+        opts_p_base = ['🔴 STH Cost Basis', '🔵 LTH Cost Basis', '⚪ Realized Price', '🟣 True Market Mean', '🟢 CVDD', '🔵 LTH Cum P/L Price', '🔴 Active Realized Price', '🟢 MVRV 0σ', '🟨 200 DMA', '🟦 50 WMA', '🟪 200 WMA']
         all_opts_p = opts_p_base.copy()
         if w_p > 1: all_opts_p.extend([f"{m} (SMA {w_p})" for m in opts_p_base])
             
@@ -392,8 +392,8 @@ if selected_menu == "Price Levels":
             '⚪ Realized Price': ('#ffffff', 'Realized Price', 0), 
             '🟣 True Market Mean': ('#00ffff', 'True Market Mean', 0), 
             '🟢 CVDD': ('#00cc66', 'CVDD', 0),
-            '🔵 LTH P/L Price': ('#00ffff', 'LTH P/L Price', 0),
-            '🔴 Active Realized Price': ('#fffff', 'Active Realized Price', 0),
+            '🔵 LTH Cum P/L Price': ('#00ffff', 'LTH Cum P/L Price', 0),
+            '🔴 Active Realized Price': ('#ff6666', 'Active Realized Price', 0),
             '🟢 MVRV 0σ': ('#059669', 'MVRV 0σ', 0),
             '🟨 200 DMA': ('#ffe119', '200 DMA', 2), 
             '🟦 50 WMA': ('#4363d8', '50 WMA', 2), 
