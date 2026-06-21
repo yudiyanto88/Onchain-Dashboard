@@ -63,8 +63,9 @@ for key in ['sma_p', 'sma_mv', 'sma_ms', 'sma_mpl', 'sma_nupl', 'sma_d', 'sma_ex
     if key not in st.session_state: st.session_state[key] = "0d"
 for key in ['sma_gt', 'sma_wk']:
     if key not in st.session_state: st.session_state[key] = "30d"  
-for key in ['cs_p', 'cs_mv', 'cs_ms', 'cs_mpl', 'cs_nupl', 'cs_d', 'cs_ex', 'cs_gt', 'cs_wk', 'cs_sd', 'cs_fg', 'cs_msig', 'cs_pl']:
+for key in ['cs_p', 'cs_mv', 'cs_ms', 'cs_mpl', 'cs_nupl', 'cs_d', 'cs_ex', 'cs_gt', 'cs_wk', 'cs_sd', 'cs_fg', 'cs_msig']:
     if key not in st.session_state: st.session_state[key] = 50
+if 'cs_pl' not in st.session_state: st.session_state['cs_pl'] = 0
 for key in ['mode_gt', 'mode_wk']:
     if key not in st.session_state: st.session_state[key] = "Line"
 
@@ -858,13 +859,12 @@ elif selected_menu == "Realized P/L":
         with k5: render_kpi_pl("Daily Profit BTC", last_pl.get('Daily Profit BTC', 0), prev_pl.get('Daily Profit BTC', 0), 0.0, True)
         st.markdown("---")
 
-        df_pl_f, w_pl = apply_filters(df_pl_raw, st.session_state.tf_pl, st.session_state.sma_pl, st.session_state.cs_pl, st.session_state.tr_pl, st.session_state.cd_pl, ['RPL Ratio', 'STH P/L Ratio', 'LTH P/L Ratio'])
-        col_fs_pl, col_tf_pl, col_sma_pl, col_sma_cst_pl, col_radio_pl, col_custom_pl = st.columns([1, 1.2, 1.2, 1, 6, 1.2], vertical_alignment="bottom", gap="small")
+        _sma_pl = "Custom" if st.session_state.cs_pl > 1 else "0d"
+        df_pl_f, w_pl = apply_filters(df_pl_raw, st.session_state.tf_pl, _sma_pl, st.session_state.cs_pl, st.session_state.tr_pl, st.session_state.cd_pl, ['RPL Ratio', 'STH P/L Ratio', 'LTH P/L Ratio'])
+        col_fs_pl, col_tf_pl, col_sma_pl, col_radio_pl, col_custom_pl = st.columns([1, 1.2, 1.2, 6, 1.2], vertical_alignment="bottom", gap="small")
         with col_fs_pl: focus_pl = st.toggle("Full Screen", key="tg_pl")
         with col_tf_pl: st.session_state.tf_pl = st.selectbox("Timeframe", ["Daily", "3 Days", "Weekly", "Monthly"], index=["Daily", "3 Days", "Weekly", "Monthly"].index(st.session_state.tf_pl), key="tfs_pl")
-        with col_sma_pl: st.session_state.sma_pl = st.selectbox("SMA", ["0d", "7d", "14d", "30d", "Custom"], index=["0d", "7d", "14d", "30d", "Custom"].index(st.session_state.sma_pl), key="smas_pl")
-        with col_sma_cst_pl:
-            if st.session_state.sma_pl == "Custom": st.session_state.cs_pl = st.number_input("Days", min_value=1, value=st.session_state.cs_pl, label_visibility="collapsed", key="cst_pl")
+        with col_sma_pl: st.session_state.cs_pl = st.number_input("SMA (hari, 0=off)", min_value=0, value=st.session_state.cs_pl, step=1, key="sma_num_pl")
         with col_radio_pl:
             c_idx_pl = t_opts.index(st.session_state.tr_pl) if st.session_state.tr_pl in t_opts else 5
             st.session_state.tr_pl = st.radio("Range:", t_opts, index=c_idx_pl, horizontal=True, label_visibility="collapsed", key="rg_pl")
@@ -933,7 +933,7 @@ elif selected_menu == "Realized P/L":
             with k3_4: render_kpi_pl("Relative PL", last_pl.get('Relative Realized PL', 0), prev_pl.get('Relative Realized PL', 0), 0.0)
             st.markdown("---")
 
-            df_pl_f3, w_pl3 = apply_filters(df_pl_raw, st.session_state.tf_pl, st.session_state.sma_pl, st.session_state.cs_pl, st.session_state.tr_pl, st.session_state.cd_pl, ['RRP', 'RRL', 'Relative Realized PL'])
+            df_pl_f3, w_pl3 = apply_filters(df_pl_raw, st.session_state.tf_pl, _sma_pl, st.session_state.cs_pl, st.session_state.tr_pl, st.session_state.cd_pl, ['RRP', 'RRL', 'Relative Realized PL'])
 
             opts_rrl = ['🟢 RRP', '🔴 RRL', '⚪ Relative PL']
             all_opts_rrl = opts_rrl.copy()
