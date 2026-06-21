@@ -258,6 +258,19 @@ def load_data_pl():
         return df
     except: return pd.DataFrame()
 
+@st.cache_data(ttl=3600)
+def load_data_aviv():
+    try:
+        df = pd.read_csv("data_aviv.csv")
+        df.rename(columns={
+            'date': 'Date',
+            'price_at_aviv_mean': 'AVIV Mean Price',
+            'price_at_aviv_upper_0.5sd': 'AVIV +0.5σ Price',
+        }, inplace=True)
+        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        return df.dropna(subset=['Date']).sort_values('Date').drop_duplicates(subset=['Date'], keep='last')
+    except: return pd.DataFrame()
+
 # 🟢 METRIK BARU: LTH P/L Flow Loader
 @st.cache_data(ttl=3600)
 def load_data_lth_flow():
@@ -279,6 +292,7 @@ df_supply_raw = load_data_supply()
 df_cum_raw = load_data_cum()
 df_lth_flow_raw = load_data_lth_flow()
 df_pl_raw = load_data_pl()
+df_aviv_raw = load_data_aviv()
 
 # ⚡ PROSES MERGE AMAN (Mengecek keberadaan variabel hulu terlebih dahulu)
 if not df_cum_raw.empty:
@@ -289,6 +303,10 @@ if not df_cum_raw.empty:
 if df_lth_flow_raw is not None and not df_lth_flow_raw.empty:
     if df_price_raw is not None and not df_price_raw.empty:
         df_price_raw = pd.merge(df_price_raw, df_lth_flow_raw[['Date', 'LTH Cum P/L Price']], on='Date', how='left')
+
+if df_aviv_raw is not None and not df_aviv_raw.empty:
+    if df_price_raw is not None and not df_price_raw.empty:
+        df_price_raw = pd.merge(df_price_raw, df_aviv_raw[['Date', 'AVIV Mean Price', 'AVIV +0.5σ Price']], on='Date', how='left')
     if df_mom_raw is not None and not df_mom_raw.empty:
         df_mom_raw = pd.merge(df_mom_raw, df_lth_flow_raw[['Date', 'LTH P/L Flow']], on='Date', how='left')
 
@@ -363,7 +381,7 @@ with st.sidebar:
 # 1. Terapkan filter (HAPUS 'Cum P/L Price', TAMBAH 'Active Realized Price', 'MVRV 0σ', 'LTH P/L Price')
 if selected_menu == "Price Levels":
     if not df_price_raw.empty:
-        metrics_to_filter = ['STH Cost Basis', 'LTH Cost Basis', 'Realized Price', 'True Market Mean', 'CVDD', 'LTH Cum P/L Price', 'Active Realized Price', 'MVRV 0σ']
+        metrics_to_filter = ['STH Cost Basis', 'LTH Cost Basis', 'Realized Price', 'True Market Mean', 'CVDD', 'LTH Cum P/L Price', 'Active Realized Price', 'MVRV 0σ', 'AVIV Mean Price', 'AVIV +0.5σ Price']
         df_p, w_p = apply_filters(df_price_raw, st.session_state.tf_p, st.session_state.sma_p, st.session_state.cs_p, st.session_state.tr_p, st.session_state.cd_p, metrics_to_filter)
     
 
@@ -399,6 +417,10 @@ if selected_menu == "Price Levels":
         with k3: render_kpi_p("LTH Cost Basis", last_p.get('LTH Cost Basis', 0))
         with k4: render_kpi_p("Realized Price", last_p.get('Realized Price', 0))
         with k5: render_kpi_p("True Market Mean", last_p.get('True Market Mean', 0))
+
+        col_k2a, col_k2b, col_k2c = st.columns([1.5, 1, 1])
+        with col_k2b: render_kpi_p("AVIV Mean Price", last_p.get('AVIV Mean Price', 0))
+        with col_k2c: render_kpi_p("AVIV +0.5σ Price", last_p.get('AVIV +0.5σ Price', 0))
         
         st.markdown("---")
 
@@ -415,7 +437,7 @@ if selected_menu == "Price Levels":
             if st.session_state.tr_p == "Custom": st.session_state.cd_p = st.number_input("Days back", min_value=7, value=st.session_state.cd_p, label_visibility="collapsed", key="cdin_p")
         
         # 2. Injeksi Opsi (Buang Cum P/L Price warna coklat, masukkan metrik baru)
-        opts_p_base = ['🔴 STH Cost Basis', '🔵 LTH Cost Basis', '⚪ Realized Price', '🟣 True Market Mean', '🟢 CVDD', '🔵 LTH Cum P/L Price', '🔴 Active Realized Price', '🟢 MVRV 0σ', '🟨 200 DMA', '🟦 50 WMA', '🟪 200 WMA']
+        opts_p_base = ['🔴 STH Cost Basis', '🔵 LTH Cost Basis', '⚪ Realized Price', '🟣 True Market Mean', '🟢 CVDD', '🔵 LTH Cum P/L Price', '🔴 Active Realized Price', '🟢 MVRV 0σ', '🟨 200 DMA', '🟦 50 WMA', '🟪 200 WMA', '🟠 AVIV Mean Price', '🟡 AVIV +0.5σ Price']
         all_opts_p = opts_p_base.copy()
         if w_p > 1: all_opts_p.extend([f"{m} (SMA {w_p})" for m in opts_p_base])
             
@@ -436,9 +458,11 @@ if selected_menu == "Price Levels":
             '🔵 LTH Cum P/L Price': ('#00ffff', 'LTH Cum P/L Price', 0),
             '🔴 Active Realized Price': ('#ff6666', 'Active Realized Price', 0),
             '🟢 MVRV 0σ': ('#059669', 'MVRV 0σ', 0),
-            '🟨 200 DMA': ('#ffe119', '200 DMA', 2), 
-            '🟦 50 WMA': ('#4363d8', '50 WMA', 2), 
-            '🟪 200 WMA': ('#f032e6', '200 WMA', 2)
+            '🟨 200 DMA': ('#ffe119', '200 DMA', 2),
+            '🟦 50 WMA': ('#4363d8', '50 WMA', 2),
+            '🟪 200 WMA': ('#f032e6', '200 WMA', 2),
+            '🟠 AVIV Mean Price': ('#ff9900', 'AVIV Mean Price', 0),
+            '🟡 AVIV +0.5σ Price': ('#ffdd00', 'AVIV +0.5σ Price', 0)
         }
         
         for m in active_metrics_p:
