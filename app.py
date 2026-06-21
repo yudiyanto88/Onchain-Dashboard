@@ -66,6 +66,10 @@ for key in ['sma_gt', 'sma_wk']:
 for key in ['cs_p', 'cs_mv', 'cs_ms', 'cs_mpl', 'cs_nupl', 'cs_d', 'cs_ex', 'cs_gt', 'cs_wk', 'cs_sd', 'cs_fg', 'cs_msig']:
     if key not in st.session_state: st.session_state[key] = 50
 if 'cs_pl' not in st.session_state: st.session_state['cs_pl'] = 0
+for key in ['cs_pl1', 'cs_pl2', 'cs_pl3']:
+    if key not in st.session_state: st.session_state[key] = 0
+for key in ['smooth_type_pl1', 'smooth_type_pl2', 'smooth_type_pl3']:
+    if key not in st.session_state: st.session_state[key] = "SMA"
 for key in ['mode_gt', 'mode_wk']:
     if key not in st.session_state: st.session_state[key] = "Line"
 
@@ -849,6 +853,35 @@ elif selected_menu == "Realized P/L":
         d_btc_pl = f"<div style='margin-top:4px;'><span style='color:{dc_btc_pl}; font-size:0.85rem; background-color:{dc_btc_pl}20; padding:2px 6px; border-radius:4px;'>{ar_btc_pl} {abs(dp_btc_pl):.2f}%</span></div>"
         btc_html_pl = f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:#f7931a; font-size:0.95rem; font-weight:600;'>BTC Price</span><br><span style='color:#f7931a; font-size:1.4rem; font-weight:700;'>${btc_pl:,.2f}</span>{d_btc_pl}</div>"
 
+        # ── SHARED CONTROLS (full screen, timeframe, range) ──
+        col_fs_pl, col_tf_pl, col_radio_pl, col_custom_pl = st.columns([1, 1.2, 7, 1.2], vertical_alignment="bottom", gap="small")
+        with col_fs_pl: focus_pl = st.toggle("Full Screen", key="tg_pl")
+        with col_tf_pl: st.session_state.tf_pl = st.selectbox("Timeframe", ["Daily", "3 Days", "Weekly", "Monthly"], index=["Daily", "3 Days", "Weekly", "Monthly"].index(st.session_state.tf_pl), key="tfs_pl")
+        with col_radio_pl:
+            c_idx_pl = t_opts.index(st.session_state.tr_pl) if st.session_state.tr_pl in t_opts else 5
+            st.session_state.tr_pl = st.radio("Range:", t_opts, index=c_idx_pl, horizontal=True, label_visibility="collapsed", key="rg_pl")
+        with col_custom_pl:
+            if st.session_state.tr_pl == "Custom": st.session_state.cd_pl = st.number_input("Days back", min_value=7, value=st.session_state.cd_pl, label_visibility="collapsed", key="cdin_pl")
+
+        # Base data: time-filtered + resampled only (no smoothing — tiap chart atur sendiri)
+        df_pl_base, _ = apply_filters(df_pl_raw, st.session_state.tf_pl, "0d", 0, st.session_state.tr_pl, st.session_state.cd_pl, [])
+
+        def apply_smooth_pl(df, cols, period, stype):
+            df = df.copy()
+            if period > 1:
+                for col in cols:
+                    if col in df.columns:
+                        if stype == "EMA":
+                            df[f"{col}_smooth"] = df[col].ewm(span=period, adjust=False).mean()
+                        else:
+                            df[f"{col}_smooth"] = df[col].rolling(period, min_periods=1).mean()
+            return df
+
+        def smooth_ctrl(key_period, key_type, label_suffix):
+            c1, c2, c3 = st.columns([1.2, 1, 8], gap="small")
+            with c1: st.session_state[key_period] = st.number_input(f"Period (0=off)", min_value=0, value=st.session_state[key_period], step=1, key=f"inp_{key_period}")
+            with c2: st.session_state[key_type] = st.selectbox("", ["SMA", "EMA"], index=["SMA","EMA"].index(st.session_state[key_type]), key=f"sel_{key_type}", label_visibility="collapsed")
+
         # ── CHART 1: RPL Ratio + STH/LTH P/L Ratio ──
         col_t1, k1, k2, k3, k4, k5 = st.columns([1.5, 1, 1, 1, 1, 1], vertical_alignment="center")
         with col_t1: st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.4rem;'>Realized P/L<br><span style='font-size: 1rem; color: #d1d4dc;'>Market P/L Ratios</span></h3></div>", unsafe_allow_html=True)
@@ -858,47 +891,36 @@ elif selected_menu == "Realized P/L":
         with k4: render_kpi_pl("LTH P/L Ratio", last_pl.get('LTH P/L Ratio', 0), prev_pl.get('LTH P/L Ratio', 0), 1.0)
         with k5: render_kpi_pl("Daily Profit BTC", last_pl.get('Daily Profit BTC', 0), prev_pl.get('Daily Profit BTC', 0), 0.0, True)
         st.markdown("---")
+        smooth_ctrl('cs_pl1', 'smooth_type_pl1', '1')
 
-        _sma_pl = "Custom" if st.session_state.cs_pl > 1 else "0d"
-        df_pl_f, w_pl = apply_filters(df_pl_raw, st.session_state.tf_pl, _sma_pl, st.session_state.cs_pl, st.session_state.tr_pl, st.session_state.cd_pl, ['RPL Ratio', 'STH P/L Ratio', 'LTH P/L Ratio'])
-        col_fs_pl, col_tf_pl, col_sma_pl, col_radio_pl, col_custom_pl = st.columns([1, 1.2, 1.2, 6, 1.2], vertical_alignment="bottom", gap="small")
-        with col_fs_pl: focus_pl = st.toggle("Full Screen", key="tg_pl")
-        with col_tf_pl: st.session_state.tf_pl = st.selectbox("Timeframe", ["Daily", "3 Days", "Weekly", "Monthly"], index=["Daily", "3 Days", "Weekly", "Monthly"].index(st.session_state.tf_pl), key="tfs_pl")
-        with col_sma_pl: st.session_state.cs_pl = st.number_input("SMA (hari, 0=off)", min_value=0, value=st.session_state.cs_pl, step=1, key="sma_num_pl")
-        with col_radio_pl:
-            c_idx_pl = t_opts.index(st.session_state.tr_pl) if st.session_state.tr_pl in t_opts else 5
-            st.session_state.tr_pl = st.radio("Range:", t_opts, index=c_idx_pl, horizontal=True, label_visibility="collapsed", key="rg_pl")
-        with col_custom_pl:
-            if st.session_state.tr_pl == "Custom": st.session_state.cd_pl = st.number_input("Days back", min_value=7, value=st.session_state.cd_pl, label_visibility="collapsed", key="cdin_pl")
-
-        opts_ratio = ['🟡 RPL Ratio', '🟣 STH P/L Ratio', '🟤 LTH P/L Ratio']
-        all_opts_ratio = opts_ratio.copy()
-        if w_pl > 1: all_opts_ratio.extend([f"{m} (SMA {w_pl})" for m in opts_ratio])
-        try: sel_ratio = st.pills("Ratio Metrics", all_opts_ratio, default=['🟡 RPL Ratio', '🟣 STH P/L Ratio', '🟤 LTH P/L Ratio'], selection_mode="multi", label_visibility="collapsed", key="pills_ratio")
-        except: sel_ratio = st.multiselect("Ratio Metrics", all_opts_ratio, default=['🟡 RPL Ratio', '🟣 STH P/L Ratio', '🟤 LTH P/L Ratio'], label_visibility="collapsed", key="ms_ratio")
+        p1, t1 = st.session_state.cs_pl1, st.session_state.smooth_type_pl1
+        df_c1 = apply_smooth_pl(df_pl_base, ['RPL Ratio', 'STH P/L Ratio', 'LTH P/L Ratio'], p1, t1)
+        sl1 = f"{t1} {p1}" if p1 > 1 else ""
+        opts_ratio_base = ['🟡 RPL Ratio', '🟣 STH P/L Ratio', '🟤 LTH P/L Ratio']
+        all_opts_ratio = opts_ratio_base + ([f"{m} ({sl1})" for m in opts_ratio_base] if p1 > 1 else [])
+        try: sel_ratio = st.pills("Ratio Metrics", all_opts_ratio, default=opts_ratio_base, selection_mode="multi", label_visibility="collapsed", key="pills_ratio")
+        except: sel_ratio = st.multiselect("Ratio Metrics", all_opts_ratio, default=opts_ratio_base, label_visibility="collapsed", key="ms_ratio")
 
         chart_top_pl = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 250, "rightPriceScale": {"visible": True}, "leftPriceScale": {"visible": False}}
         chart_bot_ratio = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 550 if focus_pl else 400, "rightPriceScale": {"visible": False}, "leftPriceScale": {"visible": True, "mode": 1}}
 
-        series_price_pl = [{"type": 'Line', "data": get_s(df_pl_f, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
-        df_pl_f['Neutral'] = 1.0
-        series_ratio = [{"type": 'Line', "data": get_s(df_pl_f, 'Neutral'), "options": {"color": '#ffffff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": 'Neutral (1.0)'}}]
-
+        series_price_pl = [{"type": 'Line', "data": get_s(df_c1, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
+        df_c1['Neutral'] = 1.0
+        series_ratio = [{"type": 'Line', "data": get_s(df_c1, 'Neutral'), "options": {"color": '#ffffff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": 'Neutral (1.0)'}}]
         color_map_ratio = {'🟡 RPL Ratio': ('#f5c518', 'rgba(245,197,24,0.8)', 'RPL Ratio'), '🟣 STH P/L Ratio': ('#cc33ff', 'rgba(204,51,255,0.7)', 'STH P/L Ratio'), '🟤 LTH P/L Ratio': ('#cc9966', 'rgba(204,153,102,0.7)', 'LTH P/L Ratio')}
         for m in sel_ratio:
-            is_sma = "(SMA" in m
-            base_m = m.split(" (SMA")[0]
+            is_smooth = f"({sl1})" in m and p1 > 1
+            base_m = m.split(" (")[0]
             if base_m not in color_map_ratio: continue
             c_col, c_col_raw, c_name = color_map_ratio[base_m]
-            col_key = f"{c_name}_SMA" if is_sma else c_name
-            series_ratio.append({"type": 'Line', "data": get_s(df_pl_f, col_key), "options": {"color": c_col if is_sma else c_col_raw, "lineWidth": 1, "lineStyle": 2 if is_sma else 0, "priceScaleId": 'left', "title": f"{c_name} SMA" if is_sma else c_name}})
-
+            col_key = f"{c_name}_smooth" if is_smooth else c_name
+            series_ratio.append({"type": 'Line', "data": get_s(df_c1, col_key), "options": {"color": c_col if is_smooth else c_col_raw, "lineWidth": 1, "lineStyle": 2 if is_smooth else 0, "priceScaleId": 'left', "title": f"{c_name} {sl1}" if is_smooth else c_name}})
         renderLightweightCharts([{"chart": chart_top_pl, "series": series_price_pl}, {"chart": chart_bot_ratio, "series": series_ratio}], 'chart_pl_ratio')
 
         st.markdown("<br>", unsafe_allow_html=True)
 
         # ── CHART 2: Daily Realized Profit vs Loss (BTC) ──
-        col_t2, k2_1, k2_2, k2_3 = st.columns([1.5, 1, 1, 3], vertical_alignment="center")
+        col_t2, k2_1, k2_2, _ = st.columns([1.5, 1, 1, 3], vertical_alignment="center")
         with col_t2: st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.4rem;'>Realized P/L<br><span style='font-size: 1rem; color: #d1d4dc;'>Daily Profit & Loss (BTC)</span></h3></div>", unsafe_allow_html=True)
         with k2_1: render_kpi_pl("Daily Profit BTC", last_pl.get('Daily Profit BTC', 0), prev_pl.get('Daily Profit BTC', 0), 0.0, True)
         with k2_2:
@@ -910,19 +932,23 @@ elif selected_menu == "Realized P/L":
             d_l = f"<div style='margin-top:4px;'><span style='color:{dc_l}; font-size:0.85rem; background-color:{dc_l}20; padding:2px 6px; border-radius:4px;'>{ar_l} ₿{abs(diff_loss):,.2f}</span></div>"
             st.markdown(f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:#ff4d4d; font-size:0.95rem; font-weight:600;'>Daily Loss BTC</span><br><span style='color:#ff4d4d; font-size:1.4rem; font-weight:700;'>₿{loss_val:,.2f}</span>{d_l}</div>", unsafe_allow_html=True)
         st.markdown("---")
+        smooth_ctrl('cs_pl2', 'smooth_type_pl2', '2')
 
-        df_pl_f2, _ = apply_filters(df_pl_raw, st.session_state.tf_pl, "0d", 0, st.session_state.tr_pl, st.session_state.cd_pl, [])
+        p2, t2 = st.session_state.cs_pl2, st.session_state.smooth_type_pl2
+        df_c2 = apply_smooth_pl(df_pl_base, ['Daily Profit BTC', 'Daily Loss BTC'], p2, t2)
         chart_top_pl2 = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 250, "rightPriceScale": {"visible": True}, "leftPriceScale": {"visible": False}}
         chart_bot_flow = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 550 if focus_pl else 400, "rightPriceScale": {"visible": False}, "leftPriceScale": {"visible": True}}
-
-        series_price_pl2 = [{"type": 'Line', "data": get_s(df_pl_f2, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
+        series_price_pl2 = [{"type": 'Line', "data": get_s(df_c2, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
+        profit_key2 = 'Daily Profit BTC_smooth' if p2 > 1 else 'Daily Profit BTC'
+        loss_key2   = 'Daily Loss BTC_smooth'   if p2 > 1 else 'Daily Loss BTC'
+        chart_type2 = 'Line' if p2 > 1 else 'Histogram'
         series_flow = [
-            {"type": 'Histogram', "data": get_s(df_pl_f2, 'Daily Profit BTC'), "options": {"color": 'rgba(0, 204, 102, 0.7)', "priceScaleId": 'left', "title": 'Daily Profit BTC'}},
-            {"type": 'Histogram', "data": get_s(df_pl_f2, 'Daily Loss BTC'), "options": {"color": 'rgba(255, 77, 77, 0.7)', "priceScaleId": 'left', "title": 'Daily Loss BTC'}},
+            {"type": chart_type2, "data": get_s(df_c2, profit_key2), "options": {"color": 'rgba(0, 204, 102, 0.7)', "priceScaleId": 'left', "title": f'Daily Profit BTC ({t2} {p2})' if p2 > 1 else 'Daily Profit BTC'}},
+            {"type": chart_type2, "data": get_s(df_c2, loss_key2),   "options": {"color": 'rgba(255, 77, 77, 0.7)', "priceScaleId": 'left', "title": f'Daily Loss BTC ({t2} {p2})' if p2 > 1 else 'Daily Loss BTC'}},
         ]
         renderLightweightCharts([{"chart": chart_top_pl2, "series": series_price_pl2}, {"chart": chart_bot_flow, "series": series_flow}], 'chart_pl_flow')
 
-        # ── CHART 3: Relative Realized Profit/Loss (rrp, rrl, net) ──
+        # ── CHART 3: Relative Realized P/L (rrp, rrl, net) ──
         if 'RRP' in df_pl_raw.columns:
             st.markdown("<br>", unsafe_allow_html=True)
             col_t3, k3_1, k3_2, k3_3, k3_4 = st.columns([1.5, 1, 1, 1, 2], vertical_alignment="center")
@@ -932,36 +958,30 @@ elif selected_menu == "Realized P/L":
             with k3_3: render_kpi_pl("RRL", last_pl.get('RRL', 0), prev_pl.get('RRL', 0), 0.0)
             with k3_4: render_kpi_pl("Relative PL", last_pl.get('Relative Realized PL', 0), prev_pl.get('Relative Realized PL', 0), 0.0)
             st.markdown("---")
+            smooth_ctrl('cs_pl3', 'smooth_type_pl3', '3')
 
-            df_pl_f3, w_pl3 = apply_filters(df_pl_raw, st.session_state.tf_pl, _sma_pl, st.session_state.cs_pl, st.session_state.tr_pl, st.session_state.cd_pl, ['RRP', 'RRL', 'Relative Realized PL'])
-
-            opts_rrl = ['🟢 RRP', '🔴 RRL', '⚪ Relative PL']
-            all_opts_rrl = opts_rrl.copy()
-            if w_pl3 > 1: all_opts_rrl.extend([f"{m} (SMA {w_pl3})" for m in opts_rrl])
-            try: sel_rrl = st.pills("Relative Metrics", all_opts_rrl, default=['🟢 RRP', '🔴 RRL', '⚪ Relative PL'], selection_mode="multi", label_visibility="collapsed", key="pills_rrl")
-            except: sel_rrl = st.multiselect("Relative Metrics", all_opts_rrl, default=['🟢 RRP', '🔴 RRL', '⚪ Relative PL'], label_visibility="collapsed", key="ms_rrl")
+            p3, t3 = st.session_state.cs_pl3, st.session_state.smooth_type_pl3
+            df_c3 = apply_smooth_pl(df_pl_base, ['RRP', 'RRL', 'Relative Realized PL'], p3, t3)
+            sl3 = f"{t3} {p3}" if p3 > 1 else ""
+            opts_rrl_base = ['🟢 RRP', '🔴 RRL', '⚪ Relative PL']
+            all_opts_rrl = opts_rrl_base + ([f"{m} ({sl3})" for m in opts_rrl_base] if p3 > 1 else [])
+            try: sel_rrl = st.pills("Relative Metrics", all_opts_rrl, default=opts_rrl_base, selection_mode="multi", label_visibility="collapsed", key="pills_rrl")
+            except: sel_rrl = st.multiselect("Relative Metrics", all_opts_rrl, default=opts_rrl_base, label_visibility="collapsed", key="ms_rrl")
 
             chart_top_pl3 = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 250, "rightPriceScale": {"visible": True}, "leftPriceScale": {"visible": False}}
             chart_bot_rrl = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 550 if focus_pl else 400, "rightPriceScale": {"visible": False}, "leftPriceScale": {"visible": True}}
-
-            series_price_pl3 = [{"type": 'Line', "data": get_s(df_pl_f3, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
-            df_pl_f3['Zero'] = 0.0
-            series_rrl = [{"type": 'Line', "data": get_s(df_pl_f3, 'Zero'), "options": {"color": '#ffffff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": 'Zero'}}]
-
-            color_map_rrl = {
-                '🟢 RRP':        ('#00cc66', 'rgba(0,204,102,0.7)',   'RRP'),
-                '🔴 RRL':        ('#ff4d4d', 'rgba(255,77,77,0.7)',   'RRL'),
-                '⚪ Relative PL': ('#d1d4dc', 'rgba(209,212,220,0.9)', 'Relative Realized PL'),
-            }
+            series_price_pl3 = [{"type": 'Line', "data": get_s(df_c3, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
+            df_c3['Zero'] = 0.0
+            series_rrl = [{"type": 'Line', "data": get_s(df_c3, 'Zero'), "options": {"color": '#ffffff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": 'Zero'}}]
+            color_map_rrl = {'🟢 RRP': ('#00cc66', 'rgba(0,204,102,0.7)', 'RRP'), '🔴 RRL': ('#ff4d4d', 'rgba(255,77,77,0.7)', 'RRL'), '⚪ Relative PL': ('#d1d4dc', 'rgba(209,212,220,0.9)', 'Relative Realized PL')}
             for m in sel_rrl:
-                is_sma = "(SMA" in m
-                base_m = m.split(" (SMA")[0]
+                is_smooth = f"({sl3})" in m and p3 > 1
+                base_m = m.split(" (")[0]
                 if base_m not in color_map_rrl: continue
                 c_col, c_col_raw, c_name = color_map_rrl[base_m]
-                col_key = f"{c_name}_SMA" if is_sma else c_name
-                chart_type = 'Histogram' if base_m in ('🟢 RRP', '🔴 RRL') and not is_sma else 'Line'
-                series_rrl.append({"type": chart_type, "data": get_s(df_pl_f3, col_key), "options": {"color": c_col if is_sma else c_col_raw, "lineWidth": 1, "lineStyle": 2 if is_sma else 0, "priceScaleId": 'left', "title": f"{c_name} SMA" if is_sma else c_name}})
-
+                col_key = f"{c_name}_smooth" if is_smooth else c_name
+                is_hist = base_m in ('🟢 RRP', '🔴 RRL') and not is_smooth
+                series_rrl.append({"type": 'Histogram' if is_hist else 'Line', "data": get_s(df_c3, col_key), "options": {"color": c_col if is_smooth else c_col_raw, "lineWidth": 1, "lineStyle": 2 if is_smooth else 0, "priceScaleId": 'left', "title": f"{c_name} {sl3}" if is_smooth else c_name}})
             renderLightweightCharts([{"chart": chart_top_pl3, "series": series_price_pl3}, {"chart": chart_bot_rrl, "series": series_rrl}], 'chart_pl_rrl')
 
     else:
