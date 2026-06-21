@@ -51,19 +51,19 @@ div[data-testid="stPill"] button { font-size: 0.85rem !important; padding: 2px 1
 """, unsafe_allow_html=True)
 
 # State initialization (Termasuk ex untuk Exchange Flow)
-for key in ['tr_p', 'tr_mv', 'tr_ms', 'tr_mpl', 'tr_nupl', 'tr_d', 'tr_ex', 'tr_gt', 'tr_wk', 'tr_sd', 'tr_fg', 'tr_msig', 'tr_bt', 'tr_sl']:
+for key in ['tr_p', 'tr_mv', 'tr_ms', 'tr_mpl', 'tr_nupl', 'tr_d', 'tr_ex', 'tr_gt', 'tr_wk', 'tr_sd', 'tr_fg', 'tr_msig', 'tr_bt', 'tr_sl', 'tr_pl']:
     if key not in st.session_state: st.session_state[key] = "All Time"
-for key in ['cd_p', 'cd_mv', 'cd_ms', 'cd_mpl', 'cd_nupl', 'cd_d', 'cd_ex', 'cd_gt', 'cd_wk', 'cd_sd', 'cd_fg', 'cd_msig', 'cd_bt', 'cd_sl']:
+for key in ['cd_p', 'cd_mv', 'cd_ms', 'cd_mpl', 'cd_nupl', 'cd_d', 'cd_ex', 'cd_gt', 'cd_wk', 'cd_sd', 'cd_fg', 'cd_msig', 'cd_bt', 'cd_sl', 'cd_pl']:
     if key not in st.session_state: st.session_state[key] = 120
-for key in ['tf_p', 'tf_mv', 'tf_ms', 'tf_mpl', 'tf_nupl', 'tf_d', 'tf_ex', 'tf_gt', 'tf_wk', 'tf_sd', 'tf_fg', 'tf_msig', 'tf_bt', 'tf_sl']:
+for key in ['tf_p', 'tf_mv', 'tf_ms', 'tf_mpl', 'tf_nupl', 'tf_d', 'tf_ex', 'tf_gt', 'tf_wk', 'tf_sd', 'tf_fg', 'tf_msig', 'tf_bt', 'tf_sl', 'tf_pl']:
     if key not in st.session_state: st.session_state[key] = "Daily"
 for key, val in [('sl_sma_a', 14), ('sl_sma_b', 30), ('sl_sma_c', 60), ('sl_b5_thresh', 1.10)]:
     if key not in st.session_state: st.session_state[key] = val
-for key in ['sma_p', 'sma_mv', 'sma_ms', 'sma_mpl', 'sma_nupl', 'sma_d', 'sma_ex', 'sma_sd', 'sma_fg', 'sma_msig']:
+for key in ['sma_p', 'sma_mv', 'sma_ms', 'sma_mpl', 'sma_nupl', 'sma_d', 'sma_ex', 'sma_sd', 'sma_fg', 'sma_msig', 'sma_pl']:
     if key not in st.session_state: st.session_state[key] = "0d"
 for key in ['sma_gt', 'sma_wk']:
     if key not in st.session_state: st.session_state[key] = "30d"  
-for key in ['cs_p', 'cs_mv', 'cs_ms', 'cs_mpl', 'cs_nupl', 'cs_d', 'cs_ex', 'cs_gt', 'cs_wk', 'cs_sd', 'cs_fg', 'cs_msig']:
+for key in ['cs_p', 'cs_mv', 'cs_ms', 'cs_mpl', 'cs_nupl', 'cs_d', 'cs_ex', 'cs_gt', 'cs_wk', 'cs_sd', 'cs_fg', 'cs_msig', 'cs_pl']:
     if key not in st.session_state: st.session_state[key] = 50
 for key in ['mode_gt', 'mode_wk']:
     if key not in st.session_state: st.session_state[key] = "Line"
@@ -227,6 +227,24 @@ def load_data_cum():
         return df.dropna(subset=['Date']).sort_values('Date').drop_duplicates(subset=['Date'], keep='last')
     except: return pd.DataFrame()
 
+@st.cache_data(ttl=3600)
+def load_data_pl():
+    try:
+        df = pd.read_csv("data_pl.csv")
+        df.rename(columns={
+            'date': 'Date', 'btc_price': 'BTC Price',
+            'daily_realized_profit_btc': 'Daily Profit BTC',
+            'daily_realized_loss_btc': 'Daily Loss BTC',
+            'rpl_ratio': 'RPL Ratio',
+            'sth_pl_ratio': 'STH P/L Ratio',
+            'lth_pl_ratio': 'LTH P/L Ratio'
+        }, inplace=True)
+        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        df = df.dropna(subset=['Date']).sort_values('Date').drop_duplicates(subset=['Date'], keep='last')
+        df['Daily Loss BTC'] = -df['Daily Loss BTC'].abs()
+        return df
+    except: return pd.DataFrame()
+
 # 🟢 METRIK BARU: LTH P/L Flow Loader
 @st.cache_data(ttl=3600)
 def load_data_lth_flow():
@@ -247,6 +265,7 @@ df_sentiment_raw = load_data_sentiment()
 df_supply_raw = load_data_supply()
 df_cum_raw = load_data_cum()
 df_lth_flow_raw = load_data_lth_flow()
+df_pl_raw = load_data_pl()
 
 # ⚡ PROSES MERGE AMAN (Mengecek keberadaan variabel hulu terlebih dahulu)
 if not df_cum_raw.empty:
@@ -316,7 +335,7 @@ with st.sidebar:
     # Menambahkan "Exchange Flow" ke dalam urutan menu
     selected_menu = st.radio(
         "Menu Navigasi",
-        ["Price Levels", "Market Valuation", "Profit & Loss", "Supply Dynamics", "Exchange Flow", "Derivatives", "Social Sentiment", "Market Signals", "Backtesting", "MVRV Signal Lab"],
+        ["Price Levels", "Market Valuation", "Profit & Loss", "Realized P/L", "Supply Dynamics", "Exchange Flow", "Derivatives", "Social Sentiment", "Market Signals", "Backtesting", "MVRV Signal Lab"],
         label_visibility="collapsed"
     )
     st.markdown("---")
@@ -798,7 +817,114 @@ elif selected_menu == "Profit & Loss":
         renderLightweightCharts([{"chart": chart_opts_nupl, "series": series_nupl}], 'chart_nupl')
 
 # ------------------------------------------------------------------------------
-# TAB 4: SUPPLY DYNAMICS 
+# TAB: REALIZED P/L
+# ------------------------------------------------------------------------------
+elif selected_menu == "Realized P/L":
+    if not df_pl_raw.empty:
+        last_pl = df_pl_raw.iloc[-1]
+        prev_pl = df_pl_raw.iloc[-2] if len(df_pl_raw) > 1 else last_pl
+        btc_pl = last_pl.get('BTC Price', 0)
+        btc_prev_pl = prev_pl.get('BTC Price', 1)
+
+        def render_kpi_pl(title, value, prev_val, threshold=1.0, is_btc=False):
+            if pd.isna(value) or value == 0:
+                color = "#a3a8b8"; d = ""
+            else:
+                color = "#00cc66" if value >= threshold else "#ff4d4d"
+                diff = value - prev_val
+                ip = diff >= 0
+                dc = "#00cc66" if ip else "#ff4d4d"
+                ar = "↑" if ip else "↓"
+                diff_str = f"₿{abs(diff):,.2f}" if is_btc else f"{abs(diff):.4f}"
+                d = f"<div style='margin-top:4px;'><span style='color:{dc}; font-size:0.85rem; background-color:{dc}20; padding:2px 6px; border-radius:4px;'>{ar} {diff_str}</span></div>"
+            val_str = f"₿{value:,.2f}" if is_btc else f"{value:.4f}"
+            st.markdown(f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:{color}; font-size:0.95rem; font-weight:600;'>{title}</span><br><span style='color:{color}; font-size:1.4rem; font-weight:700;'>{val_str}</span>{d}</div>", unsafe_allow_html=True)
+
+        dp_btc_pl = ((btc_pl - btc_prev_pl) / btc_prev_pl * 100) if btc_prev_pl else 0
+        dc_btc_pl = "#00cc66" if dp_btc_pl >= 0 else "#ff4d4d"
+        ar_btc_pl = "↑" if dp_btc_pl >= 0 else "↓"
+        d_btc_pl = f"<div style='margin-top:4px;'><span style='color:{dc_btc_pl}; font-size:0.85rem; background-color:{dc_btc_pl}20; padding:2px 6px; border-radius:4px;'>{ar_btc_pl} {abs(dp_btc_pl):.2f}%</span></div>"
+        btc_html_pl = f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:#f7931a; font-size:0.95rem; font-weight:600;'>BTC Price</span><br><span style='color:#f7931a; font-size:1.4rem; font-weight:700;'>${btc_pl:,.2f}</span>{d_btc_pl}</div>"
+
+        # ── CHART 1: RPL Ratio + STH/LTH P/L Ratio ──
+        col_t1, k1, k2, k3, k4, k5 = st.columns([1.5, 1, 1, 1, 1, 1], vertical_alignment="center")
+        with col_t1: st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.4rem;'>Realized P/L<br><span style='font-size: 1rem; color: #d1d4dc;'>Market P/L Ratios</span></h3></div>", unsafe_allow_html=True)
+        with k1: st.markdown(btc_html_pl, unsafe_allow_html=True)
+        with k2: render_kpi_pl("RPL Ratio", last_pl.get('RPL Ratio', 0), prev_pl.get('RPL Ratio', 0), 1.0)
+        with k3: render_kpi_pl("STH P/L Ratio", last_pl.get('STH P/L Ratio', 0), prev_pl.get('STH P/L Ratio', 0), 1.0)
+        with k4: render_kpi_pl("LTH P/L Ratio", last_pl.get('LTH P/L Ratio', 0), prev_pl.get('LTH P/L Ratio', 0), 1.0)
+        with k5: render_kpi_pl("Daily Profit BTC", last_pl.get('Daily Profit BTC', 0), prev_pl.get('Daily Profit BTC', 0), 0.0, True)
+        st.markdown("---")
+
+        df_pl_f, w_pl = apply_filters(df_pl_raw, st.session_state.tf_pl, st.session_state.sma_pl, st.session_state.cs_pl, st.session_state.tr_pl, st.session_state.cd_pl, ['RPL Ratio', 'STH P/L Ratio', 'LTH P/L Ratio'])
+        col_fs_pl, col_tf_pl, col_sma_pl, col_sma_cst_pl, col_radio_pl, col_custom_pl = st.columns([1, 1.2, 1.2, 1, 6, 1.2], vertical_alignment="bottom", gap="small")
+        with col_fs_pl: focus_pl = st.toggle("Full Screen", key="tg_pl")
+        with col_tf_pl: st.session_state.tf_pl = st.selectbox("Timeframe", ["Daily", "3 Days", "Weekly", "Monthly"], index=["Daily", "3 Days", "Weekly", "Monthly"].index(st.session_state.tf_pl), key="tfs_pl")
+        with col_sma_pl: st.session_state.sma_pl = st.selectbox("SMA", ["0d", "7d", "14d", "30d", "Custom"], index=["0d", "7d", "14d", "30d", "Custom"].index(st.session_state.sma_pl), key="smas_pl")
+        with col_sma_cst_pl:
+            if st.session_state.sma_pl == "Custom": st.session_state.cs_pl = st.number_input("Days", min_value=1, value=st.session_state.cs_pl, label_visibility="collapsed", key="cst_pl")
+        with col_radio_pl:
+            c_idx_pl = t_opts.index(st.session_state.tr_pl) if st.session_state.tr_pl in t_opts else 5
+            st.session_state.tr_pl = st.radio("Range:", t_opts, index=c_idx_pl, horizontal=True, label_visibility="collapsed", key="rg_pl")
+        with col_custom_pl:
+            if st.session_state.tr_pl == "Custom": st.session_state.cd_pl = st.number_input("Days back", min_value=7, value=st.session_state.cd_pl, label_visibility="collapsed", key="cdin_pl")
+
+        opts_ratio = ['🟡 RPL Ratio', '🟣 STH P/L Ratio', '🟤 LTH P/L Ratio']
+        all_opts_ratio = opts_ratio.copy()
+        if w_pl > 1: all_opts_ratio.extend([f"{m} (SMA {w_pl})" for m in opts_ratio])
+        try: sel_ratio = st.pills("Ratio Metrics", all_opts_ratio, default=['🟡 RPL Ratio', '🟣 STH P/L Ratio', '🟤 LTH P/L Ratio'], selection_mode="multi", label_visibility="collapsed", key="pills_ratio")
+        except: sel_ratio = st.multiselect("Ratio Metrics", all_opts_ratio, default=['🟡 RPL Ratio', '🟣 STH P/L Ratio', '🟤 LTH P/L Ratio'], label_visibility="collapsed", key="ms_ratio")
+
+        chart_top_pl = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 250, "rightPriceScale": {"visible": True}, "leftPriceScale": {"visible": False}}
+        chart_bot_ratio = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 550 if focus_pl else 400, "rightPriceScale": {"visible": False}, "leftPriceScale": {"visible": True, "mode": 1}}
+
+        series_price_pl = [{"type": 'Line', "data": get_s(df_pl_f, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
+        df_pl_f['Neutral'] = 1.0
+        series_ratio = [{"type": 'Line', "data": get_s(df_pl_f, 'Neutral'), "options": {"color": '#ffffff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": 'Neutral (1.0)'}}]
+
+        color_map_ratio = {'🟡 RPL Ratio': ('#f5c518', 'rgba(245,197,24,0.8)', 'RPL Ratio'), '🟣 STH P/L Ratio': ('#cc33ff', 'rgba(204,51,255,0.7)', 'STH P/L Ratio'), '🟤 LTH P/L Ratio': ('#cc9966', 'rgba(204,153,102,0.7)', 'LTH P/L Ratio')}
+        for m in sel_ratio:
+            is_sma = "(SMA" in m
+            base_m = m.split(" (SMA")[0]
+            if base_m not in color_map_ratio: continue
+            c_col, c_col_raw, c_name = color_map_ratio[base_m]
+            col_key = f"{c_name}_SMA" if is_sma else c_name
+            series_ratio.append({"type": 'Line', "data": get_s(df_pl_f, col_key), "options": {"color": c_col if is_sma else c_col_raw, "lineWidth": 1, "lineStyle": 2 if is_sma else 0, "priceScaleId": 'left', "title": f"{c_name} SMA" if is_sma else c_name}})
+
+        renderLightweightCharts([{"chart": chart_top_pl, "series": series_price_pl}, {"chart": chart_bot_ratio, "series": series_ratio}], 'chart_pl_ratio')
+
+        st.markdown("<br>", unsafe_allow_html=True)
+
+        # ── CHART 2: Daily Realized Profit vs Loss (BTC) ──
+        col_t2, k2_1, k2_2, k2_3 = st.columns([1.5, 1, 1, 3], vertical_alignment="center")
+        with col_t2: st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.4rem;'>Realized P/L<br><span style='font-size: 1rem; color: #d1d4dc;'>Daily Profit & Loss (BTC)</span></h3></div>", unsafe_allow_html=True)
+        with k2_1: render_kpi_pl("Daily Profit BTC", last_pl.get('Daily Profit BTC', 0), prev_pl.get('Daily Profit BTC', 0), 0.0, True)
+        with k2_2:
+            loss_val = abs(last_pl.get('Daily Loss BTC', 0))
+            loss_prev = abs(prev_pl.get('Daily Loss BTC', 0))
+            diff_loss = loss_val - loss_prev
+            dc_l = "#00cc66" if diff_loss <= 0 else "#ff4d4d"
+            ar_l = "↓" if diff_loss <= 0 else "↑"
+            d_l = f"<div style='margin-top:4px;'><span style='color:{dc_l}; font-size:0.85rem; background-color:{dc_l}20; padding:2px 6px; border-radius:4px;'>{ar_l} ₿{abs(diff_loss):,.2f}</span></div>"
+            st.markdown(f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:#ff4d4d; font-size:0.95rem; font-weight:600;'>Daily Loss BTC</span><br><span style='color:#ff4d4d; font-size:1.4rem; font-weight:700;'>₿{loss_val:,.2f}</span>{d_l}</div>", unsafe_allow_html=True)
+        st.markdown("---")
+
+        df_pl_f2, _ = apply_filters(df_pl_raw, st.session_state.tf_pl, "0d", 0, st.session_state.tr_pl, st.session_state.cd_pl, [])
+        chart_top_pl2 = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 250, "rightPriceScale": {"visible": True}, "leftPriceScale": {"visible": False}}
+        chart_bot_flow = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 550 if focus_pl else 400, "rightPriceScale": {"visible": False}, "leftPriceScale": {"visible": True}}
+
+        series_price_pl2 = [{"type": 'Line', "data": get_s(df_pl_f2, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
+        series_flow = [
+            {"type": 'Histogram', "data": get_s(df_pl_f2, 'Daily Profit BTC'), "options": {"color": 'rgba(0, 204, 102, 0.7)', "priceScaleId": 'left', "title": 'Daily Profit BTC'}},
+            {"type": 'Histogram', "data": get_s(df_pl_f2, 'Daily Loss BTC'), "options": {"color": 'rgba(255, 77, 77, 0.7)', "priceScaleId": 'left', "title": 'Daily Loss BTC'}},
+        ]
+        renderLightweightCharts([{"chart": chart_top_pl2, "series": series_price_pl2}, {"chart": chart_bot_flow, "series": series_flow}], 'chart_pl_flow')
+
+    else:
+        st.warning("Data Realized P/L belum tersedia. Jalankan auto_update.py terlebih dahulu.")
+
+# ------------------------------------------------------------------------------
+# TAB 4: SUPPLY DYNAMICS
 # ------------------------------------------------------------------------------
 elif selected_menu == "Supply Dynamics":
     if not df_supply_raw.empty:
