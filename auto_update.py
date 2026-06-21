@@ -384,6 +384,17 @@ try:
         if not df_age_pl.empty:
             df_rpl = pd.merge(df_rpl, df_age_pl, on='date', how='outer')
 
+        # Kalkulasi rrp, rrl, relative_realized_pl via realized cap
+        if os.path.exists("data_realized_cap.csv"):
+            df_rcap = pd.read_csv("data_realized_cap.csv")[['date', 'realized_cap_usd']]
+            df_rcap['date'] = pd.to_datetime(df_rcap['date'], errors='coerce').dt.strftime('%Y-%m-%d')
+            df_rpl = pd.merge(df_rpl, df_rcap, on='date', how='left')
+            safe_rcap = df_rpl['realized_cap_usd'].replace(0, np.nan)
+            df_rpl['rrp'] = (df_rpl['daily_realized_profit_btc'] * df_rpl['btc_price']) / safe_rcap
+            df_rpl['rrl'] = (df_rpl['daily_realized_loss_btc']   * df_rpl['btc_price']) / safe_rcap
+            df_rpl['relative_realized_pl'] = df_rpl['rrp'] - df_rpl['rrl']
+            df_rpl.drop(columns=['realized_cap_usd'], inplace=True)
+
         df_rpl['date'] = pd.to_datetime(df_rpl['date'], errors='coerce').dt.strftime('%Y-%m-%d')
         df_rpl = df_rpl.dropna(subset=['date']).drop_duplicates(subset=['date'], keep='last')
         df_rpl = df_rpl.sort_values('date').reset_index(drop=True)
@@ -411,7 +422,7 @@ try:
             else:
                 print("ℹ️ data_pl_events.csv: sudah up-to-date.")
 
-        print(df_rpl[['date', 'btc_price', 'rpl_ratio', 'sth_pl_ratio', 'lth_pl_ratio']].tail(3).to_string(index=False))
+        print(df_rpl[['date', 'btc_price', 'rpl_ratio', 'rrp', 'rrl', 'relative_realized_pl']].tail(3).to_string(index=False))
     else:
         print("❌ GAGAL: Data Realized P/L BTC kosong atau gagal ditarik.")
 except Exception as e:

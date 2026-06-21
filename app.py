@@ -237,7 +237,9 @@ def load_data_pl():
             'daily_realized_loss_btc': 'Daily Loss BTC',
             'rpl_ratio': 'RPL Ratio',
             'sth_pl_ratio': 'STH P/L Ratio',
-            'lth_pl_ratio': 'LTH P/L Ratio'
+            'lth_pl_ratio': 'LTH P/L Ratio',
+            'rrp': 'RRP', 'rrl': 'RRL',
+            'relative_realized_pl': 'Relative Realized PL'
         }, inplace=True)
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
         df = df.dropna(subset=['Date']).sort_values('Date').drop_duplicates(subset=['Date'], keep='last')
@@ -919,6 +921,48 @@ elif selected_menu == "Realized P/L":
             {"type": 'Histogram', "data": get_s(df_pl_f2, 'Daily Loss BTC'), "options": {"color": 'rgba(255, 77, 77, 0.7)', "priceScaleId": 'left', "title": 'Daily Loss BTC'}},
         ]
         renderLightweightCharts([{"chart": chart_top_pl2, "series": series_price_pl2}, {"chart": chart_bot_flow, "series": series_flow}], 'chart_pl_flow')
+
+        # ── CHART 3: Relative Realized Profit/Loss (rrp, rrl, net) ──
+        if 'RRP' in df_pl_raw.columns:
+            st.markdown("<br>", unsafe_allow_html=True)
+            col_t3, k3_1, k3_2, k3_3, k3_4 = st.columns([1.5, 1, 1, 1, 2], vertical_alignment="center")
+            with col_t3: st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.4rem;'>Realized P/L<br><span style='font-size: 1rem; color: #d1d4dc;'>Relative Realized P/L</span></h3></div>", unsafe_allow_html=True)
+            with k3_1: st.markdown(btc_html_pl, unsafe_allow_html=True)
+            with k3_2: render_kpi_pl("RRP", last_pl.get('RRP', 0), prev_pl.get('RRP', 0), 0.0)
+            with k3_3: render_kpi_pl("RRL", last_pl.get('RRL', 0), prev_pl.get('RRL', 0), 0.0)
+            with k3_4: render_kpi_pl("Relative PL", last_pl.get('Relative Realized PL', 0), prev_pl.get('Relative Realized PL', 0), 0.0)
+            st.markdown("---")
+
+            df_pl_f3, w_pl3 = apply_filters(df_pl_raw, st.session_state.tf_pl, st.session_state.sma_pl, st.session_state.cs_pl, st.session_state.tr_pl, st.session_state.cd_pl, ['RRP', 'RRL', 'Relative Realized PL'])
+
+            opts_rrl = ['🟢 RRP', '🔴 RRL', '⚪ Relative PL']
+            all_opts_rrl = opts_rrl.copy()
+            if w_pl3 > 1: all_opts_rrl.extend([f"{m} (SMA {w_pl3})" for m in opts_rrl])
+            try: sel_rrl = st.pills("Relative Metrics", all_opts_rrl, default=['🟢 RRP', '🔴 RRL', '⚪ Relative PL'], selection_mode="multi", label_visibility="collapsed", key="pills_rrl")
+            except: sel_rrl = st.multiselect("Relative Metrics", all_opts_rrl, default=['🟢 RRP', '🔴 RRL', '⚪ Relative PL'], label_visibility="collapsed", key="ms_rrl")
+
+            chart_top_pl3 = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 250, "rightPriceScale": {"visible": True}, "leftPriceScale": {"visible": False}}
+            chart_bot_rrl = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 550 if focus_pl else 400, "rightPriceScale": {"visible": False}, "leftPriceScale": {"visible": True}}
+
+            series_price_pl3 = [{"type": 'Line', "data": get_s(df_pl_f3, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
+            df_pl_f3['Zero'] = 0.0
+            series_rrl = [{"type": 'Line', "data": get_s(df_pl_f3, 'Zero'), "options": {"color": '#ffffff', "lineWidth": 1, "lineStyle": 2, "priceScaleId": 'left', "title": 'Zero'}}]
+
+            color_map_rrl = {
+                '🟢 RRP':        ('#00cc66', 'rgba(0,204,102,0.7)',   'RRP'),
+                '🔴 RRL':        ('#ff4d4d', 'rgba(255,77,77,0.7)',   'RRL'),
+                '⚪ Relative PL': ('#d1d4dc', 'rgba(209,212,220,0.9)', 'Relative Realized PL'),
+            }
+            for m in sel_rrl:
+                is_sma = "(SMA" in m
+                base_m = m.split(" (SMA")[0]
+                if base_m not in color_map_rrl: continue
+                c_col, c_col_raw, c_name = color_map_rrl[base_m]
+                col_key = f"{c_name}_SMA" if is_sma else c_name
+                chart_type = 'Histogram' if base_m in ('🟢 RRP', '🔴 RRL') and not is_sma else 'Line'
+                series_rrl.append({"type": chart_type, "data": get_s(df_pl_f3, col_key), "options": {"color": c_col if is_sma else c_col_raw, "lineWidth": 1, "lineStyle": 2 if is_sma else 0, "priceScaleId": 'left', "title": f"{c_name} SMA" if is_sma else c_name}})
+
+            renderLightweightCharts([{"chart": chart_top_pl3, "series": series_price_pl3}, {"chart": chart_bot_rrl, "series": series_rrl}], 'chart_pl_rrl')
 
     else:
         st.warning("Data Realized P/L belum tersedia. Jalankan auto_update.py terlebih dahulu.")
