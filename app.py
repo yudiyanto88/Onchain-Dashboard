@@ -70,6 +70,12 @@ for key in ['cs_pl1', 'cs_pl2', 'cs_pl3']:
     if key not in st.session_state: st.session_state[key] = 0
 for key in ['smooth_type_pl1', 'smooth_type_pl2', 'smooth_type_pl3']:
     if key not in st.session_state: st.session_state[key] = "SMA"
+for key in ['tr_pl1', 'tr_pl2', 'tr_pl3']:
+    if key not in st.session_state: st.session_state[key] = "All Time"
+for key in ['cd_pl1', 'cd_pl2', 'cd_pl3']:
+    if key not in st.session_state: st.session_state[key] = 120
+for key in ['tf_pl1', 'tf_pl2', 'tf_pl3']:
+    if key not in st.session_state: st.session_state[key] = "Daily"
 for key in ['mode_gt', 'mode_wk']:
     if key not in st.session_state: st.session_state[key] = "Line"
 
@@ -853,18 +859,8 @@ elif selected_menu == "Realized P/L":
         d_btc_pl = f"<div style='margin-top:4px;'><span style='color:{dc_btc_pl}; font-size:0.85rem; background-color:{dc_btc_pl}20; padding:2px 6px; border-radius:4px;'>{ar_btc_pl} {abs(dp_btc_pl):.2f}%</span></div>"
         btc_html_pl = f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:#f7931a; font-size:0.95rem; font-weight:600;'>BTC Price</span><br><span style='color:#f7931a; font-size:1.4rem; font-weight:700;'>${btc_pl:,.2f}</span>{d_btc_pl}</div>"
 
-        # ── SHARED CONTROLS (full screen, timeframe, range) ──
-        col_fs_pl, col_tf_pl, col_radio_pl, col_custom_pl = st.columns([1, 1.2, 7, 1.2], vertical_alignment="bottom", gap="small")
-        with col_fs_pl: focus_pl = st.toggle("Full Screen", key="tg_pl")
-        with col_tf_pl: st.session_state.tf_pl = st.selectbox("Timeframe", ["Daily", "3 Days", "Weekly", "Monthly"], index=["Daily", "3 Days", "Weekly", "Monthly"].index(st.session_state.tf_pl), key="tfs_pl")
-        with col_radio_pl:
-            c_idx_pl = t_opts.index(st.session_state.tr_pl) if st.session_state.tr_pl in t_opts else 5
-            st.session_state.tr_pl = st.radio("Range:", t_opts, index=c_idx_pl, horizontal=True, label_visibility="collapsed", key="rg_pl")
-        with col_custom_pl:
-            if st.session_state.tr_pl == "Custom": st.session_state.cd_pl = st.number_input("Days back", min_value=7, value=st.session_state.cd_pl, label_visibility="collapsed", key="cdin_pl")
-
-        # Base data: time-filtered + resampled only (no smoothing — tiap chart atur sendiri)
-        df_pl_base, _ = apply_filters(df_pl_raw, st.session_state.tf_pl, "0d", 0, st.session_state.tr_pl, st.session_state.cd_pl, [])
+        # ── FULL SCREEN toggle (shared, affects chart heights) ──
+        focus_pl = st.toggle("Full Screen", key="tg_pl")
 
         def apply_smooth_pl(df, cols, period, stype):
             df = df.copy()
@@ -877,10 +873,19 @@ elif selected_menu == "Realized P/L":
                             df[f"{col}_smooth"] = df[col].rolling(period, min_periods=1).mean()
             return df
 
-        def smooth_ctrl(key_period, key_type, label_suffix):
-            c1, c2, c3 = st.columns([1.2, 1, 8], gap="small")
-            with c1: st.session_state[key_period] = st.number_input(f"Period (0=off)", min_value=0, value=st.session_state[key_period], step=1, key=f"inp_{key_period}")
-            with c2: st.session_state[key_type] = st.selectbox("", ["SMA", "EMA"], index=["SMA","EMA"].index(st.session_state[key_type]), key=f"sel_{key_type}", label_visibility="collapsed")
+        def chart_ctrl_pl(n):
+            k_tf = f"tf_pl{n}"; k_tr = f"tr_pl{n}"; k_cd = f"cd_pl{n}"
+            k_cs = f"cs_pl{n}"; k_st = f"smooth_type_pl{n}"
+            tf_list = ["Daily", "3 Days", "Weekly", "Monthly"]
+            col_tf, col_smooth, col_stype, col_radio, col_custom = st.columns([1.2, 1.2, 1, 6, 1.2], vertical_alignment="bottom", gap="small")
+            with col_tf: st.session_state[k_tf] = st.selectbox("Timeframe", tf_list, index=tf_list.index(st.session_state[k_tf]), key=f"tfs_pl{n}")
+            with col_smooth: st.session_state[k_cs] = st.number_input("Period (0=off)", min_value=0, value=st.session_state[k_cs], step=1, key=f"inp_cs_pl{n}")
+            with col_stype: st.session_state[k_st] = st.selectbox("", ["SMA", "EMA"], index=["SMA","EMA"].index(st.session_state[k_st]), key=f"sel_st_pl{n}", label_visibility="collapsed")
+            with col_radio:
+                c_idx = t_opts.index(st.session_state[k_tr]) if st.session_state[k_tr] in t_opts else 5
+                st.session_state[k_tr] = st.radio("Range:", t_opts, index=c_idx, horizontal=True, label_visibility="collapsed", key=f"rg_pl{n}")
+            with col_custom:
+                if st.session_state[k_tr] == "Custom": st.session_state[k_cd] = st.number_input("Days back", min_value=7, value=st.session_state[k_cd], label_visibility="collapsed", key=f"cdin_pl{n}")
 
         # ── CHART 1: RPL Ratio + STH/LTH P/L Ratio ──
         col_t1, k1, k2, k3, k4, k5 = st.columns([1.5, 1, 1, 1, 1, 1], vertical_alignment="center")
@@ -891,10 +896,11 @@ elif selected_menu == "Realized P/L":
         with k4: render_kpi_pl("LTH P/L Ratio", last_pl.get('LTH P/L Ratio', 0), prev_pl.get('LTH P/L Ratio', 0), 1.0)
         with k5: render_kpi_pl("Daily Profit BTC", last_pl.get('Daily Profit BTC', 0), prev_pl.get('Daily Profit BTC', 0), 0.0, True)
         st.markdown("---")
-        smooth_ctrl('cs_pl1', 'smooth_type_pl1', '1')
+        chart_ctrl_pl(1)
 
         p1, t1 = st.session_state.cs_pl1, st.session_state.smooth_type_pl1
-        df_c1 = apply_smooth_pl(df_pl_base, ['RPL Ratio', 'STH P/L Ratio', 'LTH P/L Ratio'], p1, t1)
+        df_c1_raw, _ = apply_filters(df_pl_raw, st.session_state.tf_pl1, "0d", 0, st.session_state.tr_pl1, st.session_state.cd_pl1, [])
+        df_c1 = apply_smooth_pl(df_c1_raw, ['RPL Ratio', 'STH P/L Ratio', 'LTH P/L Ratio'], p1, t1)
         sl1 = f"{t1} {p1}" if p1 > 1 else ""
         opts_ratio_base = ['🟡 RPL Ratio', '🟣 STH P/L Ratio', '🟤 LTH P/L Ratio']
         all_opts_ratio = opts_ratio_base + ([f"{m} ({sl1})" for m in opts_ratio_base] if p1 > 1 else [])
@@ -932,10 +938,11 @@ elif selected_menu == "Realized P/L":
             d_l = f"<div style='margin-top:4px;'><span style='color:{dc_l}; font-size:0.85rem; background-color:{dc_l}20; padding:2px 6px; border-radius:4px;'>{ar_l} ₿{abs(diff_loss):,.2f}</span></div>"
             st.markdown(f"<div style='line-height: 1.4; padding: 5px 0;'><span style='color:#ff4d4d; font-size:0.95rem; font-weight:600;'>Daily Loss BTC</span><br><span style='color:#ff4d4d; font-size:1.4rem; font-weight:700;'>₿{loss_val:,.2f}</span>{d_l}</div>", unsafe_allow_html=True)
         st.markdown("---")
-        smooth_ctrl('cs_pl2', 'smooth_type_pl2', '2')
+        chart_ctrl_pl(2)
 
         p2, t2 = st.session_state.cs_pl2, st.session_state.smooth_type_pl2
-        df_c2 = apply_smooth_pl(df_pl_base, ['Daily Profit BTC', 'Daily Loss BTC'], p2, t2)
+        df_c2_raw, _ = apply_filters(df_pl_raw, st.session_state.tf_pl2, "0d", 0, st.session_state.tr_pl2, st.session_state.cd_pl2, [])
+        df_c2 = apply_smooth_pl(df_c2_raw, ['Daily Profit BTC', 'Daily Loss BTC'], p2, t2)
         chart_top_pl2 = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 250, "rightPriceScale": {"visible": True}, "leftPriceScale": {"visible": False}}
         chart_bot_flow = {"layout": {"textColor": '#d1d4dc', "background": {"type": 'solid', "color": '#131722'}}, "grid": {"vertLines": {"color": "rgba(42,46,57,0.3)"}, "horzLines": {"color": "rgba(42,46,57,0.3)"}}, "crosshair": {"mode": 0}, "height": 550 if focus_pl else 400, "rightPriceScale": {"visible": False}, "leftPriceScale": {"visible": True}}
         series_price_pl2 = [{"type": 'Line', "data": get_s(df_c2, 'BTC Price'), "options": {"color": '#f7931a', "lineWidth": 2, "priceScaleId": 'right', "title": 'BTC Price'}}]
@@ -958,10 +965,11 @@ elif selected_menu == "Realized P/L":
             with k3_3: render_kpi_pl("RRL", last_pl.get('RRL', 0), prev_pl.get('RRL', 0), 0.0)
             with k3_4: render_kpi_pl("Relative PL", last_pl.get('Relative Realized PL', 0), prev_pl.get('Relative Realized PL', 0), 0.0)
             st.markdown("---")
-            smooth_ctrl('cs_pl3', 'smooth_type_pl3', '3')
+            chart_ctrl_pl(3)
 
             p3, t3 = st.session_state.cs_pl3, st.session_state.smooth_type_pl3
-            df_c3 = apply_smooth_pl(df_pl_base, ['RRP', 'RRL', 'Relative Realized PL'], p3, t3)
+            df_c3_raw, _ = apply_filters(df_pl_raw, st.session_state.tf_pl3, "0d", 0, st.session_state.tr_pl3, st.session_state.cd_pl3, [])
+            df_c3 = apply_smooth_pl(df_c3_raw, ['RRP', 'RRL', 'Relative Realized PL'], p3, t3)
             sl3 = f"{t3} {p3}" if p3 > 1 else ""
             opts_rrl_base = ['🟢 RRP', '🔴 RRL', '⚪ Relative PL']
             all_opts_rrl = opts_rrl_base + ([f"{m} ({sl3})" for m in opts_rrl_base] if p3 > 1 else [])
