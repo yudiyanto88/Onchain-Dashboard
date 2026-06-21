@@ -139,12 +139,21 @@ def load_data_momentum():
     try:
         df = pd.read_csv("data_momentum.csv")
         df.rename(columns={
-            'date': 'Date', 'btc_price': 'BTC Price', 'asopr': 'aSOPR', 'lth_sopr': 'LTH SOPR', 'sth_sopr': 'STH SOPR', 
-            'net_realized_pl_usd': 'Net Realized PL', 'sth_pl_ratio': 'STH P/L Ratio', 'lth_pl_ratio': 'LTH P/L Ratio',
+            'date': 'Date', 'btc_price': 'BTC Price', 'asopr': 'aSOPR', 'lth_sopr': 'LTH SOPR', 'sth_sopr': 'STH SOPR',
+            'net_realized_pl_usd': 'Net Realized PL',
             'nupl': 'NUPL', 'sth_nupl': 'STH NUPL', 'lth_nupl': 'LTH NUPL'
         }, inplace=True)
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
         df = df.dropna(subset=['Date']).sort_values('Date').drop_duplicates(subset=['Date'], keep='last')
+        # STH/LTH P/L Ratio sudah dipindahkan ke data_pl.csv — load dan merge di sini
+        try:
+            df_pl = pd.read_csv("data_pl.csv")[['date', 'sth_pl_ratio', 'lth_pl_ratio']]
+            df_pl.rename(columns={'date': 'Date', 'sth_pl_ratio': 'STH P/L Ratio', 'lth_pl_ratio': 'LTH P/L Ratio'}, inplace=True)
+            df_pl['Date'] = pd.to_datetime(df_pl['Date'], errors='coerce')
+            df = pd.merge(df, df_pl, on='Date', how='left')
+        except Exception:
+            df['STH P/L Ratio'] = 1.0
+            df['LTH P/L Ratio'] = 1.0
         df['LTH P/L Ratio'] = df['LTH P/L Ratio'].ffill().fillna(1.0)
         df['STH P/L Ratio'] = df['STH P/L Ratio'].ffill().fillna(1.0)
         return df

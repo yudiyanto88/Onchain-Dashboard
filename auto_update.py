@@ -79,11 +79,11 @@ if not df_age.empty:
     lth_loss = df_age[[f'band_{i}_loss_usd' for i in range(3, 11)]].sum(axis=1)
     df_age['lth_pl_ratio'] = (lth_prof / lth_loss).replace([np.inf, -np.inf], np.nan).ffill().fillna(1.0)
     
-    df_age_clean = df_age[['date', 'sth_pl_ratio', 'lth_pl_ratio']]
+    df_age_pl = df_age[['date', 'sth_pl_ratio', 'lth_pl_ratio']]
 else:
-    df_age_clean = pd.DataFrame(columns=['date', 'sth_pl_ratio', 'lth_pl_ratio'])
+    df_age_pl = pd.DataFrame(columns=['date', 'sth_pl_ratio', 'lth_pl_ratio'])
 
-dfs = [df_sopr, df_lth_sopr, df_sth_sopr, df_net_pl, df_age_clean, df_nupl]
+dfs = [df_sopr, df_lth_sopr, df_sth_sopr, df_net_pl, df_nupl]
 df_master_mom = dfs[0]
 for d in dfs[1:]:
     if not d.empty:
@@ -94,7 +94,7 @@ if not df_master_mom.empty:
     df_master_mom = df_master_mom.sort_values('date').reset_index(drop=True)
     df_master_mom.to_csv("data_momentum.csv", index=False)
     print("✅ data_momentum.csv berhasil diperbarui.")
-    print(df_master_mom[['date', 'btc_price', 'sth_pl_ratio', 'lth_pl_ratio']].tail(3).to_string(index=False))
+    print(df_master_mom[['date', 'btc_price', 'asopr', 'net_realized_pl_usd']].tail(3).to_string(index=False))
 
 # ==========================================
 # 3. PIPELINE: DERIVATIVES
@@ -369,16 +369,65 @@ except Exception as e:
 
 
 # ==========================================
-# 15. MASTER PIPELINE: ALL METRICS AGGREGATOR (NEW)
+# 15. PIPELINE: REALIZED PROFIT/LOSS IN BTC + P/L RATIOS
 # ==========================================
-print("\n[15/15] 🌌 Mengkompilasi Semua File CSV ke dalam 1 Master Dataset...")
+print("\n[15/16] Menarik data Realized Profit/Loss (BTC) + P/L Ratios...")
+try:
+    df_rpl = fetch_data(
+        "https://chartinspect.com/api/onchain/realized-profit-loss?timeframe=all&isProUser=false",
+        ['date', 'btc_price', 'daily_realized_profit_btc', 'daily_realized_loss_btc']
+    )
+
+    if not df_rpl.empty:
+        df_rpl['rpl_ratio'] = (df_rpl['daily_realized_profit_btc'] / df_rpl['daily_realized_loss_btc']).replace([np.inf, -np.inf], np.nan)
+
+        if not df_age_pl.empty:
+            df_rpl = pd.merge(df_rpl, df_age_pl, on='date', how='outer')
+
+        df_rpl['date'] = pd.to_datetime(df_rpl['date'], errors='coerce').dt.strftime('%Y-%m-%d')
+        df_rpl = df_rpl.dropna(subset=['date']).drop_duplicates(subset=['date'], keep='last')
+        df_rpl = df_rpl.sort_values('date').reset_index(drop=True)
+        df_rpl.to_csv("data_pl.csv", index=False)
+        print("✅ data_pl.csv berhasil diperbarui.")
+
+        # Update data_pl_events.csv — preserve existing event annotations, append new rows only
+        events_file = "data_pl_events.csv"
+        if not os.path.exists(events_file):
+            df_pl_events = df_rpl.copy()
+            df_pl_events.insert(1, 'event', '')
+            df_pl_events.to_csv(events_file, index=False)
+            print("✅ data_pl_events.csv berhasil dibuat (baru).")
+        else:
+            df_existing_events = pd.read_csv(events_file)
+            df_existing_events['date'] = pd.to_datetime(df_existing_events['date'], errors='coerce').dt.strftime('%Y-%m-%d')
+            latest_date = df_existing_events['date'].max()
+            df_new_rows = df_rpl[df_rpl['date'] > latest_date].copy()
+            if not df_new_rows.empty:
+                df_new_rows.insert(1, 'event', '')
+                df_existing_events = pd.concat([df_existing_events, df_new_rows], ignore_index=True)
+                df_existing_events = df_existing_events.sort_values('date').reset_index(drop=True)
+                df_existing_events.to_csv(events_file, index=False)
+                print(f"✅ data_pl_events.csv diperbarui (+{len(df_new_rows)} baris baru).")
+            else:
+                print("ℹ️ data_pl_events.csv: sudah up-to-date.")
+
+        print(df_rpl[['date', 'btc_price', 'rpl_ratio', 'sth_pl_ratio', 'lth_pl_ratio']].tail(3).to_string(index=False))
+    else:
+        print("❌ GAGAL: Data Realized P/L BTC kosong atau gagal ditarik.")
+except Exception as e:
+    print(f"❌ Error Pipeline 15 Realized P/L BTC: {e}")
+
+# ==========================================
+# 16. MASTER PIPELINE: ALL METRICS AGGREGATOR (NEW)
+# ==========================================
+print("\n[16/16] 🌌 Mengkompilasi Semua File CSV ke dalam 1 Master Dataset...")
 try:
     # Daftar semua file CSV target hulu hasil rekapitulasi individu
     csv_files = [
-        "data_price_level.csv", "data_momentum.csv", "data_derivatives.csv",
-        "data_sentiment.csv", "data_supply.csv", "data_mvrv.csv", "data_fg.csv",
-        "data_exchange.csv", "data_rhodl.csv", "data_hodl_waves.csv",
-        "data_realized_cap.csv", "data_cdd.csv", "data_lth_flow.csv"
+        "data_price_level.csv", "data_momentum.csv", "data_pl.csv",
+        "data_derivatives.csv", "data_sentiment.csv", "data_supply.csv",
+        "data_mvrv.csv", "data_fg.csv", "data_exchange.csv", "data_rhodl.csv",
+        "data_hodl_waves.csv", "data_realized_cap.csv", "data_cdd.csv", "data_lth_flow.csv"
     ]
     
     df_master = None
