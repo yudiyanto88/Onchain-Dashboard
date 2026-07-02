@@ -1112,8 +1112,6 @@ elif selected_menu == "Supply Dynamics":
         with k5_sd2: render_kpi_sd("STH % Profit", last_sd.get('STH % Profit', 0), prev_sd.get('STH % Profit', 0), True)
         st.markdown("---")
 
-        df_sd2, w_sd2 = apply_filters(df_supply_raw, st.session_state.tf_sd, st.session_state.sma_sd, st.session_state.cs_sd, st.session_state.tr_sd, st.session_state.cd_sd, ['LTH % Profit', 'STH % Profit', 'LTH % Loss', 'STH % Loss', 'Total % Profit', 'Total % Loss'])
-
         col_fs_sd2, col_tf_sd2, col_sma_sd2, col_sma_cst_sd2, col_radio_sd2, col_custom_sd2 = st.columns([1, 1.2, 1.2, 1, 6, 1.2], vertical_alignment="bottom", gap="small")
         with col_fs_sd2: focus_sd2 = st.toggle("Full Screen", key="tg_sd2")
         with col_tf_sd2: st.session_state.tf_sd = st.selectbox("Timeframe", ["Daily", "3 Days", "Weekly", "Monthly"], index=["Daily", "3 Days", "Weekly", "Monthly"].index(st.session_state.tf_sd), key="tfs_sd2")
@@ -1125,7 +1123,9 @@ elif selected_menu == "Supply Dynamics":
             st.session_state.tr_sd = st.radio("Range:", t_opts, index=c_idx_sd, horizontal=True, label_visibility="collapsed", key="rg_sd2")
         with col_custom_sd2:
             if st.session_state.tr_sd == "Custom": st.session_state.cd_sd = st.number_input("Days back", min_value=7, value=st.session_state.cd_sd, label_visibility="collapsed", key="cdin_sd2")
-            
+
+        df_sd2, w_sd2 = apply_filters(df_supply_raw, st.session_state.tf_sd, st.session_state.sma_sd, st.session_state.cs_sd, st.session_state.tr_sd, st.session_state.cd_sd, ['LTH % Profit', 'STH % Profit', 'LTH % Loss', 'STH % Loss', 'Total % Profit', 'Total % Loss'])
+
         opts_sd_pct = ['⚪ Total % Profit', '⚫ Total % Loss', '🔵 LTH % Profit', '🟣 LTH % Loss', '🔴 STH % Profit', '🟠 STH % Loss']
         all_opts_sd_pct = opts_sd_pct.copy()
         if w_sd2 > 1: all_opts_sd_pct.extend([f"{m} (SMA {w_sd2})" for m in opts_sd_pct])
