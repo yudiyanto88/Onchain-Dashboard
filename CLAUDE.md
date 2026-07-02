@@ -124,10 +124,25 @@ Semua dokumen berikut ada di folder ini. Baca yang relevan sebelum analisis:
 
 ---
 
-## CURRENT STATE (terakhir diupdate: Juni 2026)
+## CURRENT STATE
+
+### 3 Juli 2026 (data: 29 Juni 2026)
+
+- **BTC Price:** $59,635
+- **S2 Latch:** AKTIF sejak November 2025
+- **Zona:** HIJAU TUA (zona shift dari BIRU — Supply in Profit 46.53%, sustained < 50% selama 5 hari)
+- **Regime:** Bear Market Decline, mid-to-late stage
+- **BB1:** 1/5 triggers met (hanya Supply trigger) — belum actionable (min. 4/5)
+- **PD1:** 0/5 triggers met
+- **Confidence:** MEDIUM
+- **Notable:** LTH-SOPR 0.774 (capitulation sedang berlangsung tapi belum di threshold BB1 < 0.50). MVRV 1.12, NUPL 0.107 — belum di level deep capitulation.
+
+---
+
+### Juni 2026 (sebelumnya)
 
 - **S2 Latch:** AKTIF sejak November 2025
-- **Zona terakhir:** ZONA BIRU (borderline HIJAU TUA — Supply in Profit ~49-62% range)
+- **Zona:** BIRU (borderline HIJAU TUA — Supply in Profit ~49-62% range)
 - **Regime:** Bear Market Decline, mid-to-late stage
 - **BB1:** 0-1/5 triggers met (belum actionable)
 - **PD1:** 0/5 triggers met
