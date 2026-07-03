@@ -265,8 +265,12 @@ def load_data_aviv():
         df.rename(columns={
             'date': 'Date',
             'price_at_aviv_mean': 'AVIV Mean Price',
-            'price_at_aviv_upper_0.5sd': 'AVIV +0.5σ Price',
         }, inplace=True)
+        # ChartInspect export no longer provides the 0.5sd band directly (only 1sd/2sd).
+        # Sigma bands are linear on the ratio scale, so the 0.5sd price is the midpoint
+        # between the mean price and the +1sd price.
+        if 'price_at_aviv_plus_1_sigma' in df.columns:
+            df['AVIV +0.5σ Price'] = (df['AVIV Mean Price'] + df['price_at_aviv_plus_1_sigma']) / 2
         df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
         return df.dropna(subset=['Date']).sort_values('Date').drop_duplicates(subset=['Date'], keep='last')
     except: return pd.DataFrame()
