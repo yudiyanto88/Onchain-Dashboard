@@ -288,13 +288,15 @@ ALL_CHECKERS = [
 # Message builder
 # ---------------------------------------------------------------------------
 
-ZONE_LABELS = {
-    "Z1":  "Price < STH RP — bear bottom terdalam",
-    "Z1b": "STH RP ≤ Price < RP",
-    "Z2":  "STH RP ≈ RP ≈ LTH RP — konvergen",
-    "Z3":  "RP ≤ Price < AVIV Mean",
-    "Z4":  "AVIV Mean ≤ Price < AVIV Upper",
-    "Z5":  "Price ≥ AVIV Upper — puncak siklus",
+# Deskripsi singkat tiap zona (dipakai berulang di berbagai tempat pesan,
+# supaya Z[x] apapun yang disebut selalu ada penjelasannya).
+ZONE_DESC_SHORT = {
+    "Z1":  "harga di bawah STH RP, bear bottom terdalam",
+    "Z1b": "harga antara STH RP dan RP",
+    "Z2":  "STH RP≈RP≈LTH RP, konvergen",
+    "Z3":  "harga antara RP dan AVIV Mean",
+    "Z4":  "harga antara AVIV Mean–AVIV Upper",
+    "Z5":  "puncak siklus, di atas AVIV Upper",
 }
 
 # Batas atas tiap zona + zona tujuan kalau tembus ke atas. Z2/Z5 ditangani
@@ -307,15 +309,34 @@ ZONE_UPPER_BOUND = {
 }
 
 
+def zone_numeric_desc(row: pd.Series, zone: str) -> str:
+    """Deskripsi zona SAAT INI dengan angka $ asli (bukan label generik)."""
+    sth_rp, rp = row["sth_cost_basis"], row["realized_price"]
+    aviv_mean, aviv_upper = row["aviv_mean_px"], row["aviv_upper_px"]
+    if zone == "Z1":
+        return f"harga di bawah STH RP ${sth_rp:,.0f}, bear bottom terdalam"
+    if zone == "Z1b":
+        return f"harga antara STH RP ${sth_rp:,.0f} – RP ${rp:,.0f}"
+    if zone == "Z2":
+        return "STH RP≈RP≈LTH RP, konvergen"
+    if zone == "Z3":
+        return f"harga antara RP ${rp:,.0f} – AVIV Mean ${aviv_mean:,.0f}"
+    if zone == "Z4":
+        return f"harga antara AVIV Mean ${aviv_mean:,.0f} – AVIV Upper ${aviv_upper:,.0f}"
+    if zone == "Z5":
+        return f"harga di atas AVIV Upper ${aviv_upper:,.0f}, puncak siklus"
+    return ""
+
+
 def build_zone_block(row: pd.Series, zone: str) -> list[str]:
     price = row["btc_price"]
-    lines = [f"📍 Zona {zone}: {ZONE_LABELS.get(zone, '')}"]
+    lines = []
 
     if zone in ZONE_UPPER_BOUND:
         label, col, target = ZONE_UPPER_BOUND[zone]
         level = row[col]
         pct = (level / price - 1) * 100
-        lines.append(f"⬆️ Ke atas: {label} ${level:,.0f} ({pct:+.1f}%) → masuk {target}")
+        lines.append(f"⬆️ {label} {pct:+.1f}% → {target} ({ZONE_DESC_SHORT[target]})")
     elif zone == "Z5":
         lines.append("⬆️ Sudah di puncak zona — tidak ada batas atas")
     elif zone == "Z2":
@@ -324,7 +345,7 @@ def build_zone_block(row: pd.Series, zone: str) -> list[str]:
     cvdd = row["cvdd"]
     cvdd_ratio = price / cvdd
     cvdd_pct = (cvdd / price - 1) * 100
-    lines.append(f"⬇️ Ke bawah: CVDD ${cvdd:,.0f} ({cvdd_pct:+.1f}%) | Price/CVDD {cvdd_ratio:.2f} (K4 flag ≤1.10)")
+    lines.append(f"⬇️ CVDD {cvdd_pct:+.1f}% (Price/CVDD {cvdd_ratio:.2f})")
 
     return lines
 
@@ -338,10 +359,8 @@ def build_k3_k4_block(df: pd.DataFrame) -> list[str]:
     pnl_pct = (K3_SHORT_ENTRY_PRICE - price) / K3_SHORT_ENTRY_PRICE * 100
 
     lines = [
-        f"🎯 *K3 — Short aktif* (entry ~${K3_SHORT_ENTRY_PRICE:,.0f})",
-        f"Unrealized: {pnl_pct:+.1f}%",
-        "",
-        "*Exit check K3:*",
+        f"K3 (short/hedge saat bear mulai) — AKTIF (entry ${K3_SHORT_ENTRY_PRICE:,.0f}, {pnl_pct:+.1f}%)",
+        "Exit kalau salah satu ini kejadian:",
     ]
 
     # Kondisi 1: 4 hari berturutan close > AVIV Mean, tapi harga masih < STH RP
@@ -349,39 +368,57 @@ def build_k3_k4_block(df: pd.DataFrame) -> list[str]:
     above_mean_streak = len(last4) >= 4 and (last4["btc_price"] > last4["aviv_mean_px"]).all()
     below_sth = price < today["sth_cost_basis"]
     cond1 = above_mean_streak and below_sth
-    lines.append(f"• 4hr close > AVIV Mean, masih < STH RP: {'✅ kurangi ukuran short' if cond1 else 'belum'}")
+    mark1 = "✅" if cond1 else "✗"
+    lines.append(
+        f"{mark1} Harga 4 hari beruntun di atas AVIV Mean, tapi masih di bawah "
+        f"STH RP (${today['sth_cost_basis']:,.0f}) → kurangi sizing short"
+    )
 
     # Kondisi 2: harga balik ke Z5 dan bertahan ≥3 hari
     last3 = df.tail(3)
     zones3 = last3.apply(classify_zone, axis=1)
     cond2 = len(last3) >= 3 and (zones3 == "Z5").all()
-    lines.append(f"• Balik ke Z5 (≥3 hari): {'✅ tutup short penuh' if cond2 else 'belum'}")
+    mark2 = "✅" if cond2 else "✗"
+    lines.append(
+        f"{mark2} Harga balik ke Z5 ({ZONE_DESC_SHORT['Z5']}) & bertahan 3 hari "
+        f"→ tutup short penuh (bacaan K3 salah)"
+    )
 
     # Kondisi 3: K4 mulai aktif (zona Z1 hari ini)
     cond3 = classify_zone(today) == "Z1"
-    lines.append(f"• K4 mulai aktif (Z1): {'✅ tutup short, alih ke akumulasi' if cond3 else 'belum'}")
+    mark3 = "✅" if cond3 else "✗"
+    lines.append(
+        f"{mark3} K4 mulai aktif, masuk Z1 ({ZONE_DESC_SHORT['Z1']}) "
+        f"→ tutup short, pindah ke akumulasi"
+    )
 
     # K4 watch — 4 kondisi framework
     lth_mvrv = today["lth_mvrv"]
     c1 = lth_mvrv < 1.0
 
-    asopr_7d = df.tail(7)["asopr"]
-    asopr_streak_ok = len(asopr_7d) >= 7 and (asopr_7d < 0.93).all()
-    lth_sopr_ok = today["lth_sopr"] < 0.50
-    c2 = asopr_streak_ok and lth_sopr_ok
+    asopr_streak = 0
+    for v in df["asopr"].iloc[::-1]:
+        if v < 0.93:
+            asopr_streak += 1
+        else:
+            break
+    lth_sopr = today["lth_sopr"]
+    c2 = asopr_streak >= 7 and lth_sopr < 0.50
 
-    c3 = today["percent_btc_in_profit"] < 50 and today["pct_sth_in_profit"] < 10
+    supply_profit, sth_profit = today["percent_btc_in_profit"], today["pct_sth_in_profit"]
+    c3 = supply_profit < 50 and sth_profit < 10
 
-    c4 = (price / today["cvdd"]) < 1.10
+    cvdd_ratio_now = price / today["cvdd"]
+    c4 = cvdd_ratio_now < 1.10
 
     k4_score = sum([c1, c2, c3, c4])
     lines += [
         "",
-        f"*K4 watch ({k4_score}/4 kondisi):*",
-        f"• LTH-MVRV < 1.0: {'✅' if c1 else '—'} ({lth_mvrv:.2f})",
-        f"• aSOPR<0.93×7hr & LTH-SOPR<0.50: {'✅' if c2 else '—'} (LTH-SOPR {today['lth_sopr']:.2f})",
-        f"• Supply Profit<50% & STH<10%: {'✅' if c3 else '—'} ({today['percent_btc_in_profit']:.1f}% / {today['pct_sth_in_profit']:.1f}%)",
-        f"• Price/CVDD < 1.10: {'✅' if c4 else '—'} ({price / today['cvdd']:.2f})",
+        f"K4 (akumulasi agresif di bear bottom) — {k4_score}/4 kondisi",
+        f"{'✅' if c1 else '✗'} LTH-MVRV {lth_mvrv:.2f} (target <1.0)",
+        f"{'✅' if c2 else '✗'} aSOPR streak {asopr_streak} hari (target ≥7 hari) & LTH-SOPR {lth_sopr:.2f} (target <0.50)",
+        f"{'✅' if c3 else '✗'} Supply Profit {supply_profit:.1f}% / STH {sth_profit:.1f}% (target <50% / <10%)",
+        f"{'✅' if c4 else '✗'} Price/CVDD {cvdd_ratio_now:.2f} (target <1.10)",
     ]
     return lines
 
@@ -390,16 +427,11 @@ def build_message(row: pd.Series, triggered: list[Condition], df: pd.DataFrame) 
     zone     = classify_zone(row)
     date_str = str(row["date"])[:10]
 
-    if triggered:
-        lines = [
-            f"🔔 *BTC ALERT — {date_str}*",
-            f"Harga: *${row['btc_price']:,.0f}* | Zona: *{zone}*",
-        ]
-    else:
-        lines = [
-            f"📊 BTC Status — {date_str}",
-            f"Harga: *${row['btc_price']:,.0f}* | Zona: *{zone}*",
-        ]
+    header = f"🔔 *BTC ALERT — {date_str}*" if triggered else f"📊 BTC Status — {date_str}"
+    lines = [
+        header,
+        f"${row['btc_price']:,.0f} | Zona {zone} ({zone_numeric_desc(row, zone)})",
+    ]
 
     lines.append("")
     lines += build_zone_block(row, zone)
@@ -413,17 +445,8 @@ def build_message(row: pd.Series, triggered: list[Condition], df: pd.DataFrame) 
         for c in triggered:
             lines.append(f"• *{c.name}*: {c.detail}")
     else:
-        lines += ["", "Tidak ada kondisi khusus hari ini — cuma update rutin."]
+        lines += ["", "Tidak ada kondisi trigger khusus hari ini."]
 
-    lines += [
-        "",
-        "📊 *KEY LEVELS:*",
-        f"STH RP     : ${row['sth_cost_basis']:,.0f}",
-        f"RP         : ${row['realized_price']:,.0f}",
-        f"AVIV Mean  : ${row['aviv_mean_px']:,.0f}",
-        f"AVIV Upper : ${row['aviv_upper_px']:,.0f}",
-        f"CVDD       : ${row['cvdd']:,.0f}",
-    ]
     return "\n".join(lines)
 
 
