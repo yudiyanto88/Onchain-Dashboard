@@ -2,7 +2,10 @@ name: Auto Update On-chain Data
 
 on:
   schedule:
-    - cron: '0 0 * * *'
+    # 04:00 UTC = 11:00 WIB — buffer 4 jam setelah tengah malam UTC supaya
+    # ChartInspect sempat finalisasi data hari sebelumnya (fetch persis di
+    # 00:00 UTC kadang masih dapat data live/belum closed)
+    - cron: '0 4 * * *'
   workflow_dispatch:
 
 # ---------------------------------------------------------

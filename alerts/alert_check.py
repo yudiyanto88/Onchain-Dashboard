@@ -288,14 +288,22 @@ def build_message(row: pd.Series, triggered: list[Condition]) -> str:
     zone     = classify_zone(row)
     date_str = str(row["date"])[:10]
 
-    lines = [
-        f"🔔 *BTC ALERT — {date_str}*",
-        f"Harga: *${row['btc_price']:,.0f}* | Zona: *{zone}*",
-        "",
-        "*KONDISI AKTIF:*",
-    ]
-    for c in triggered:
-        lines.append(f"• *{c.name}*: {c.detail}")
+    if triggered:
+        lines = [
+            f"🔔 *BTC ALERT — {date_str}*",
+            f"Harga: *${row['btc_price']:,.0f}* | Zona: *{zone}*",
+            "",
+            "*KONDISI AKTIF:*",
+        ]
+        for c in triggered:
+            lines.append(f"• *{c.name}*: {c.detail}")
+    else:
+        lines = [
+            f"📊 BTC Status — {date_str}",
+            f"Harga: *${row['btc_price']:,.0f}* | Zona: *{zone}*",
+            "",
+            "Tidak ada kondisi khusus hari ini — cuma update rutin.",
+        ]
 
     lines += [
         "",
@@ -391,15 +399,11 @@ def main():
     for c in triggered:
         print(f"  ✓ {c.name}: {c.detail}")
 
-    sent = False
-    if triggered:
-        message = build_message(today, triggered)
-        print("\n--- Preview Pesan ---")
-        print(message)
-        print("---------------------\n")
-        sent = send_telegram(message)
-    else:
-        print("\nTidak ada kondisi trigger — tidak ada pesan dikirim hari ini.")
+    message = build_message(today, triggered)
+    print("\n--- Preview Pesan ---")
+    print(message)
+    print("---------------------\n")
+    sent = send_telegram(message)
 
     save_log(today, triggered, sent)
 
