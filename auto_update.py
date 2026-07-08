@@ -429,16 +429,48 @@ except Exception as e:
     print(f"❌ Error Pipeline 15 Realized P/L BTC: {e}")
 
 # ==========================================
-# 16. MASTER PIPELINE: ALL METRICS AGGREGATOR (NEW)
+# 16. PIPELINE: AVIV RATIO & BANDS
 # ==========================================
-print("\n[16/16] 🌌 Mengkompilasi Semua File CSV ke dalam 1 Master Dataset...")
+print("\n[16/17] Menarik data AVIV Ratio & Bands...")
+try:
+    df_aviv = fetch_data(
+        "https://chartinspect.com/api/onchain/aviv-bands?timeframe=all&isProUser=false",
+        ['date', 'btc_price', 'aviv_ratio', 'aviv_mean', 'aviv_upper_1sd', 'aviv_upper_2sd',
+         'aviv_lower_1sd', 'aviv_lower_2sd', 'price_at_aviv_mean', 'price_at_aviv_plus_1_sigma',
+         'price_at_aviv_plus_2_sigma', 'price_at_aviv_minus_1_sigma', 'investor_cap',
+         'active_realized_price', 'liveliness']
+    )
+
+    if not df_aviv.empty:
+        df_aviv = df_aviv.sort_values('date').reset_index(drop=True)
+        df_aviv.to_csv("data_aviv.csv", index=False)
+        print("✅ data_aviv.csv berhasil diperbarui.")
+        print(df_aviv[['date', 'btc_price', 'aviv_ratio', 'aviv_mean']].tail(3).to_string(index=False))
+    else:
+        print("❌ GAGAL: Data AVIV Bands kosong atau gagal ditarik.")
+except Exception as e:
+    print(f"❌ Error Pipeline 16 AVIV Bands: {e}")
+
+# NOTE: kolom price_at_aviv_mean / price_at_aviv_plus_1_sigma dari API ChartInspect pakai
+# active_realized_price sebagai basis, yang salah (basis benar = btc_price / aviv_ratio,
+# match persis ke field true_market_mean_price mereka sendiri). app.py load_data_aviv() dan
+# alerts/alert_check.py load_data() SUDAH menghitung ulang sendiri dari kolom mentah
+# (btc_price, aviv_ratio, aviv_mean, aviv_upper_1sd) — kolom price_at_aviv_* di CSV ini
+# cuma dipertahankan untuk kompatibilitas script lama di research/, jangan dipakai langsung
+# di script baru.
+
+# ==========================================
+# 17. MASTER PIPELINE: ALL METRICS AGGREGATOR (NEW)
+# ==========================================
+print("\n[17/17] 🌌 Mengkompilasi Semua File CSV ke dalam 1 Master Dataset...")
 try:
     # Daftar semua file CSV target hulu hasil rekapitulasi individu
     csv_files = [
         "data_price_level.csv", "data_momentum.csv", "data_pl.csv",
         "data_derivatives.csv", "data_sentiment.csv", "data_supply.csv",
         "data_mvrv.csv", "data_fg.csv", "data_exchange.csv", "data_rhodl.csv",
-        "data_hodl_waves.csv", "data_realized_cap.csv", "data_cdd.csv", "data_lth_flow.csv"
+        "data_hodl_waves.csv", "data_realized_cap.csv", "data_cdd.csv", "data_lth_flow.csv",
+        "data_aviv.csv"
     ]
     
     df_master = None
