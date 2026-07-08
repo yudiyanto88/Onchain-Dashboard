@@ -31,6 +31,10 @@ LOOKBACK = 20              # baris history yang diload
 PULLBACK_WINDOW = 14       # hari untuk deteksi pullback 5%
 ZONE_CONVERGENCE_PCT = 0.02  # threshold Z2 convergence (2%)
 
+# --- Posisi user saat ini — update manual kalau posisi berubah ---
+K3_ACTIVE = True           # short K3 lagi jalan; set False kalau sudah ditutup
+K3_SHORT_ENTRY_PRICE = 79000  # harga entry short (Oktober 2025)
+
 
 # ---------------------------------------------------------------------------
 # Data loading
@@ -325,7 +329,64 @@ def build_zone_block(row: pd.Series, zone: str) -> list[str]:
     return lines
 
 
-def build_message(row: pd.Series, triggered: list[Condition]) -> str:
+def build_k3_k4_block(df: pd.DataFrame) -> list[str]:
+    """Status posisi short K3 user + progres menuju trigger K4.
+    Asumsi K3_ACTIVE (bukan auto-detect dari histori) — update manual di
+    config kalau posisi berubah."""
+    today = df.iloc[-1]
+    price = today["btc_price"]
+    pnl_pct = (K3_SHORT_ENTRY_PRICE - price) / K3_SHORT_ENTRY_PRICE * 100
+
+    lines = [
+        f"🎯 *K3 — Short aktif* (entry ~${K3_SHORT_ENTRY_PRICE:,.0f})",
+        f"Unrealized: {pnl_pct:+.1f}%",
+        "",
+        "*Exit check K3:*",
+    ]
+
+    # Kondisi 1: 4 hari berturutan close > AVIV Mean, tapi harga masih < STH RP
+    last4 = df.tail(4)
+    above_mean_streak = len(last4) >= 4 and (last4["btc_price"] > last4["aviv_mean_px"]).all()
+    below_sth = price < today["sth_cost_basis"]
+    cond1 = above_mean_streak and below_sth
+    lines.append(f"• 4hr close > AVIV Mean, masih < STH RP: {'✅ kurangi ukuran short' if cond1 else 'belum'}")
+
+    # Kondisi 2: harga balik ke Z5 dan bertahan ≥3 hari
+    last3 = df.tail(3)
+    zones3 = last3.apply(classify_zone, axis=1)
+    cond2 = len(last3) >= 3 and (zones3 == "Z5").all()
+    lines.append(f"• Balik ke Z5 (≥3 hari): {'✅ tutup short penuh' if cond2 else 'belum'}")
+
+    # Kondisi 3: K4 mulai aktif (zona Z1 hari ini)
+    cond3 = classify_zone(today) == "Z1"
+    lines.append(f"• K4 mulai aktif (Z1): {'✅ tutup short, alih ke akumulasi' if cond3 else 'belum'}")
+
+    # K4 watch — 4 kondisi framework
+    lth_mvrv = today["lth_mvrv"]
+    c1 = lth_mvrv < 1.0
+
+    asopr_7d = df.tail(7)["asopr"]
+    asopr_streak_ok = len(asopr_7d) >= 7 and (asopr_7d < 0.93).all()
+    lth_sopr_ok = today["lth_sopr"] < 0.50
+    c2 = asopr_streak_ok and lth_sopr_ok
+
+    c3 = today["percent_btc_in_profit"] < 50 and today["pct_sth_in_profit"] < 10
+
+    c4 = (price / today["cvdd"]) < 1.10
+
+    k4_score = sum([c1, c2, c3, c4])
+    lines += [
+        "",
+        f"*K4 watch ({k4_score}/4 kondisi):*",
+        f"• LTH-MVRV < 1.0: {'✅' if c1 else '—'} ({lth_mvrv:.2f})",
+        f"• aSOPR<0.93×7hr & LTH-SOPR<0.50: {'✅' if c2 else '—'} (LTH-SOPR {today['lth_sopr']:.2f})",
+        f"• Supply Profit<50% & STH<10%: {'✅' if c3 else '—'} ({today['percent_btc_in_profit']:.1f}% / {today['pct_sth_in_profit']:.1f}%)",
+        f"• Price/CVDD < 1.10: {'✅' if c4 else '—'} ({price / today['cvdd']:.2f})",
+    ]
+    return lines
+
+
+def build_message(row: pd.Series, triggered: list[Condition], df: pd.DataFrame) -> str:
     zone     = classify_zone(row)
     date_str = str(row["date"])[:10]
 
@@ -342,6 +403,10 @@ def build_message(row: pd.Series, triggered: list[Condition]) -> str:
 
     lines.append("")
     lines += build_zone_block(row, zone)
+
+    if K3_ACTIVE:
+        lines.append("")
+        lines += build_k3_k4_block(df)
 
     if triggered:
         lines += ["", "*KONDISI AKTIF:*"]
@@ -444,7 +509,7 @@ def main():
     for c in triggered:
         print(f"  ✓ {c.name}: {c.detail}")
 
-    message = build_message(today, triggered)
+    message = build_message(today, triggered, df)
     print("\n--- Preview Pesan ---")
     print(message)
     print("---------------------\n")
