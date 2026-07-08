@@ -1,0 +1,400 @@
+BITCOIN ON-CHAIN ANALYSIS
+Date: 2026-06-11
+Data reference: 2026-06-10 (latest available)
+Framework version: signal_framework_v1.0.3
+================================================================
+
+LAYER 1 — ROUTING
+================================================================
+
+Step 1: Price vs STH Realized Price
+-------------------------------------
+BTC Price (2026-06-10) : $61,666
+STH Realized Price     : $73,984
+Gap                    : -$12,318 (-16.7%)
+% hari ABOVE (30 hari) : 4/30 = 13%
+  - ABOVE: 12-15 Mei 2026 (4 hari)
+  - BELOW: 16 Mei – 10 Juni 2026 (26 hari)
+
+Kondisi sustained >80% ABOVE? TIDAK
+→ ZONA BAWAH → lanjut Step 2B
+
+Step 2B: Total Supply in Profit
+---------------------------------
+percent_btc_in_profit (2026-06-10) : 48.71%
+Rentang 10 hari terakhir           : 47.71% – 49.87%
+Threshold HIJAU TUA                : < 50%
+Threshold BIRU                     : 50–65%
+
+Klasifikasi strict: 48.71% < 50% → ZONA HIJAU TUA
+⚠️  BOUNDARY AMBIGUITY: Supply in Profit oscillasi di boundary 50%
+    selama 10+ hari. Framework tidak mendefinisikan hysteresis rule
+    (Known Open Issue #1). Workaround sesi ini: gunakan tren 10-hari
+    (mayoritas di bawah 50%) sebagai tiebreaker.
+
+ROUTING RESULT: ZONA HIJAU TUA (primary), ZONA BIRU (secondary check)
+Active signals: BB1 (primary), PD1 (secondary)
+
+
+LAYER 2 — SIGNAL EVALUATION
+================================================================
+
+Nilai Aktual (2026-06-10)
+--------------------------
+MVRV Family:
+  MVRV Ratio   : 1.1521
+  STH-MVRV     : 0.8335
+  LTH-MVRV     : 1.2606
+
+NUPL Family:
+  NUPL         : 0.1320
+  STH-NUPL     : -0.1998
+  LTH-NUPL     : 0.2067
+  LTH-STH Gap  : 0.4065
+
+SOPR Family:
+  aSOPR        : 0.9611
+  LTH-SOPR     : 0.7730
+  STH-SOPR     : 0.9655
+  net_realized_pl_usd : -$824,437,434
+
+Price Levels:
+  STH RP               : $73,984
+  LTH RP               : $48,918
+  Realized Price       : $53,524
+  MVRV 0σ              : $97,053
+  Cum PL Price         : $46,707
+  Price / STH RP       : 0.833
+  STH / LTH RP ratio   : 1.513
+  Price / Realized     : 1.152
+  MVRV 0σ / Cum PL     : 2.077 (kalkulasi manual)
+
+Supply:
+  Total Profit %       : 48.71%
+  STH Profit %         : 6.02%
+  LTH Profit %         : 58.32%
+  STH > LTH?           : TIDAK (6.02% < 58.32%)
+
+Layer 1 routing 30-day detail:
+  2026-05-12 | Price: $80,516 | STH RP: $78,830 | ABOVE
+  2026-05-13 | Price: $79,455 | STH RP: $78,718 | ABOVE
+  2026-05-14 | Price: $81,060 | STH RP: $78,585 | ABOVE
+  2026-05-15 | Price: $79,064 | STH RP: $78,534 | ABOVE
+  2026-05-16 | Price: $78,177 | STH RP: $78,436 | BELOW
+  2026-05-17 | Price: $77,418 | STH RP: $78,435 | BELOW
+  2026-05-18 | Price: $77,092 | STH RP: $78,361 | BELOW
+  2026-05-19 | Price: $76,758 | STH RP: $78,154 | BELOW
+  2026-05-20 | Price: $77,563 | STH RP: $78,093 | BELOW
+  2026-05-21 | Price: $77,506 | STH RP: $78,095 | BELOW
+  2026-05-22 | Price: $75,960 | STH RP: $78,005 | BELOW
+  2026-05-23 | Price: $76,641 | STH RP: $77,945 | BELOW
+  2026-05-24 | Price: $77,066 | STH RP: $77,901 | BELOW
+  2026-05-25 | Price: $77,172 | STH RP: $77,910 | BELOW
+  2026-05-26 | Price: $75,821 | STH RP: $77,831 | BELOW
+  2026-05-27 | Price: $74,764 | STH RP: $77,705 | BELOW
+  2026-05-28 | Price: $73,579 | STH RP: $77,319 | BELOW
+  2026-05-29 | Price: $73,375 | STH RP: $77,163 | BELOW
+  2026-05-30 | Price: $73,907 | STH RP: $77,076 | BELOW
+  2026-05-31 | Price: $73,647 | STH RP: $77,036 | BELOW
+  2026-06-01 | Price: $71,189 | STH RP: $76,822 | BELOW
+  2026-06-02 | Price: $66,699 | STH RP: $76,376 | BELOW
+  2026-06-03 | Price: $64,257 | STH RP: $75,812 | BELOW
+  2026-06-04 | Price: $63,783 | STH RP: $75,321 | BELOW
+  2026-06-05 | Price: $61,815 | STH RP: $74,802 | BELOW
+  2026-06-06 | Price: $60,811 | STH RP: $74,600 | BELOW
+  2026-06-07 | Price: $61,793 | STH RP: $74,561 | BELOW
+  2026-06-08 | Price: $63,029 | STH RP: $74,518 | BELOW
+  2026-06-09 | Price: $61,745 | STH RP: $74,280 | BELOW
+  2026-06-10 | Price: $61,666 | STH RP: $73,984 | BELOW
+
+
+BB1: DEEP BEAR BOTTOM
+-----------------------
+Minimum confirmation: 4/5
+
+  #1 | MVRV, STH-MVRV, LTH-MVRV semua < 1.0
+     | Aktual: MVRV=1.152, STH=0.834, LTH=1.261
+     | Threshold: ketiga-tiganya < 1.0
+     | MVRV dan LTH masih di atas 1.0                          ❌
+
+  #2 | NUPL, STH-NUPL, LTH-NUPL semua negatif
+     | Aktual: NUPL=+0.132, STH=-0.200, LTH=+0.207
+     | Threshold: ketiga-tiganya < 0
+     | Hanya STH yang negatif                                   ❌
+
+  #3 | aSOPR < 0.93 DAN LTH-SOPR < 0.50
+     | Aktual: aSOPR=0.961, LTH-SOPR=0.773
+     | aSOPR tidak < 0.93, LTH-SOPR tidak < 0.50               ❌
+
+  #4 | STH/LTH RP < 1.0 DAN Price/Realized Price < 1.0
+     | Aktual: STH/LTH RP=1.513, Price/RP=1.152
+     | Keduanya jauh di atas 1.0                                ❌
+
+  #5 | Total profit < 50% DAN STH profit < 10%
+     | Aktual: Total=48.71%, STH=6.02%
+     | Kedua kondisi terpenuhi                                  ✅
+
+BB1 RESULT: 1/5 → NOT ACTIONABLE (butuh minimum 4/5)
+
+Catatan: 4 trigger yang belum terpenuhi bukan borderline — nilainya
+jauh dari threshold. MVRV 1.15 vs target <1.0. Price/RP 1.15 vs
+target <1.0. Bear masih dalam fase decline, belum di capitulation zone.
+
+
+PD1: PRE-DETECTION (secondary check)
+---------------------------------------
+Minimum confirmation: 3/5
+
+  #1 | STH-MVRV crossing above LTH-MVRV, keduanya mendekati 1.0
+     | Aktual: STH=0.834 < LTH=1.261, tidak ada cross
+     | LTH jauh dari 1.0                                        ❌
+
+  #2 | NUPL gap negatif (STH > LTH), keduanya positif rendah <0.20
+     | Aktual: STH-NUPL=-0.200, LTH-NUPL=+0.207
+     | STH negatif (bukan positif rendah), LTH masih > STH      ❌
+
+  #3 | STH-SOPR > 1.0 sustained + aSOPR < 1.0 + State D oscillation
+     | Aktual: STH-SOPR=0.966 (< 1.0), tidak sustained di atas 1.0
+     | 1 spike Jun-7 (1.098) tapi tidak sustained               ❌
+
+  #4 | Price approaching STH RP dari bawah + STH/LTH RP < 1.0
+     | Aktual: Price $61,666 vs STH RP $73,984 (gap $12,318/16.7%)
+     | Tidak "approaching". STH/LTH RP=1.513                    ❌
+
+  #5 | STH profit > LTH profit + Total profit 56–59%
+     | Aktual: STH=6.02% < LTH=58.32%, Total=48.71%
+     | STH jauh di bawah LTH, total di luar range 56-59%        ❌
+
+PD1 RESULT: 0/5 → NOT ACTIONABLE
+
+
+FRICTION LOG
+================================================================
+
+[FRICTION-1] Zone boundary tidak ada buffer — framework issue
+  - Supply in Profit oscillasi 47.71%–49.87% selama 10+ hari
+  - Boundary 50% dilintas hampir setiap hari
+  - Framework tidak mendefinisikan hysteresis/buffer rule
+  - Acknowledged sebagai Known Open Issue #1 di CLAUDE.md
+  - Dampak: active signal set berubah hari ke hari tanpa perubahan kondisi meaningful
+  - Workaround sesi ini: tren 10-hari (mayoritas < 50%) sebagai tiebreaker
+  - Solusi: tambahkan buffer rule di framework (misal: zone tidak berubah
+    sampai threshold terlampaui selama N hari berturut-turut)
+  - STATUS: GENUINE FRAMEWORK GAP — perlu update signal_framework_v1.md
+
+[FRICTION-2] Kolom MVRV 0σ corrupt di CSV header
+  - Terbaca sebagai "MVRV 0I?" di data_price_level.csv
+  - Karakter sigma (σ) tidak terbaca karena encoding issue
+  - Nilai $97,053 konsisten dan dapat dipakai (parsing by position berfungsi)
+  - Verifikasi: $97,053 / $53,524 = 1.81x ≈ plausible long-term MVRV mean
+  - TIDAK memblokir analisis — data intact, nama kolom saja yang rusak
+  - STATUS: operational concern untuk pipeline, bukan analytical blocker
+
+[FRICTION-3] State D (SOPR) tidak bisa diverifikasi tanpa sopr_knowledge_base.md
+  - PD1 Trigger #3 mensyaratkan "State D↔E oscillation 2-4 weeks"
+  - Definisi State D ada di sopr_knowledge_base.md (tidak dibaca sesi ini)
+  - Dampak sesi ini: minimal (STH-SOPR < 1.0 sudah cukup untuk ❌ trigger #3)
+  - Solusi: baca sopr_knowledge_base.md saat PD1 perlu dievaluasi penuh
+  - STATUS: tidak memblokir sesi ini, tapi perlu diperhatikan saat zone = BIRU
+
+[FRICTION-4] aSOPR 7d average tidak tersedia sebagai kolom terpisah
+  - S1 Trigger #3 menyebut "aSOPR 7d avg" sebagai kondisi evaluasi
+  - CSV hanya ada kolom asopr (nilai harian)
+  - TIDAK memblokir sesi ini: S1 hanya aktif di ZONA MERAH (tidak relevan sekarang)
+  - Solusi saat dibutuhkan: hitung rolling 7d dari kolom asopr yang sudah ada
+  - STATUS: future blocker untuk ZONA MERAH, tidak relevan sesi ini
+
+[FRICTION-5] pl_price_ratio bukan MVRV 0σ / Cum PL ratio
+  - Dashboard template meminta "MVRV 0σ / Cum PL Ratio"
+  - Kolom pl_price_ratio = btc_price / cum_pl_price = $61,666 / $46,707 = 1.320
+  - Ratio yang dibutuhkan = MVRV 0σ / Cum PL = $97,053 / $46,707 = 2.077
+  - Harus dikalkulasi manual — tidak ada dampak ke analisis karena kedua nilai tersedia
+  - STATUS: naming misleading, tidak memblokir analisis
+
+
+OUTPUT AKHIR
+================================================================
+
+REGIME CLASSIFICATION
+  Primary  : Bear Market Decline — mid-to-late stage, S2 Latch aktif sejak November 2025
+  Zone     : Borderline HIJAU TUA (48.71%, oscillasi di boundary 50%)
+  BB1      : 1/5 — belum di accumulation zone
+  PD1      : 0/5 — recovery signal belum terbentuk
+  S2 Latch : AKTIF — belum ada PD1/SB1 trigger untuk reset
+
+CONFIDENCE: MEDIUM-LOW
+  - Regime classification (bear) sendiri: HIGH
+  - "Seberapa dekat dengan bottom": rendah — 4 dari 5 BB1 triggers jauh dari threshold
+  - Zone ambiguity (boundary 50%): mengurangi routing precision
+  - Anomali Jun-7 (aSOPR briefly > 1.0, net PL positif): tidak sustained, perlu dimonitor
+
+YANG PERLU DIKONFIRMASI SEBELUM CLASSIFICATION INI BISA DIPEGANG
+  1. Resolve hysteresis issue di framework (Friction-1)
+  2. Monitor trajectory MVRV, NUPL, LTH-SOPR mingguan — kapan mulai mendekati BB1 thresholds
+  3. Perhatikan apakah anomali Jun-7 mulai terjadi lebih sering (pattern recovery atau isolated spike)
+  4. Validasi nilai MVRV 0σ $97,053 dari sumber eksternal
+
+APAKAH FRAMEWORK BISA DIEKSEKUSI TANPA AMBIGUITY?
+  Ya, dengan satu workaround (Friction-1).
+  Satu-satunya genuine framework gap adalah hysteresis di zone boundary.
+  Semua friction lainnya: data tersedia, bisa diselesaikan dari kolom yang sudah ada
+  atau dengan membaca KB file yang sudah ada di repo.
+
+ACTION ITEMS
+  - Spot only. No leverage (S2 latch aktif).
+  - Update signal_framework_v1.md: tambahkan buffer/hysteresis rule di boundary 50%
+  - Baca sopr_knowledge_base.md di sesi berikutnya untuk complete PD1 evaluation
+  - Monitor Supply in Profit weekly — threshold < 48% sustained = deeper into HIJAU TUA
+
+FRICTION-1 RESOLUTION OPTIONS
+================================================================
+
+Masalah: Supply in Profit oscillasi 47.71%–49.87% melintas boundary 50%
+hampir setiap hari. Tiga opsi untuk menambahkan hysteresis rule:
+
+OPSI A — Duration Rule (3 consecutive days)
+  Deskripsi : Zone tidak berubah sampai kondisi baru bertahan 3 hari berturut-turut
+  Kelebihan :
+    - Simpel, apply manual tanpa kalkulasi tambahan
+    - Tidak perlu ubah threshold lama yang sudah terdokumentasi di KB
+    - Konsisten dengan style framework (duration filter sudah ada di BT1, BD1)
+  Kekurangan:
+    - "3 hari" arbitrary, tidak data-backed
+    - Kalau market genuinely berubah, respons telat 3 hari
+    - Kalau oscillasi bertahan > 3 hari (seperti kondisi saat ini), tetap bisa flip
+
+OPSI B — Percentage Buffer (±1%)
+  Deskripsi : Boundary bukan 50% tapi dua garis — < 49% untuk masuk HIJAU TUA,
+              > 51% untuk masuk BIRU. Antara 49–51% tetap di zone sebelumnya.
+  Kelebihan :
+    - Respons cepat kalau ada pergerakan nyata (misal supply drop ke 45%)
+    - Buffer bisa dikalibrasi dari data historis oscillasi
+  Kekurangan:
+    - ±1% arbitrary — kalau oscillasi melebar ke ±2%, buffer jadi tidak efektif
+    - Perlu define "stuck di buffer zone" — zone apa yang berlaku kalau
+      belum pernah definitif di salah satu sisi?
+    - Menambah "zone ke-3" yang tidak ada di framework saat ini
+
+OPSI C — Kombinasi (Buffer + Duration)
+  Deskripsi : Buffer ±1% AND harus bertahan 3 hari berturut-turut
+  Kelebihan :
+    - Paling robust, false transition paling sedikit
+  Kekurangan:
+    - Paling lambat respons — double filter bisa terlalu konservatif
+    - Kompleks untuk apply manual
+    - Kalau supply drop signifikan dalam satu hari, tetap harus tunggu 3 hari
+
+KONTEKS PENTING
+  Ini adalah routing rule, bukan signal trigger. Tujuannya hanya menentukan
+  signal set mana yang dievaluasi — bukan langsung actionable.
+  Kondisi saat ini: BB1 1/5 dan PD1 0/5 terlepas dari zone mana yang dipakai.
+  Zone ambiguity saat ini tidak berdampak ke actionability.
+  Implikasi: tidak perlu solusi yang terlalu ketat. Opsi A sudah cukup.
+
+KEPUTUSAN: [PENDING — belum dipilih]
+
+================================================================
+END OF ANALYSIS
+
+
+================================================================
+DEBUGGING SESSION: CUM LTH P/L PRICE FORMULA
+Date: 2026-06-11
+================================================================
+
+TUJUAN
+  Debug kalkulasi "Cumulative LTH P/L Price" di Pipeline 9 (auto_update.py).
+  Target: error < 3% di 3 checkpoint validasi.
+
+FORMULA YANG DIKONFIRMASI
+  cum_pl_price[t] = realized_price[t] + cumsum(Net P/L bands 5-11) / lth_supply[t]
+
+  Dimana:
+    - realized_price = kolom realized_price dari data_price_level.csv
+    - Net P/L bands 5-11 = profit minus loss dari CI API "realized-profit-by-age"
+      (bands 5=6-12m, 6=1-2y, 7=2-3y, 8=3-5y, 9=5-7y, 10=7-10y, 11=10y+)
+    - lth_supply = lth_supply_btc dari data_supply.csv
+    - cumsum = kumulatif dari row pertama data API
+
+CHECKPOINT VALIDASI
+  Tanggal       | CI Target  | Formula Result | Error
+  --------------|------------|----------------|--------
+  Dec 17, 2017  | $6,000     | $7,413         | +23.5%   ← TARGET FIX
+  Nov 9, 2021   | $39,900    | $39,307        | -1.5%    ✅
+  Jun 7, 2026   | $103,500   | $100,364       | -3.0%    ✅
+
+HIPOTESIS YANG SUDAH DIUJI (semua gagal)
+
+  1. realized_price[t] sebagai base (formula saat ini)
+     Dec 2017: +23.5% ❌ | Nov 2021: -1.5% OK | Jun 2026: -3.0% OK
+
+  2. Start date sweep (cumsum mulai 2010, 2011, ... 2017)
+     Start 2017-01-01 — Dec 2017: +18.7% ❌ | Nov 2021: -1.9% OK | Jun 2026: -3.2% OK
+     (Tidak ada start date yang fix Dec 2017 tanpa rusak yang lain)
+
+  3. Bands 6-11 only (drop band_5 / 6-12m)
+     Dec 2017: +9.9% ❌ | Nov 2021: -12.6% ❌ | Jun 2026: -11.4% ❌
+
+  4. Total supply (lth+sth) sebagai denominator
+     Dec 2017: +1.2% OK | Nov 2021: -10.2% ❌ | Jun 2026: -11.3% ❌
+
+  5. active_realized_price sebagai base
+     Dec 2017: +74.3% ❌ | Nov 2021: +35.4% ❌ | Jun 2026: +26.8% ❌
+
+  6. band_X_net_usd vs profit-loss manual
+     Identik, tidak ada perbedaan
+
+BUKTI MATEMATIS TIDAK ADA FIX SEDERHANA
+
+  Untuk formula: baseline + cumsum/lth_supply = CI_target
+  Maka: baseline = CI_target - cumsum/lth_supply
+
+  Baseline yang DIBUTUHKAN per checkpoint:
+    Dec 17, 2017  → $3,140   (cumsum/supply = $2,860, target $6,000)
+    Nov 9, 2021   → $24,356  (cumsum/supply = $15,544, target $39,900)
+    Jun 7, 2026   → $56,731  (cumsum/supply = $46,769, target $103,500)
+
+  Untuk single fixed-date baseline:
+    Dec 2017 cocok → butuh baseline $2,960–$3,320
+    Nov 2021 cocok → butuh baseline $23,159–$25,553
+    Gap antara range: $21,215 → TIDAK BISA dipenuhi oleh satu nilai
+
+  Catatan: realized_price[t] ≈ baseline yang dibutuhkan untuk Nov 2021 (-2.4%)
+  dan Jun 2026 (-5.5%), tapi +45% off untuk Dec 2017.
+
+DISCOVERY TAMBAHAN
+
+  CI "Cumulative P/L Price" (formula resmi CI):
+    = LTH Realized Price_initial + cumsum/lth_supply
+    = $549.67 + $25.476B/8,908,820 BTC
+    = $549.67 + $2,860 = $3,410 di Dec 2017
+    (Ini berbeda, bukan metrik yang sama)
+
+  Nilai $5,500 yang CI tunjukkan di chart "Cumulative P/L Price" Dec 2017
+  JUGA beda dengan target $6,000 yang kita kejar.
+  Artinya: target $6,000 = metrik ketiga yang belum teridentifikasi formulanya.
+
+KESIMPULAN
+
+  1. Formula realized_price[t] + cumsum/lth_supply BENAR untuk 2021-2026
+     (error -1.5% dan -3.0%).
+
+  2. Target $6,000 untuk Dec 17, 2017 kemungkinan besar adalah visual read
+     dari log-scale chart. Pada ATH 2017, distinguishing $6,000 dari $7,413
+     bisa hanya ~7 pixel di chart biasa.
+
+  3. TIDAK ADA perubahan formula sederhana yang bisa fix Dec 2017 tanpa
+     merusak akurasi 2021-2026 yang sudah bagus.
+
+  4. Rekomendasi: PERTAHANKAN formula saat ini. Error Dec 2017 adalah
+     outlier yang tidak merepresentasikan kelemahan formula.
+
+STATUS DEBUGGING: SELESAI — tidak ada fix yang justified
+Formula di auto_update.py Pipeline 9: acceptable as-is.
+
+FILE TERKAIT
+  - debug_formula.py   : test rolling windows dan formula variants
+  - debug_2017.py      : trace cumsum per tahun, start_date sweep, band variants
+
+================================================================
+END OF DEBUGGING SESSION

@@ -19,4 +19,4 @@ jobs:
         run: pip install pandas numpy requests
 
       - name: Run debug script
-        run: python debug_formula.py
+        run: python research/debug_formula.py

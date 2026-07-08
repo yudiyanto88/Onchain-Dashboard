@@ -1,0 +1,31 @@
+[Data] 6364 rows | 2009-01-03 – 2026-06-11
+
+============================================================
+  BITCOIN ML ZONE PREDICTOR
+============================================================
+  Data: 2026-06-11  |  BTC: $62,006
+------------------------------------------------------------
+
+CURRENT ZONE (rule-based): 💚 HIJAU_TUA
+  Price vs STH RP : 0.841x  (STH RP: $73,739)
+  Price vs LTH RP : 1.265x  (LTH RP: $49,027)
+  Price vs RP     : 1.159x  (RP: $53,518)
+  Supply in Profit: 49.4%
+
+PREDIKSI +7 HARI (2026-06-18):
+  Zona: 💚 HIJAU_TUA  (71% confidence)
+  Distribusi: HIJAU_TUA 71% | BIRU 28%
+
+PREDIKSI +14 HARI (2026-06-25):
+  Zona: 💚 HIJAU_TUA  (68% confidence)
+  Distribusi: HIJAU_TUA 68% | BIRU 30%
+
+MODEL PERFORMANCE (walk-forward CV, 5-fold):
+  +7d  — Accuracy: 61.1% ± 13.4%  |  Weighted F1: 60.4% ± 14.8%
+  +14d — Accuracy: 52.0% ± 10.2%  |  Weighted F1: 50.3% ± 12.4%
+
+  ⚠  Model dilatih ~4 market cycles. Gunakan sebagai
+     supporting signal, bukan sole decision maker.
+  ⚠  S2 Latch AKTIF — bear market regime confirmed.
+============================================================
+
