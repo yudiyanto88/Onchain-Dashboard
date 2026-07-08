@@ -284,6 +284,47 @@ ALL_CHECKERS = [
 # Message builder
 # ---------------------------------------------------------------------------
 
+ZONE_LABELS = {
+    "Z1":  "Price < STH RP — bear bottom terdalam",
+    "Z1b": "STH RP ≤ Price < RP",
+    "Z2":  "STH RP ≈ RP ≈ LTH RP — konvergen",
+    "Z3":  "RP ≤ Price < AVIV Mean",
+    "Z4":  "AVIV Mean ≤ Price < AVIV Upper",
+    "Z5":  "Price ≥ AVIV Upper — puncak siklus",
+}
+
+# Batas atas tiap zona + zona tujuan kalau tembus ke atas. Z2/Z5 ditangani
+# terpisah (Z2 = state konvergen tanpa batas harga tunggal, Z5 = sudah puncak).
+ZONE_UPPER_BOUND = {
+    "Z1":  ("STH RP", "sth_cost_basis", "Z1b"),
+    "Z1b": ("RP", "realized_price", "Z2"),
+    "Z3":  ("AVIV Mean", "aviv_mean_px", "Z4"),
+    "Z4":  ("AVIV Upper", "aviv_upper_px", "Z5"),
+}
+
+
+def build_zone_block(row: pd.Series, zone: str) -> list[str]:
+    price = row["btc_price"]
+    lines = [f"📍 Zona {zone}: {ZONE_LABELS.get(zone, '')}"]
+
+    if zone in ZONE_UPPER_BOUND:
+        label, col, target = ZONE_UPPER_BOUND[zone]
+        level = row[col]
+        pct = (level / price - 1) * 100
+        lines.append(f"⬆️ Ke atas: {label} ${level:,.0f} ({pct:+.1f}%) → masuk {target}")
+    elif zone == "Z5":
+        lines.append("⬆️ Sudah di puncak zona — tidak ada batas atas")
+    elif zone == "Z2":
+        lines.append("⬆️ Zona transisi (konvergen) — tunggu breakout arah Z3")
+
+    cvdd = row["cvdd"]
+    cvdd_ratio = price / cvdd
+    cvdd_pct = (cvdd / price - 1) * 100
+    lines.append(f"⬇️ Ke bawah: CVDD ${cvdd:,.0f} ({cvdd_pct:+.1f}%) | Price/CVDD {cvdd_ratio:.2f} (K4 flag ≤1.10)")
+
+    return lines
+
+
 def build_message(row: pd.Series, triggered: list[Condition]) -> str:
     zone     = classify_zone(row)
     date_str = str(row["date"])[:10]
@@ -292,18 +333,22 @@ def build_message(row: pd.Series, triggered: list[Condition]) -> str:
         lines = [
             f"🔔 *BTC ALERT — {date_str}*",
             f"Harga: *${row['btc_price']:,.0f}* | Zona: *{zone}*",
-            "",
-            "*KONDISI AKTIF:*",
         ]
-        for c in triggered:
-            lines.append(f"• *{c.name}*: {c.detail}")
     else:
         lines = [
             f"📊 BTC Status — {date_str}",
             f"Harga: *${row['btc_price']:,.0f}* | Zona: *{zone}*",
-            "",
-            "Tidak ada kondisi khusus hari ini — cuma update rutin.",
         ]
+
+    lines.append("")
+    lines += build_zone_block(row, zone)
+
+    if triggered:
+        lines += ["", "*KONDISI AKTIF:*"]
+        for c in triggered:
+            lines.append(f"• *{c.name}*: {c.detail}")
+    else:
+        lines += ["", "Tidak ada kondisi khusus hari ini — cuma update rutin."]
 
     lines += [
         "",
