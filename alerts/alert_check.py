@@ -368,7 +368,7 @@ def build_k3_k4_block(df: pd.DataFrame) -> list[str]:
     above_mean_streak = len(last4) >= 4 and (last4["btc_price"] > last4["aviv_mean_px"]).all()
     below_sth = price < today["sth_cost_basis"]
     cond1 = above_mean_streak and below_sth
-    mark1 = "✅" if cond1 else "✗"
+    mark1 = "✅" if cond1 else "❌"
     lines.append(
         f"{mark1} Harga 4 hari beruntun di atas AVIV Mean, tapi masih di bawah "
         f"STH RP (${today['sth_cost_basis']:,.0f}) → kurangi sizing short"
@@ -378,7 +378,7 @@ def build_k3_k4_block(df: pd.DataFrame) -> list[str]:
     last3 = df.tail(3)
     zones3 = last3.apply(classify_zone, axis=1)
     cond2 = len(last3) >= 3 and (zones3 == "Z5").all()
-    mark2 = "✅" if cond2 else "✗"
+    mark2 = "✅" if cond2 else "❌"
     lines.append(
         f"{mark2} Harga balik ke Z5 ({ZONE_DESC_SHORT['Z5']}) & bertahan 3 hari "
         f"→ tutup short penuh (bacaan K3 salah)"
@@ -386,7 +386,7 @@ def build_k3_k4_block(df: pd.DataFrame) -> list[str]:
 
     # Kondisi 3: K4 mulai aktif (zona Z1 hari ini)
     cond3 = classify_zone(today) == "Z1"
-    mark3 = "✅" if cond3 else "✗"
+    mark3 = "✅" if cond3 else "❌"
     lines.append(
         f"{mark3} K4 mulai aktif, masuk Z1 ({ZONE_DESC_SHORT['Z1']}) "
         f"→ tutup short, pindah ke akumulasi"
@@ -415,10 +415,10 @@ def build_k3_k4_block(df: pd.DataFrame) -> list[str]:
     lines += [
         "",
         f"K4 (akumulasi agresif di bear bottom) — {k4_score}/4 kondisi",
-        f"{'✅' if c1 else '✗'} LTH-MVRV {lth_mvrv:.2f} (target <1.0)",
-        f"{'✅' if c2 else '✗'} aSOPR streak {asopr_streak} hari (target ≥7 hari) & LTH-SOPR {lth_sopr:.2f} (target <0.50)",
-        f"{'✅' if c3 else '✗'} Supply Profit {supply_profit:.1f}% / STH {sth_profit:.1f}% (target <50% / <10%)",
-        f"{'✅' if c4 else '✗'} Price/CVDD {cvdd_ratio_now:.2f} (target <1.10)",
+        f"{'✅' if c1 else '❌'} LTH-MVRV {lth_mvrv:.2f} (target <1.0)",
+        f"{'✅' if c2 else '❌'} aSOPR streak {asopr_streak} hari (target ≥7 hari) & LTH-SOPR {lth_sopr:.2f} (target <0.50)",
+        f"{'✅' if c3 else '❌'} Supply Profit {supply_profit:.1f}% / STH {sth_profit:.1f}% (target <50% / <10%)",
+        f"{'✅' if c4 else '❌'} Price/CVDD {cvdd_ratio_now:.2f} (target <1.10)",
     ]
     return lines
 
