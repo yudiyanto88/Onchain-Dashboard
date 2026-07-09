@@ -308,8 +308,6 @@ ZONE_UPPER_BOUND = {
     "Z4":  ("AVIV Upper", "aviv_upper_px", "Z5"),
 }
 
-# Pemisah antar section pesan Telegram (5 section: status, zona, K3, K4, kondisi trigger)
-DIVIDER = "-" * 20
 
 
 def zone_numeric_desc(row: pd.Series, zone: str) -> str:
@@ -397,7 +395,7 @@ def build_k3_k4_block(df: pd.DataFrame) -> list[str]:
 
     # K4 watch — 4 kondisi framework (scorecard dipakai bareng build_k4_block)
     k4_score, k4_lines, _ = _k4_scorecard(df)
-    lines += ["", DIVIDER, f"*🎯 K4 — Akumulasi Bear Bottom* ({k4_score}/4 kondisi)"]
+    lines += ["", f"*🎯 K4 — Akumulasi Bear Bottom* ({k4_score}/4 kondisi)"]
     lines += k4_lines
     return lines
 
@@ -635,7 +633,7 @@ def build_k1_block(df: pd.DataFrame) -> list[str]:
     prev = df.iloc[-2] if len(df) >= 2 else today
     aviv_cross_down = price <= today["aviv_upper_px"] and prev["btc_price"] > prev["aviv_upper_px"]
     trigger = aviv_cross_down or gap_declining
-    lines.append(DIVIDER)
+    lines.append("")
     if trigger and relevant:
         why = "AVIV Upper cross-down" if aviv_cross_down else "gap MA90-MA60 turun ≥14 hari"
         lines.append(f"🔴 TRIGGER ({why}) → lunasi SEMUA loan + jual 20–30% BTC ke USDT")
@@ -747,23 +745,23 @@ def build_message(row: pd.Series, triggered: list[Condition], df: pd.DataFrame) 
         f"${row['btc_price']:,.0f} | Zona {zone} ({zone_numeric_desc(row, zone)})",
     ]
 
-    lines += ["", DIVIDER]
+    lines += [""]
     lines += build_zone_block(row, zone)
 
     if K3_ACTIVE:
         # Posisi short live: tampilkan jalur exit K3 + progres akumulasi K4.
         # Selama K3 aktif, node zona early-bull (K5/K6) belum berlaku (framework).
-        lines += ["", DIVIDER]
+        lines += [""]
         lines += build_k3_k4_block(df)
     else:
         # Dispatch otomatis berdasarkan zona sekarang.
         for knode in ZONE_KNODE_MAP.get(zone, []):
             builder = KNODE_BUILDERS.get(knode)
             if builder:
-                lines += ["", DIVIDER]
+                lines += [""]
                 lines += builder(df)
 
-    lines += ["", DIVIDER, "*⚡ Kondisi Trigger*"]
+    lines += ["", "*⚡ Kondisi Trigger*"]
     if triggered:
         for c in triggered:
             lines.append(f"• *{c.name}*: {c.detail}")
