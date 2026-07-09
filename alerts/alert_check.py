@@ -425,7 +425,7 @@ def build_k3_k4_block(df: pd.DataFrame) -> list[str]:
 
 def build_message(row: pd.Series, triggered: list[Condition], df: pd.DataFrame) -> str:
     zone     = classify_zone(row)
-    date_str = str(row["date"])[:10]
+    date_str = row["date"].strftime("%d %b %Y")
 
     header = f"🔔 *BTC ALERT — {date_str}*" if triggered else f"📊 BTC Status — {date_str}"
     lines = [
@@ -476,7 +476,7 @@ def send_telegram(message: str) -> bool:
 
 def save_log(row: pd.Series, triggered: list[Condition], sent: bool) -> None:
     date_str = str(row["date"])[:10]
-    log_path = LOG_DIR / f"alert_{date_str.replace('-', '')}.json"
+    log_path = LOG_DIR / f"alert_{date_str}.json"
     entry = {
         "timestamp_utc": datetime.now(timezone.utc).isoformat(),
         "data_date": date_str,
@@ -539,6 +539,9 @@ def main():
     sent = send_telegram(message)
 
     save_log(today, triggered, sent)
+
+    if not sent:
+        sys.exit(1)
 
 
 if __name__ == "__main__":
