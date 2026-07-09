@@ -309,7 +309,7 @@ ZONE_UPPER_BOUND = {
 }
 
 # Pemisah antar section pesan Telegram (5 section: status, zona, K3, K4, kondisi trigger)
-DIVIDER = "──────────"
+DIVIDER = "-" * 20
 
 
 def zone_numeric_desc(row: pd.Series, zone: str) -> str:
