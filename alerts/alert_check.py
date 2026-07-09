@@ -362,7 +362,7 @@ def build_k3_k4_block(df: pd.DataFrame) -> list[str]:
     pnl_pct = (K3_SHORT_ENTRY_PRICE - price) / K3_SHORT_ENTRY_PRICE * 100
 
     lines = [
-        f"*🩳 K3 — Short/Hedge* (AKTIF, entry ${K3_SHORT_ENTRY_PRICE:,.0f}, {pnl_pct:+.1f}%)",
+        f"*📉 K3 — Short/Hedge* (AKTIF, entry ${K3_SHORT_ENTRY_PRICE:,.0f}, {pnl_pct:+.1f}%)",
         "Exit kalau salah satu ini kejadian:",
     ]
 
@@ -427,6 +427,117 @@ def build_k3_k4_block(df: pd.DataFrame) -> list[str]:
     return lines
 
 
+def build_k5_block(df: pd.DataFrame) -> list[str]:
+    """K5 — Deploy loan di awal bull (Z2/Z3).
+    Masuk hanya setelah pullback ≥5% dari high lokal, lalu tentukan besar deploy
+    dari F&G dan STH Loss / SOPR. LTV cap 52% (hard limit, tidak digeser sinyal)."""
+    today = df.iloc[-1]
+    price = today["btc_price"]
+
+    window   = df.tail(PULLBACK_WINDOW)
+    high_loc = window["btc_price"].max()
+    pullback = (high_loc - price) / high_loc * 100 if high_loc > 0 else 0.0
+
+    fg          = today["fg"]
+    sth_loss    = 100 - today["pct_sth_in_profit"]
+    sopr_min    = min(today["asopr"], today["sth_sopr"])
+
+    has_pullback = pullback >= 5
+    c_fg         = fg < 50
+    c_loss_sopr  = sth_loss >= 50 or sopr_min <= 0.98
+
+    # Ladder deploy sesuai tabel framework (semua mensyaratkan pullback ≥5% dulu)
+    if not has_pullback:
+        deploy = "Belum masuk — tunggu pullback ≥5% dari high lokal"
+    elif c_fg and c_loss_sopr:
+        deploy = "Deploy 100% kapasitas sisa"
+    elif c_loss_sopr:
+        deploy = "Deploy 70–80% kapasitas sisa"
+    elif c_fg:
+        deploy = "Deploy 50–60% kapasitas sisa"
+    else:
+        deploy = "Pullback cukup, tapi F&G/SOPR belum — tunggu konfirmasi"
+
+    return [
+        "*🏗️ K5 — Deploy Loan Awal Bull*",
+        f"{'✅' if has_pullback else '❌'} Pullback {PULLBACK_WINDOW}D {pullback:.1f}% "
+        f"(high ${high_loc:,.0f} → ${price:,.0f}, target ≥5%)",
+        f"{'✅' if c_fg else '❌'} F&G {fg:.0f} (target <50)",
+        f"{'✅' if c_loss_sopr else '❌'} STH Loss {sth_loss:.1f}% (≥50%) "
+        f"atau min(aSOPR,STH-SOPR) {sopr_min:.2f} (≤0.98)",
+        f"→ {deploy}. LTV cap 52%.",
+    ]
+
+
+def _find_local_highs(prices: list[float], w: int = 5) -> list[int]:
+    """Index harga yang lebih tinggi dari w hari sebelum DAN w hari sesudah.
+    Butuh w hari data setelahnya, jadi local high baru terkonfirmasi H+w."""
+    highs = []
+    for i in range(w, len(prices) - w):
+        before = max(prices[i - w:i])
+        after  = max(prices[i + 1:i + w + 1])
+        if prices[i] > before and prices[i] > after:
+            highs.append(i)
+    return highs
+
+
+def build_k6_block(df: pd.DataFrame) -> list[str]:
+    """K6 — Kurangi loan tiap local high baru (Z2/Z3).
+    Local high = harga > 5 hari sebelum & sesudah → baru terkonfirmasi H+5.
+    Aksi: bayar loan sampai LTV turun 10 poin (butuh LTV live user — belum di-state)."""
+    prices = df["btc_price"].tolist()
+    highs  = _find_local_highs(prices, w=5)
+
+    lines = ["*📉 K6 — Kurangi Loan di Local High*"]
+
+    if not highs:
+        lines.append("❌ Belum ada local high baru terkonfirmasi (butuh 5 hari data sesudah)")
+        return lines
+
+    last_idx  = highs[-1]
+    last_high = prices[last_idx]
+    days_ago  = len(prices) - 1 - last_idx  # ==5: high 5 hari lalu, baru terkonfirmasi HARI INI
+    prev_high = prices[highs[-2]] if len(highs) >= 2 else None
+
+    # Trigger K6 = local high baru DAN lebih tinggi dari sebelumnya.
+    # "baru" = baru terkonfirmasi hari ini (days_ago==5). Local high lama yang sudah
+    # terkonfirmasi berhari-hari lalu berarti aksinya seharusnya sudah diambil — jangan
+    # ulang sinyal basi tiap hari.
+    just_confirmed = days_ago == 5
+    is_higher      = prev_high is None or last_high > prev_high
+
+    if just_confirmed and is_higher:
+        cmp = "(higher high)" if prev_high else "(local high pertama di window)"
+        lines.append(
+            f"✅ Local high baru ${last_high:,.0f} baru terkonfirmasi hari ini {cmp} "
+            f"→ bayar loan sampai LTV turun 10 poin"
+        )
+    elif not just_confirmed:
+        lines.append(
+            f"❌ Belum ada local high baru — terakhir ${last_high:,.0f} (terkonfirmasi {days_ago - 5}h lalu)"
+        )
+    else:  # just_confirmed but not higher
+        lines.append(
+            f"❌ Local high baru ${last_high:,.0f} tidak lebih tinggi dari sebelumnya "
+            f"${prev_high:,.0f} — bukan trigger"
+        )
+    return lines
+
+
+# Registry builder per K-node + peta zona → K-node yang aktif.
+# Dispatch otomatis: kalau zona berubah, section K ikut berubah tanpa edit build_message.
+# (K1/K2/K4 belum di-dispatch di sini — K4 masih lewat blok K3/K4 live-position.)
+KNODE_BUILDERS = {
+    "K5": build_k5_block,
+    "K6": build_k6_block,
+}
+
+ZONE_KNODE_MAP = {
+    "Z2": ["K5", "K6"],
+    "Z3": ["K5", "K6"],
+}
+
+
 def build_message(row: pd.Series, triggered: list[Condition], df: pd.DataFrame) -> str:
     zone     = classify_zone(row)
     date_str = row["date"].strftime("%d %b %Y")
@@ -441,8 +552,17 @@ def build_message(row: pd.Series, triggered: list[Condition], df: pd.DataFrame) 
     lines += build_zone_block(row, zone)
 
     if K3_ACTIVE:
+        # Posisi short live: tampilkan jalur exit K3 + progres akumulasi K4.
+        # Selama K3 aktif, node zona early-bull (K5/K6) belum berlaku (framework).
         lines += ["", DIVIDER]
         lines += build_k3_k4_block(df)
+    else:
+        # Dispatch otomatis berdasarkan zona sekarang.
+        for knode in ZONE_KNODE_MAP.get(zone, []):
+            builder = KNODE_BUILDERS.get(knode)
+            if builder:
+                lines += ["", DIVIDER]
+                lines += builder(df)
 
     lines += ["", DIVIDER, "*⚡ Kondisi Trigger*"]
     if triggered:
