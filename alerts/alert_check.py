@@ -27,7 +27,7 @@ LOG_DIR.mkdir(parents=True, exist_ok=True)
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
 
-LOOKBACK = 20              # baris history yang diload
+LOOKBACK = 120             # baris history yang diload (≥104 utk K1 gap MA90-MA60 + declining 14d)
 PULLBACK_WINDOW = 14       # hari untuk deteksi pullback 5%
 ZONE_CONVERGENCE_PCT = 0.02  # threshold Z2 convergence (2%)
 
@@ -50,7 +50,7 @@ def load_data() -> pd.DataFrame:
     mvrv     = _load_tail(REPO_ROOT / "data_mvrv.csv", LOOKBACK)[
                    ["date", "sth_mvrv", "lth_mvrv"]]
     supply   = _load_tail(REPO_ROOT / "data_supply.csv", LOOKBACK)[
-                   ["date", "percent_btc_in_profit", "pct_sth_in_profit"]]
+                   ["date", "percent_btc_in_profit", "pct_sth_in_profit", "pct_lth_in_profit"]]
     momentum = _load_tail(REPO_ROOT / "data_momentum.csv", LOOKBACK)[
                    ["date", "asopr", "lth_sopr", "sth_sopr"]]
 
@@ -395,7 +395,19 @@ def build_k3_k4_block(df: pd.DataFrame) -> list[str]:
         f"→ tutup short, pindah ke akumulasi"
     )
 
-    # K4 watch — 4 kondisi framework
+    # K4 watch — 4 kondisi framework (scorecard dipakai bareng build_k4_block)
+    k4_score, k4_lines, _ = _k4_scorecard(df)
+    lines += ["", DIVIDER, f"*🎯 K4 — Akumulasi Bear Bottom* ({k4_score}/4 kondisi)"]
+    lines += k4_lines
+    return lines
+
+
+def _k4_scorecard(df: pd.DataFrame) -> tuple[int, list[str], bool]:
+    """4 kondisi K4 (agresivitas DCA). Return (score, display_lines, extreme_flag).
+    extreme_flag = Price/CVDD ≤ 1.0 (event langka → deploy 50% sekaligus)."""
+    today = df.iloc[-1]
+    price = today["btc_price"]
+
     lth_mvrv = today["lth_mvrv"]
     c1 = lth_mvrv < 1.0
 
@@ -414,16 +426,31 @@ def build_k3_k4_block(df: pd.DataFrame) -> list[str]:
     cvdd_ratio_now = price / today["cvdd"]
     c4 = cvdd_ratio_now < 1.10
 
-    k4_score = sum([c1, c2, c3, c4])
-    lines += [
-        "",
-        DIVIDER,
-        f"*🎯 K4 — Akumulasi Bear Bottom* ({k4_score}/4 kondisi)",
+    lines = [
         f"{'✅' if c1 else '❌'} LTH-MVRV {lth_mvrv:.2f} (target <1.0)",
         f"{'✅' if c2 else '❌'} aSOPR streak {asopr_streak} hari (target ≥7 hari) & LTH-SOPR {lth_sopr:.2f} (target <0.50)",
         f"{'✅' if c3 else '❌'} Supply Profit {supply_profit:.1f}% / STH {sth_profit:.1f}% (target <50% / <10%)",
         f"{'✅' if c4 else '❌'} Price/CVDD {cvdd_ratio_now:.2f} (target <1.10)",
     ]
+    return sum([c1, c2, c3, c4]), lines, cvdd_ratio_now <= 1.0
+
+
+def build_k4_block(df: pd.DataFrame) -> list[str]:
+    """K4 — Akumulasi agresif bear bottom (Z1/Z1b). Standalone (dipakai saat
+    K3 sudah ditutup). Skor 0-4 → agresivitas DCA per framework."""
+    score, cond_lines, extreme = _k4_scorecard(df)
+    dca = {
+        0: "Belum beli — pantau saja",
+        1: "Belum beli — pantau saja",
+        2: "DCA ringan: 15%/bln dari cash pool + income langsung masuk",
+        3: "DCA agresif: 25%/bln dari cash pool + income langsung masuk",
+        4: "DCA maksimal: 35%/bln dari cash pool + income langsung masuk",
+    }[score]
+    lines = [f"*🎯 K4 — Akumulasi Bear Bottom* ({score}/4 kondisi)"]
+    lines += cond_lines
+    lines.append(f"→ {dca}")
+    if extreme:
+        lines.append("‼️ Price/CVDD ≤ 1.0 (langka, <2 hari/10thn) → boleh deploy 50% sisa cash pool hari ini")
     return lines
 
 
@@ -524,17 +551,189 @@ def build_k6_block(df: pd.DataFrame) -> list[str]:
     return lines
 
 
+def _sth_sopr_ma_gap(df: pd.DataFrame) -> pd.Series:
+    """Gap MA60 − MA90 dari STH-SOPR. Butuh ≥90 baris; NaN sebelum itu."""
+    s = df["sth_sopr"]
+    return s.rolling(60).mean() - s.rolling(90).mean()
+
+
+def _gap_peaked_declining(gap: pd.Series, n: int = 14):
+    """True kalau gap sudah turun berturut-turut ≥n hari (memuncak lalu menurun).
+    Return (declining, last_value_or_None)."""
+    g = gap.dropna()
+    if len(g) < n + 1:
+        return False, None
+    recent = g.iloc[-(n + 1):]
+    declining = all(recent.iloc[i] < recent.iloc[i - 1] for i in range(1, len(recent)))
+    return declining, float(g.iloc[-1])
+
+
+def _new_high_peaks(df: pd.DataFrame, w: int = 5) -> list[int]:
+    """Index local high (w hari) yang SEKALIGUS new high di window ini —
+    kandidat 'ATH baru' untuk cek diminishing MVRV/aSOPR."""
+    prices = df["btc_price"].tolist()
+    peaks, run = [], -1.0
+    for i in _find_local_highs(prices, w):
+        if prices[i] > run:
+            run = prices[i]
+            peaks.append(i)
+    return peaks
+
+
+def _diminishing_at_peaks(df: pd.DataFrame, metric: str, w: int = 5):
+    """Cek metric (MVRV/aSOPR) di ATH-baru terakhir < ATH-baru sebelumnya.
+    Return (fired_or_None, detail). None = belum cukup ATH di window."""
+    peaks = _new_high_peaks(df, w)
+    if len(peaks) < 2:
+        return None, f"belum cukup ATH baru di window {len(df)}d"
+    last, prev = peaks[-1], peaks[-2]
+    m_last, m_prev = df[metric].iloc[last], df[metric].iloc[prev]
+    return (m_last < m_prev), f"{m_last:.2f} vs ATH sebelumnya {m_prev:.2f}"
+
+
+def build_k1_block(df: pd.DataFrame) -> list[str]:
+    """K1 — Kurangi posisi di puncak siklus (Z5). OR-gate trigger:
+    AVIV Upper cross-down ATAU gap MA90-MA60 STH-SOPR turun ≥14 hari."""
+    today = df.iloc[-1]
+    price = today["btc_price"]
+
+    # Relevansi: K1 baru relevan kalau harga sudah bertahan di Z5 ≥14 hari.
+    # (approx: Z5 beruntun terakhir dalam window — bukan kumulatif sepanjang siklus.)
+    z5_streak = 0
+    for i in range(len(df) - 1, -1, -1):
+        if classify_zone(df.iloc[i]) == "Z5":
+            z5_streak += 1
+        else:
+            break
+    relevant = z5_streak >= 14
+
+    # 5 sinyal peringatan
+    mvrv_dim, mvrv_det   = _diminishing_at_peaks(df, "sth_mvrv")
+    asopr_dim, asopr_det = _diminishing_at_peaks(df, "asopr")
+    s3 = price > today["sth_cost_basis"] and today["sth_mvrv"] < 1.10
+    gap = _sth_sopr_ma_gap(df)
+    gap_declining, gap_val = _gap_peaked_declining(gap, n=14)
+    prof = today["percent_btc_in_profit"]
+    prof_prev = df["percent_btc_in_profit"].iloc[-2] if len(df) >= 2 else prof
+    s5 = prof > 90 and prof < prof_prev
+
+    def mark(v):  # None = data belum cukup
+        return "⚠️" if v is None else ("✅" if v else "❌")
+
+    rel_note = f"Z5 beruntun {z5_streak}d — " + ("relevan" if relevant else "perlu ≥14d, belum relevan")
+    lines = [f"*🔺 K1 — Kurangi Posisi di Puncak Siklus* ({rel_note})", "5 sinyal peringatan:"]
+    lines += [
+        f"{mark(mvrv_dim)} MVRV turun tiap ATH baru ({mvrv_det})",
+        f"{mark(asopr_dim)} aSOPR turun tiap ATH baru ({asopr_det})",
+        f"{mark(s3)} Harga > STH RP tapi STH-MVRV {today['sth_mvrv']:.2f} mendekati 1.0 (<1.10)",
+        f"{mark(gap_declining)} Gap MA90-MA60 STH-SOPR turun ≥14 hari"
+        + (f" (gap {gap_val:+.3f})" if gap_val is not None else " (butuh ≥90 hari data)"),
+        f"{mark(s5)} Supply Profit >90% & mulai turun ({prof:.1f}%)",
+    ]
+
+    # Trigger eksekusi — OR gate
+    prev = df.iloc[-2] if len(df) >= 2 else today
+    aviv_cross_down = price <= today["aviv_upper_px"] and prev["btc_price"] > prev["aviv_upper_px"]
+    trigger = aviv_cross_down or gap_declining
+    lines.append(DIVIDER)
+    if trigger and relevant:
+        why = "AVIV Upper cross-down" if aviv_cross_down else "gap MA90-MA60 turun ≥14 hari"
+        lines.append(f"🔴 TRIGGER ({why}) → lunasi SEMUA loan + jual 20–30% BTC ke USDT")
+    elif trigger and not relevant:
+        why = "AVIV Upper cross-down" if aviv_cross_down else "gap MA90-MA60 turun ≥14 hari"
+        lines.append(f"🟡 OR-gate nyala ({why}) tapi K1 belum relevan (Z5 <14 hari) — pantau, jangan eksekusi dulu")
+    else:
+        lines.append("→ Belum trigger. Pantau OR-gate: AVIV Upper cross-down ATAU gap MA90-MA60 turun ≥14 hari")
+    return lines
+
+
+def build_k2_block(df: pd.DataFrame) -> list[str]:
+    """K2 — Masuk di bull dip (Z4/Z3, turun dari zona atas). 5 kondisi →
+    confidence Low/Medium/High/VeryHigh. Kondisi #5 (bounce AVIV Mean) hanya
+    bisa terkonfirmasi setelah bounce, jadi ditandai terpisah."""
+    today = df.iloc[-1]
+    price = today["btc_price"]
+
+    # C1: STH-MVRV<0.95 & rasio LTH/STH-MVRV naik dalam 14 hari
+    sth_mvrv = today["sth_mvrv"]
+    ratio_now = today["lth_mvrv"] / sth_mvrv if sth_mvrv > 0 else 0.0
+    idx14 = -15 if len(df) >= 15 else 0
+    base_sth = df["sth_mvrv"].iloc[idx14]
+    ratio_14 = df["lth_mvrv"].iloc[idx14] / base_sth if base_sth > 0 else ratio_now
+    c1 = sth_mvrv < 0.95 and ratio_now > ratio_14
+
+    # C2: STH-SOPR<0.97 belum >14 hari & aSOPR masih >0.95
+    below_streak = 0
+    for v in df["sth_sopr"].iloc[::-1]:
+        if v < 0.97:
+            below_streak += 1
+        else:
+            break
+    c2 = today["sth_sopr"] < 0.97 and below_streak <= 14 and today["asopr"] > 0.95
+
+    # C3: Supply Profit >60% & STH profit turun
+    sthp = today["pct_sth_in_profit"]
+    sthp_prev = df["pct_sth_in_profit"].iloc[-2] if len(df) >= 2 else sthp
+    c3 = today["percent_btc_in_profit"] > 60 and sthp < sthp_prev
+
+    # C4: LTH profit stabil — tidak turun >2 poin dari rata-rata 30 hari
+    lthp = today["pct_lth_in_profit"]
+    lthp_ma30 = df["pct_lth_in_profit"].tail(30).mean()
+    c4 = lthp >= lthp_ma30 - 2
+
+    # C5: close < AVIV Mean lalu close balik ke atas pada/atau sebelum hari ke-4
+    c5 = False
+    below = today["btc_price"] < today["aviv_mean_px"]
+    if not below:  # sudah balik ke atas, cek berapa lama tadi di bawah
+        days_below = 0
+        for i in range(len(df) - 2, -1, -1):
+            if df["btc_price"].iloc[i] < df["aviv_mean_px"].iloc[i]:
+                days_below += 1
+            else:
+                break
+        c5 = 1 <= days_below <= 4
+
+    base_conf = sum([c1, c2, c3, c4])   # C5 dihitung terpisah (post-bounce)
+    total = base_conf + (1 if c5 else 0)
+    level = ("Very High" if total >= 5 else "High" if total == 4
+             else "Medium" if total == 3 else "Low")
+
+    lines = [f"*🟢 K2 — Bull Dip Entry* (confidence {level}, {total}/5)"]
+    lines += [
+        f"{'✅' if c1 else '❌'} STH-MVRV {sth_mvrv:.2f} <0.95 & rasio LTH/STH naik 14d",
+        f"{'✅' if c2 else '❌'} STH-SOPR {today['sth_sopr']:.2f} <0.97 ({below_streak}d ≤14) & aSOPR {today['asopr']:.2f} >0.95",
+        f"{'✅' if c3 else '❌'} Supply Profit {today['percent_btc_in_profit']:.1f}% >60% & STH profit turun",
+        f"{'✅' if c4 else '❌'} LTH profit {lthp:.1f}% stabil (≥ MA30 {lthp_ma30:.1f}% −2)",
+        f"{'✅' if c5 else '⏳'} Close balik di atas AVIV Mean ≤ hari ke-4 (hanya pasti setelah bounce)",
+    ]
+    if level == "Low":
+        lines.append("→ Low — belum ada aksi. Cash habis dulu sebelum loan; ikuti tabel deploy K2. LTV cap 52%.")
+    else:
+        lines.append(f"→ {level} — deploy cash 100% dulu, loan sesuai price action (tabel K2). LTV cap 52%.")
+    return lines
+
+
 # Registry builder per K-node + peta zona → K-node yang aktif.
 # Dispatch otomatis: kalau zona berubah, section K ikut berubah tanpa edit build_message.
 # (K1/K2/K4 belum di-dispatch di sini — K4 masih lewat blok K3/K4 live-position.)
 KNODE_BUILDERS = {
+    "K1": build_k1_block,
+    "K2": build_k2_block,
+    "K4": build_k4_block,
     "K5": build_k5_block,
     "K6": build_k6_block,
 }
 
+# K6 berlaku di Z2/Z3 (per seksi K6 doc: selesai saat masuk Z4). Z4 = K2 (dip dari
+# Z5). Z5 = K1 (kurangi puncak) + K2 (transisi turun). Z1/Z1b pakai K4 standalone
+# HANYA saat K3 sudah ditutup — kalau K3_ACTIVE, jalur K3/K4 live-position yang dipakai.
 ZONE_KNODE_MAP = {
-    "Z2": ["K5", "K6"],
-    "Z3": ["K5", "K6"],
+    "Z1":  ["K4"],
+    "Z1b": ["K4"],
+    "Z2":  ["K5", "K6"],
+    "Z3":  ["K5", "K6"],
+    "Z4":  ["K2"],
+    "Z5":  ["K1", "K2"],
 }
 
 
