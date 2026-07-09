@@ -308,6 +308,9 @@ ZONE_UPPER_BOUND = {
     "Z4":  ("AVIV Upper", "aviv_upper_px", "Z5"),
 }
 
+# Pemisah antar section pesan Telegram (5 section: status, zona, K3, K4, kondisi trigger)
+DIVIDER = "──────────"
+
 
 def zone_numeric_desc(row: pd.Series, zone: str) -> str:
     """Deskripsi zona SAAT INI dengan angka $ asli (bukan label generik)."""
@@ -330,7 +333,7 @@ def zone_numeric_desc(row: pd.Series, zone: str) -> str:
 
 def build_zone_block(row: pd.Series, zone: str) -> list[str]:
     price = row["btc_price"]
-    lines = []
+    lines = ["*📍 Zona*"]
 
     if zone in ZONE_UPPER_BOUND:
         label, col, target = ZONE_UPPER_BOUND[zone]
@@ -359,7 +362,7 @@ def build_k3_k4_block(df: pd.DataFrame) -> list[str]:
     pnl_pct = (K3_SHORT_ENTRY_PRICE - price) / K3_SHORT_ENTRY_PRICE * 100
 
     lines = [
-        f"K3 (short/hedge saat bear mulai) — AKTIF (entry ${K3_SHORT_ENTRY_PRICE:,.0f}, {pnl_pct:+.1f}%)",
+        f"*🩳 K3 — Short/Hedge* (AKTIF, entry ${K3_SHORT_ENTRY_PRICE:,.0f}, {pnl_pct:+.1f}%)",
         "Exit kalau salah satu ini kejadian:",
     ]
 
@@ -414,7 +417,8 @@ def build_k3_k4_block(df: pd.DataFrame) -> list[str]:
     k4_score = sum([c1, c2, c3, c4])
     lines += [
         "",
-        f"K4 (akumulasi agresif di bear bottom) — {k4_score}/4 kondisi",
+        DIVIDER,
+        f"*🎯 K4 — Akumulasi Bear Bottom* ({k4_score}/4 kondisi)",
         f"{'✅' if c1 else '❌'} LTH-MVRV {lth_mvrv:.2f} (target <1.0)",
         f"{'✅' if c2 else '❌'} aSOPR streak {asopr_streak} hari (target ≥7 hari) & LTH-SOPR {lth_sopr:.2f} (target <0.50)",
         f"{'✅' if c3 else '❌'} Supply Profit {supply_profit:.1f}% / STH {sth_profit:.1f}% (target <50% / <10%)",
@@ -427,25 +431,25 @@ def build_message(row: pd.Series, triggered: list[Condition], df: pd.DataFrame) 
     zone     = classify_zone(row)
     date_str = row["date"].strftime("%d %b %Y")
 
-    header = f"🔔 *BTC ALERT — {date_str}*" if triggered else f"📊 BTC Status — {date_str}"
+    header = f"🔔 *BTC ALERT — {date_str}*" if triggered else f"📊 *BTC Status — {date_str}*"
     lines = [
         header,
         f"${row['btc_price']:,.0f} | Zona {zone} ({zone_numeric_desc(row, zone)})",
     ]
 
-    lines.append("")
+    lines += ["", DIVIDER]
     lines += build_zone_block(row, zone)
 
     if K3_ACTIVE:
-        lines.append("")
+        lines += ["", DIVIDER]
         lines += build_k3_k4_block(df)
 
+    lines += ["", DIVIDER, "*⚡ Kondisi Trigger*"]
     if triggered:
-        lines += ["", "*KONDISI AKTIF:*"]
         for c in triggered:
             lines.append(f"• *{c.name}*: {c.detail}")
     else:
-        lines += ["", "Tidak ada kondisi trigger khusus hari ini."]
+        lines.append("Tidak ada kondisi trigger khusus hari ini.")
 
     return "\n".join(lines)
 
