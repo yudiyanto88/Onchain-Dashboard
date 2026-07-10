@@ -51,13 +51,15 @@ div[data-testid="stPill"] button { font-size: 0.85rem !important; padding: 2px 1
 """, unsafe_allow_html=True)
 
 # State initialization (Termasuk ex untuk Exchange Flow)
-for key in ['tr_p', 'tr_mv', 'tr_ms', 'tr_mpl', 'tr_nupl', 'tr_d', 'tr_ex', 'tr_gt', 'tr_wk', 'tr_sd', 'tr_fg', 'tr_msig', 'tr_bt', 'tr_sl', 'tr_pl']:
+for key in ['tr_p', 'tr_mv', 'tr_ms', 'tr_mpl', 'tr_nupl', 'tr_d', 'tr_ex', 'tr_gt', 'tr_wk', 'tr_sd', 'tr_fg', 'tr_msig', 'tr_bt', 'tr_sl', 'tr_pl', 'tr_z']:
     if key not in st.session_state: st.session_state[key] = "All Time"
-for key in ['cd_p', 'cd_mv', 'cd_ms', 'cd_mpl', 'cd_nupl', 'cd_d', 'cd_ex', 'cd_gt', 'cd_wk', 'cd_sd', 'cd_fg', 'cd_msig', 'cd_bt', 'cd_sl', 'cd_pl']:
+for key in ['cd_p', 'cd_mv', 'cd_ms', 'cd_mpl', 'cd_nupl', 'cd_d', 'cd_ex', 'cd_gt', 'cd_wk', 'cd_sd', 'cd_fg', 'cd_msig', 'cd_bt', 'cd_sl', 'cd_pl', 'cd_z']:
     if key not in st.session_state: st.session_state[key] = 120
 for key in ['tf_p', 'tf_mv', 'tf_ms', 'tf_mpl', 'tf_nupl', 'tf_d', 'tf_ex', 'tf_gt', 'tf_wk', 'tf_sd', 'tf_fg', 'tf_msig', 'tf_bt', 'tf_sl', 'tf_pl']:
     if key not in st.session_state: st.session_state[key] = "Daily"
 for key, val in [('sl_sma_a', 14), ('sl_sma_b', 30), ('sl_sma_c', 60), ('sl_b5_thresh', 1.10)]:
+    if key not in st.session_state: st.session_state[key] = val
+for key, val in [('z_window_mode', '1 Tahun (365d)'), ('z_window_custom', 365)]:
     if key not in st.session_state: st.session_state[key] = val
 for key in ['sma_p', 'sma_mv', 'sma_ms', 'sma_mpl', 'sma_nupl', 'sma_d', 'sma_ex', 'sma_sd', 'sma_fg', 'sma_msig', 'sma_pl']:
     if key not in st.session_state: st.session_state[key] = "0d"
@@ -369,7 +371,7 @@ with st.sidebar:
     # Menambahkan "Exchange Flow" ke dalam urutan menu
     selected_menu = st.radio(
         "Menu Navigasi",
-        ["Price Levels", "Market Valuation", "Profit & Loss", "Realized P/L", "Supply Dynamics", "Exchange Flow", "Derivatives", "Social Sentiment", "Market Signals", "Backtesting", "MVRV Signal Lab"],
+        ["Price Levels", "Market Valuation", "Profit & Loss", "Realized P/L", "Supply Dynamics", "Exchange Flow", "Derivatives", "Social Sentiment", "Market Signals", "Backtesting", "MVRV Signal Lab", "MVRV Z-Score Lab"],
         label_visibility="collapsed"
     )
     st.markdown("---")
@@ -2119,4 +2121,165 @@ elif selected_menu == "MVRV Signal Lab":
             sc2.metric("7d Positive",        _pos_rate('7d %'))
             sc3.metric("30d Positive",       _pos_rate('30d %'))
             sc4.metric("90d Positive",       _pos_rate('90d %'))
+
+# ------------------------------------------------------------------------------
+# TAB 12: MVRV Z-SCORE LAB (Rolling Window)
+# ------------------------------------------------------------------------------
+elif selected_menu == "MVRV Z-Score Lab":
+    if df_mvrv_raw.empty or df_price_raw.empty:
+        st.warning("Data MVRV / Price Level tidak tersedia.")
+    else:
+        df_z_full = df_mvrv_raw[['Date', 'BTC Price', 'MVRV']].merge(
+            df_price_raw[['Date', 'Realized Price']], on='Date', how='inner'
+        ).sort_values('Date').reset_index(drop=True)
+
+        # Controls row
+        col_fs_z, col_win_z, col_cwin_z, col_rg_z, col_cd_z = st.columns(
+            [1, 1.6, 1, 5.5, 1], vertical_alignment="bottom", gap="small"
+        )
+        with col_fs_z: focus_z = st.toggle("Full Screen", key="tg_z")
+        with col_win_z:
+            win_opts = ["1 Tahun (365d)", "2 Tahun (730d)", "4 Tahun (1460d)", "Cumulative (All Time)", "Custom"]
+            st.session_state.z_window_mode = st.selectbox("Rolling Window", win_opts, index=win_opts.index(st.session_state.z_window_mode), key="z_win_sel")
+        with col_cwin_z:
+            if st.session_state.z_window_mode == "Custom":
+                st.session_state.z_window_custom = st.number_input("Hari", min_value=30, value=st.session_state.z_window_custom, key="z_win_cst")
+        with col_rg_z:
+            c_idx_z = t_opts.index(st.session_state.tr_z) if st.session_state.tr_z in t_opts else 5
+            st.session_state.tr_z = st.radio("Range:", t_opts, index=c_idx_z, horizontal=True, label_visibility="collapsed", key="rg_z")
+        with col_cd_z:
+            if st.session_state.tr_z == "Custom":
+                st.session_state.cd_z = st.number_input("Days back", min_value=7, value=st.session_state.cd_z, label_visibility="collapsed", key="cdin_z")
+
+        # Resolve window & compute rolling Z-score (di MVRV ratio, bukan dollar diff MC-RC)
+        if st.session_state.z_window_mode == "1 Tahun (365d)": win_days = 365
+        elif st.session_state.z_window_mode == "2 Tahun (730d)": win_days = 730
+        elif st.session_state.z_window_mode == "4 Tahun (1460d)": win_days = 1460
+        elif st.session_state.z_window_mode == "Custom": win_days = st.session_state.z_window_custom
+        else: win_days = None  # Cumulative -> expanding window
+
+        if win_days is None:
+            roll_mean = df_z_full['MVRV'].expanding(min_periods=30).mean()
+            roll_std  = df_z_full['MVRV'].expanding(min_periods=30).std()
+        else:
+            roll_mean = df_z_full['MVRV'].rolling(win_days, min_periods=30).mean()
+            roll_std  = df_z_full['MVRV'].rolling(win_days, min_periods=30).std()
+
+        df_z_full['Roll_Mean'] = roll_mean
+        df_z_full['Roll_Std']  = roll_std
+        df_z_full['Z_Score']   = (df_z_full['MVRV'] - roll_mean) / roll_std
+
+        # Price bands: level di skala MVRV dikonversi ke $ via Realized Price (price = mvrv_ratio * RP)
+        sigma_levels = [-2.0, -1.5, -1.0, 0.0, 1.0, 1.5, 2.0]
+        for z in sigma_levels:
+            df_z_full[f"Band_{z}"] = (roll_mean + z * roll_std) * df_z_full['Realized Price']
+
+        df_z_full['Date_str'] = df_z_full['Date'].dt.strftime('%Y-%m-%d')
+
+        last_z = df_z_full.iloc[-1]
+        prev_z = df_z_full.iloc[-2] if len(df_z_full) > 1 else last_z
+
+        def _kpi_z(col, title, val, prev, is_money=False, thresh=None):
+            if pd.isna(val):
+                col.markdown(f"<div style='line-height:1.4; padding:5px 0;'><span style='color:#a3a8b8; font-size:0.95rem; font-weight:600;'>{title}</span><br><span style='color:#a3a8b8; font-size:1.4rem; font-weight:700;'>—</span></div>", unsafe_allow_html=True)
+                return
+            diff = val - prev if not pd.isna(prev) else 0
+            dc = "#00cc66" if diff >= 0 else "#ff4d4d"
+            ar = "↑" if diff >= 0 else "↓"
+            c  = ("#00cc66" if val >= thresh else "#ff4d4d") if thresh is not None else "#ffffff"
+            val_str = f"${val:,.0f}" if is_money else f"{val:.3f}"
+            diff_str = f"${abs(diff):,.0f}" if is_money else f"{abs(diff):.3f}"
+            d = f"<div style='margin-top:4px;'><span style='color:{dc}; font-size:0.85rem; background-color:{dc}20; padding:2px 6px; border-radius:4px;'>{ar} {diff_str}</span></div>"
+            col.markdown(f"<div style='line-height:1.4; padding:5px 0;'><span style='color:#a3a8b8; font-size:0.95rem; font-weight:600;'>{title}</span><br><span style='color:{c}; font-size:1.4rem; font-weight:700;'>{val_str}</span>{d}</div>", unsafe_allow_html=True)
+
+        col_t_z, k1_z, k2_z, k3_z, k4_z, k5_z = st.columns([1.5, 1, 1, 1, 1, 1], vertical_alignment="center")
+        with col_t_z:
+            st.markdown("<div style='border-right: 2px solid #333; padding-right: 15px;'><h3 style='color: #a855f7; margin: 0; font-weight: 700; font-size: 1.4rem;'>MVRV Z-Score Lab<br><span style='font-size: 1rem; color: #d1d4dc;'>Rolling Window + Price Bands</span></h3></div>", unsafe_allow_html=True)
+        with k1_z: _kpi_z(k1_z, "BTC Price", last_z['BTC Price'], prev_z['BTC Price'], is_money=True)
+        with k2_z: _kpi_z(k2_z, "Rolling Z-Score", last_z['Z_Score'], prev_z['Z_Score'], thresh=0.0)
+        with k3_z: _kpi_z(k3_z, "Band Mean (Z=0)", last_z['Band_0.0'], prev_z['Band_0.0'], is_money=True)
+        with k4_z: _kpi_z(k4_z, "Band +2σ", last_z['Band_2.0'], prev_z['Band_2.0'], is_money=True)
+        with k5_z: _kpi_z(k5_z, "Band -1.5σ", last_z['Band_-1.5'], prev_z['Band_-1.5'], is_money=True)
+
+        st.markdown("---")
+
+        band_opts = ['-2σ', '-1.5σ', '-1σ', 'Mean', '+1σ', '+1.5σ', '+2σ']
+        band_map = {'-2σ': -2.0, '-1.5σ': -1.5, '-1σ': -1.0, 'Mean': 0.0, '+1σ': 1.0, '+1.5σ': 1.5, '+2σ': 2.0}
+        try:
+            sel_bands_z = st.pills("Price Bands", band_opts, default=['-1.5σ', 'Mean', '+2σ'], selection_mode="multi", label_visibility="collapsed", key="pills_z")
+        except:
+            sel_bands_z = st.multiselect("Price Bands", band_opts, default=['-1.5σ', 'Mean', '+2σ'], label_visibility="collapsed", key="ms_z")
+
+        # Apply time filter
+        t_max_z = df_z_full['Date'].max()
+        if   st.session_state.tr_z == "1 Month":         t_min_z = t_max_z - timedelta(days=30)
+        elif st.session_state.tr_z == "3 Months":        t_min_z = t_max_z - timedelta(days=90)
+        elif st.session_state.tr_z == "6 Months":        t_min_z = t_max_z - timedelta(days=180)
+        elif st.session_state.tr_z == "1 Year":          t_min_z = t_max_z - timedelta(days=365)
+        elif st.session_state.tr_z == "4 Years (Cycle)": t_min_z = t_max_z - timedelta(days=365*4)
+        elif st.session_state.tr_z == "Custom":          t_min_z = t_max_z - timedelta(days=st.session_state.cd_z)
+        else:                                             t_min_z = df_z_full['Date'].min()
+        df_z = df_z_full[df_z_full['Date'] >= t_min_z].copy()
+
+        h_total_z = 1000 if focus_z else 800
+        h_top_z   = int(h_total_z * 0.62)
+        h_bot_z   = h_total_z - h_top_z
+
+        band_colors = {
+            -2.0: '#ff4d4d', -1.5: '#ff9933', -1.0: '#ffdd00',
+            0.0: '#ffffff', 1.0: '#4da6ff', 1.5: '#00cc66', 2.0: '#a855f7',
+        }
+
+        fig_z = make_subplots(
+            rows=2, cols=1, shared_xaxes=True,
+            row_heights=[h_top_z / h_total_z, h_bot_z / h_total_z],
+            vertical_spacing=0.02,
+        )
+
+        fig_z.add_trace(go.Scatter(
+            x=df_z['Date_str'], y=df_z['BTC Price'],
+            name='BTC Price', line=dict(color='#f7931a', width=2),
+            hovertemplate='$%{y:,.0f}<extra>BTC</extra>',
+        ), row=1, col=1)
+
+        for label in sel_bands_z:
+            z = band_map[label]
+            band_label = 'Mean' if z == 0.0 else f"{'+' if z > 0 else ''}{z}σ"
+            fig_z.add_trace(go.Scatter(
+                x=df_z['Date_str'], y=df_z[f"Band_{z}"],
+                name=band_label, line=dict(color=band_colors[z], width=1.3, dash='dot' if z != 0 else 'solid'),
+                hovertemplate='$%{y:,.0f}<extra>' + band_label + '</extra>',
+            ), row=1, col=1)
+
+        fig_z.add_trace(go.Scatter(
+            x=df_z['Date_str'], y=df_z['Z_Score'],
+            name='Rolling Z-Score', line=dict(color='#a855f7', width=2), fill='tozeroy',
+            fillcolor='rgba(168,85,247,0.15)',
+            hovertemplate='%{y:.3f}<extra>Z-Score</extra>',
+        ), row=2, col=1)
+        _x0_z, _x1_z = df_z['Date_str'].iloc[0], df_z['Date_str'].iloc[-1]
+        for z in sorted(set(band_map[l] for l in sel_bands_z)):
+            fig_z.add_trace(go.Scatter(
+                x=[_x0_z, _x1_z], y=[z, z],
+                line=dict(color=band_colors[z], width=1, dash='dash'),
+                showlegend=False, hoverinfo='skip', mode='lines',
+            ), row=2, col=1)
+
+        fig_z.update_layout(
+            height=h_total_z,
+            paper_bgcolor='#131722', plot_bgcolor='#131722',
+            font=dict(color='#d1d4dc', size=11),
+            legend=dict(orientation='h', yanchor='bottom', y=1.01, xanchor='left', x=0,
+                        bgcolor='rgba(0,0,0,0)', bordercolor='rgba(0,0,0,0)', font=dict(size=10)),
+            margin=dict(l=10, r=10, t=30, b=10),
+            hovermode='x unified',
+        )
+        fig_z.update_xaxes(showgrid=True, gridcolor='rgba(42,46,57,0.4)', zeroline=False)
+        fig_z.update_yaxes(showgrid=True, gridcolor='rgba(42,46,57,0.4)', zeroline=False)
+        fig_z.update_yaxes(title_text='BTC Price ($)', row=1, col=1, tickformat='$,.0f')
+        fig_z.update_yaxes(title_text='Z-Score', row=2, col=1)
+
+        st.plotly_chart(fig_z, use_container_width=True)
+
+        st.caption(f"Window: {st.session_state.z_window_mode} · Formula: Z = (MVRV − rolling mean(MVRV)) / rolling std(MVRV) · Band price = (rolling mean + z·rolling std) × Realized Price")
 
