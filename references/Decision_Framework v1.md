@@ -50,6 +50,10 @@ Kalau dua ini belum terpenuhi, K1 tidak perlu dipikirin sama sekali.
 | 4 | Gap MA90-MA60 di STH-SOPR sudah memuncak dan mulai turun | SOPR KB v1.4 |
 | 5 | Supply in Profit di atas 90% dan mulai turun | Supply KB v1.4 |
 
+> **Catatan baca signal #1:** Signal ini dibaca dari MVRV Ratio. Saat cek signal ini, tampilkan juga MVRV Z-Score rolling window 1 tahun sebagai alat bantu baca — dia bisa membuat penurunan MVRV Ratio yang kecil/halus antar ATH jadi lebih jelas kelihatan, karena dia menghitung ulang rata-rata dan standar deviasi dari 365 hari terakhir saja (bukan histori penuh), sehingga lebih sensitif ke perubahan terkini.
+>
+> Tapi Z-Score rolling ini TIDAK dihitung sebagai syarat tambahan atau signal terpisah — dia cuma representasi visual dari MVRV Ratio yang sama (sudah divalidasi 10 Juli 2026, lihat KB MVRV v1.4 § Catatan Tambahan). Keputusan signal #1 tetap berdasarkan MVRV Ratio. Kalau Z-Score rolling turun tapi MVRV Ratio-nya sendiri masih flat/naik, itu bukan tanda signal #1 sudah aktif — baru jadi early-flag untuk mulai perhatikan lebih dekat.
+
 **Trigger eksekusi — OR gate (mana yang muncul duluan):**
 - Harga turun dari Z5 ke Z4 (AVIV Upper cross-down) **ATAU**
 - Gap MA90-MA60 STH-SOPR memuncak dan turun minimal 14 hari berturutan

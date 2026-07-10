@@ -45,6 +45,8 @@ Level batas zona:
 - AVIV Upper = AVIV Mean + 0.5 SD
 - CVDD = batas bawah historis paling ekstrem
 
+Saat cek K1 signal #1 (MVRV turun di setiap ATH baru), tampilkan MVRV Ratio dan MVRV Z-Score rolling 1 tahun berdampingan. Z-Score rolling dipakai sebagai alat bantu visual untuk mempertajam pembacaan tren — BUKAN sebagai syarat tambahan atau signal terpisah. Keputusan tetap berdasarkan MVRV Ratio. Detail alasan ada di KB MVRV v1.4 § Catatan Tambahan.
+
 ---
 
 ## HARD LIMITS LTV

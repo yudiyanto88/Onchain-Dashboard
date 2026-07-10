@@ -1089,3 +1089,38 @@ STH-MVRV 0.99 — sangat dekat 1.0. STH barely profitable. Ini bisa berarti baru
 6. **LTH-MVRV 2017 anomaly:** Semua rule ranges yang melibatkan LTH-MVRV sebaiknya exclude 2017 data atau treat sebagai outlier karena pool size yang berbeda secara fundamental.
 
 7. **Z-Score punya bias dilusi struktural:** Karena dihitung dari historical mean/stdev seluruh dataset, makin panjang history makin terdilute. Ini berarti threshold "extreme" Z-Score akan terus turun seiring waktu secara matematis, terlepas dari apakah pasar benar-benar makin matang atau tidak. Jangan compare Z-Score across very different dataset lengths tanpa catatan ini.
+
+---
+
+## Catatan Tambahan — MVRV Z-Score Rolling Window 1 Tahun vs MVRV Ratio
+
+**Ditambahkan:** 10 Juli 2026
+**Sumber:** Video On-Chain Mind (22 Jan 2025) + validasi internal (independence check, 329 pasangan local top, 6 cycle + cross-cycle comparison 2017/2021/2023-2025)
+
+### Apa yang dites
+
+On-Chain Mind mengusulkan MVRV Z-Score dihitung dengan rolling window 1 tahun (bukan cumulative sejak 2010) supaya lebih responsif menangkap turning point, dan tidak "diencerkan" oleh volatilitas ekstrem cycle-cycle awal. Klaimnya masuk akal secara konsep — sejalan dengan prinsip framework ini sendiri (pola relatif, bukan threshold absolut).
+
+Yang dites: apakah Z-Score rolling 1 tahun ini benar-benar menambahkan informasi baru dibanding MVRV Ratio biasa, khususnya di titik-titik local top dalam satu cycle.
+
+### Temuan
+
+Di 329 pasangan local top berurutan (6 cycle, 2010-2026), 70.2% pasangan bergerak searah penuh antara MVRV Ratio dan Z-Score rolling 1 tahun — kalau salah satu naik/turun, yang lain juga naik/turun. Dari 13.4% yang kelihatan "berselisih arah," 96% ternyata bukan benar-benar berlawanan arah — cuma satu sisi (biasanya MVRV Ratio) nyaris tidak bergerak sementara Z-Score bergerak turun. Cuma 0.9% (3 dari 329) yang benar-benar berlawanan arah secara jelas, dan ketiganya terjadi bukan di dekat cycle top, melainkan di fase awal bull run yang sedang naik cepat.
+
+Pola "MVRV Ratio nyaris diam, tapi Z-Score kelihatan turun jelas" ini sempat diduga fenomena baru yang muncul karena market sekarang (2023-2025) lebih matang dan range harga lebih sempit. Setelah dicek ke cycle 2017, ternyata pola yang sama juga muncul di sana dengan frekuensi yang sebanding (bahkan sedikit lebih sering secara relatif: 7.1% di 2017 vs 6.1% di 2023-2025). Ini membuktikan bahwa pola tersebut bukan sinyal on-chain baru dari kondisi market terkini — dia adalah efek generik dari cara kerja rolling window itu sendiri.
+
+### Kenapa ini terjadi (mekanik)
+
+Rolling mean (RollMean) dan rolling standard deviation (RollStd) dari MVRV Ratio dihitung ulang setiap hari dari 365 hari terakhir. Kalau harga bergerak mendatar untuk sementara waktu (tidak turun, tidak naik signifikan) di tengah bull market yang sudah berjalan lama, RollMean tetap terus bergeser naik — karena hari-hari lama dengan MVRV lebih rendah keluar dari window, digantikan hari-hari baru dengan MVRV lebih tinggi. Akibatnya, MVRV Ratio yang nilainya sama persis dari waktu ke waktu jadi kelihatan "makin dekat ke rata-rata" — sehingga Z-Score turun, walau MVRV Ratio mentahnya tidak berubah sama sekali.
+
+Ini murni efek matematis dari window yang bergerak, bukan cerminan perubahan kondisi on-chain yang genuine.
+
+### Kesimpulan pemakaian
+
+**MVRV Z-Score rolling 1 tahun TIDAK menambah informasi analitis baru di atas MVRV Ratio.** Dia bukan sinyal independen — dia adalah representasi ulang dari sinyal MVRV Ratio yang sama, ditampilkan dengan skala yang membuat pergerakan kecil kelihatan lebih besar secara visual (mirip membaca suhu badan dalam Celsius vs Fahrenheit — Fahrenheit kelihatan berubah lebih jauh untuk perubahan yang sama, tapi bukan berarti kondisinya lebih parah).
+
+**Implikasi untuk K1 signal #1 ("MVRV turun di setiap ATH baru"):** tidak berubah. Signal #1 tetap dibaca dari MVRV Ratio, bukan Z-Score rolling 1 tahun. Z-Score rolling 1 tahun tidak menambah confirming power terpisah dan tidak dihitung sebagai signal tambahan.
+
+**Kapan tetap berguna:** murni sebagai alat visual — untuk dashboard atau konten edukasi (Instagram), grafik Z-Score rolling bisa membuat penurunan MVRV yang sebenarnya kecil dan halus kelihatan lebih jelas dan gampang dibaca orang awam. Tapi harus eksplisit dijelaskan sebagai cara visualisasi, bukan indikator tambahan yang berdiri sendiri.
+
+**Data mentah:** `research/findings/mvrv_zscore_independence_all_local_tops.csv`, `mvrv_zscore_independence_pairs.csv`, `mvrv_zscore_independence_soft_divergent.csv`.
