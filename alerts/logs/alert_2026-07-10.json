@@ -1,21 +1,21 @@
 {
-  "timestamp_utc": "2026-07-10T06:17:50.116127+00:00",
+  "timestamp_utc": "2026-07-10T07:27:06.320626+00:00",
   "data_date": "2026-07-10",
   "zone": "Z3",
   "telegram_sent": true,
   "triggered_count": 0,
   "triggered_conditions": [],
   "snapshot": {
-    "price": 63992.0,
-    "sth_rp": 67744.6,
-    "rp": 52889.28,
-    "lth_rp": 49887.66,
-    "cvdd": 49026.82,
-    "cvdd_ratio": 1.3052,
-    "aviv_mean_px": 88780.16,
-    "aviv_upper_px": 101633.2,
-    "sth_mvrv": 0.9446,
-    "supply_in_profit": 53.77,
+    "price": 63860.99,
+    "sth_rp": 67753.89,
+    "rp": 52890.53,
+    "lth_rp": 49888.5,
+    "cvdd": 49026.55,
+    "cvdd_ratio": 1.3026,
+    "aviv_mean_px": 88782.91,
+    "aviv_upper_px": 101636.4,
+    "sth_mvrv": 0.9425,
+    "supply_in_profit": 53.45,
     "fg": 23
   }
 }
