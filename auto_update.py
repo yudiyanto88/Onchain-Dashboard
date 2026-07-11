@@ -460,9 +460,29 @@ except Exception as e:
 # di script baru.
 
 # ==========================================
-# 17. MASTER PIPELINE: ALL METRICS AGGREGATOR (NEW)
+# 17. PIPELINE: APPARENT DEMAND
 # ==========================================
-print("\n[17/17] 🌌 Mengkompilasi Semua File CSV ke dalam 1 Master Dataset...")
+print("\n[17/18] Menarik data Apparent Demand...")
+try:
+    df_demand = fetch_data(
+        "https://chartinspect.com/api/onchain/apparent-demand?timeframe=all&isProUser=false",
+        ['date', 'btc_price', 'apparent_demand']
+    )
+
+    if not df_demand.empty:
+        df_demand = df_demand.sort_values('date').reset_index(drop=True)
+        df_demand.to_csv("data_apparent_demand.csv", index=False)
+        print("✅ data_apparent_demand.csv berhasil diperbarui.")
+        print(df_demand[['date', 'apparent_demand']].tail(3).to_string(index=False))
+    else:
+        print("❌ GAGAL: Data Apparent Demand kosong atau gagal ditarik.")
+except Exception as e:
+    print(f"❌ Error Pipeline 17 Apparent Demand: {e}")
+
+# ==========================================
+# 18. MASTER PIPELINE: ALL METRICS AGGREGATOR (NEW)
+# ==========================================
+print("\n[18/18] 🌌 Mengkompilasi Semua File CSV ke dalam 1 Master Dataset...")
 try:
     # Daftar semua file CSV target hulu hasil rekapitulasi individu
     csv_files = [
@@ -470,7 +490,7 @@ try:
         "data_derivatives.csv", "data_sentiment.csv", "data_supply.csv",
         "data_mvrv.csv", "data_fg.csv", "data_exchange.csv", "data_rhodl.csv",
         "data_hodl_waves.csv", "data_realized_cap.csv", "data_cdd.csv", "data_lth_flow.csv",
-        "data_aviv.csv"
+        "data_aviv.csv", "data_apparent_demand.csv"
     ]
     
     df_master = None
