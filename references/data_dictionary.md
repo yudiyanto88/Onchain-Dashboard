@@ -119,7 +119,7 @@ File: `data_supply.csv` / master.
 | `supply_<band>`, `realized_cap_<band>` | `data_hodl_waves.csv` / master | HODL waves — supply & realized cap per umur coin (0-1d s/d 10y+) |
 | `lth_pl_price`, `lth_pl_flow_btc` | `data_lth_flow.csv` / master | LTH profit/loss price level & aliran BTC LTH |
 | `realized_cap_usd`, `lth_realized_cap_usd`, `sth_realized_cap_usd` | `data_realized_cap.csv` / master | Realized cap total & per kohort |
-| `apparent_demand` | `data_apparent_demand.csv` / master | Apparent Demand (30-hari perubahan circulating supply, gaya Glassnode) — proxy laju permintaan baru. Ditambah 2026-07-11 dari `research/findings/video-breakdown/video_whale-accumulation-2025_findings.md`. Belum ada threshold/rule di framework, belum ada KB — pakai ekstra hati-hati. Full history sejak 2010-07-17 |
+| `apparent_demand` | `data_apparent_demand.csv` / master | Apparent Demand (30-hari perubahan circulating supply, gaya Glassnode) — proxy laju permintaan baru. Ditambah 2026-07-11. ⚠️ Sudah diuji sebagai sinyal (deceleration → forward return lemah) dan **REJECT** — hasil rapuh lintas cycle, lihat `research/findings/video-breakdown/apparent_demand_hypothesis_findings.md`. Full history sejak 2010-07-17 |
 
 ---
 

@@ -51,6 +51,8 @@ Spawn sub-agent `data-verifier` (synchronous, satu spawn bisa menangani beberapa
 
 Hasil per kandidat: SUPPORTED / NOT-SUPPORTED / MIXED, dengan n, sebaran cycle, dan catatan bias.
 
+**Kalau ada kandidat verdict `NEEDS-DATA-WE-DONT-HAVE`:** catat di findings sebagai gap, JANGAN pernah menambah pipeline data baru ke `auto_update.py` atau menarik data permanen sebagai bagian dari run ini — walau tergoda karena sudah tahu persis data apa yang kurang. Menambah sumber data permanen adalah keputusan produksi terpisah (biaya API call harian selamanya) yang harus Yudi minta secara eksplisit di luar `/video-breakdown`, bukan hasil ikutan otomatis dari video yang kebetulan dibedah.
+
 ## Stage 4 — Findings doc (kamu sendiri, orchestrator)
 
 Tulis `research/findings/video-breakdown/video_<slug>_findings.md`.
