@@ -16,7 +16,9 @@ Pengalaman yang relevan: Oktober 2025 hampir terliquidasi karena tidak memperhit
 - `app.py` — Streamlit dashboard untuk visualisasi
 - `data_*.csv` — file data on-chain harian
 - `alerts/alert_check.py` — cek kondisi framework, kirim notif Telegram
-- `references/` — knowledge base files (KB v1.4) dan Decision_Framework v1.md
+- `references/` — knowledge base files (KB v1.4), Decision_Framework v1.md, dan `data_dictionary.md` (peta semua kolom CSV)
+- `research/findings/video_index.md` — index klaim yang sudah pernah diuji (cek sebelum menguji klaim "baru")
+- `.claude/commands/video-breakdown.md` — pipeline `/video-breakdown <url>` untuk bedah video on-chain end-to-end
 
 ---
 
@@ -67,17 +69,22 @@ Berlaku di semua kondisi. Tidak ada sinyal on-chain yang bisa override ini.
 
 ## CARA KERJA DI REPO INI
 
-Dua tool, dua fungsi berbeda:
-- **Claude Code CLI (ini)** → komputasi: baca CSV, jalankan script, analisis data, debug kode, commit hasil
-- **Claude.ai (browser)** → reasoning: evaluasi sinyal, keputusan framework, interpretasi
+Seluruh loop riset — komputasi DAN reasoning — jalan di Claude Code. Peran "second opinion" (dulu lewat Claude.ai) sekarang dilakukan sub-agent `framework-skeptic` dengan konteks bersih.
 
-Jangan campur tugas. Claude Code tidak membuat keputusan investasi. Claude.ai tidak menulis kode produksi.
+**Guardrail utama — machine proposes, Yudi disposes:**
+- AI boleh menganalisis, menguji, dan MENGUSULKAN perubahan framework (proposed diff)
+- AI TIDAK PERNAH mengedit `references/Decision_Framework v1.md` atau file KB tanpa approval eksplisit Yudi
+- AI tidak membuat keputusan investasi — verdict analisis ≠ perintah beli/jual
 
 **Setiap sesi Claude Code:**
 1. Baca file ini sebagai konteks repo
 2. Kalau task menyentuh logika framework → baca `references/Decision_Framework v1.md`
 3. Kalau task menyentuh metrik spesifik → baca KB v1.4 yang relevan dari `references/`
-4. Jangan ubah `auto_update.py` atau `app.py` kecuali diminta eksplisit
+4. Kalau task menyentuh data CSV → cek `references/data_dictionary.md` dulu (kolom apa yang ada, mulai tanggal berapa)
+5. Sebelum menguji klaim/hipotesis "baru" → cek `research/findings/video_index.md`, mungkin sudah pernah diuji
+6. Jangan ubah `auto_update.py` atau `app.py` kecuali diminta eksplisit
+
+**Gaya bahasa semua output (findings, laporan, chat):** Bahasa Indonesia sederhana, kalimat pendek. Istilah teknis tetap English, dijelaskan sekali saat pertama muncul. Jangan pakai jargon statistik tanpa penjelasan satu kalimat. Findings doc selalu dibuka dengan section "Ringkasan Sederhana" yang bisa dipahami tanpa baca detailnya.
 
 ---
 

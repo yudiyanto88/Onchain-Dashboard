@@ -20,3 +20,6 @@ Thumbs.db
 # Generated / temp
 *.log
 *.tmp
+
+# Claude Code local settings (izin lokal, jangan di-push)
+.claude/settings.local.json
