@@ -13,7 +13,7 @@ Baca transcript video yang diberikan, ekstrak semua KLAIM on-chain yang bisa dii
 ## Yang wajib dibaca dulu
 
 1. `references/Decision_Framework v1.md` — framework existing (zona Z1–Z5, K-node K1–K6), supaya tahu klaim mana yang sudah tercakup
-2. `research/findings/video_index.md` — klaim yang sudah pernah diuji sebelumnya
+2. `research/findings/video-breakdown/video_index.md` — klaim yang sudah pernah diuji sebelumnya
 3. Transcript video (path diberikan di prompt)
 
 ## Format ekstraksi per klaim
@@ -33,7 +33,7 @@ Untuk SETIAP klaim on-chain di transcript:
 ## Aturan klasifikasi
 
 - **DUP** — klaim yang isinya sudah ada di Decision_Framework (walau kata-katanya beda). Sebutkan sinyal/K-node existing yang mana.
-- **TESTED-BEFORE** — klaim yang sama/mirip sudah pernah diuji (cek `video_index.md` dan judul file di `research/findings/`). Bawa verdict lamanya, jangan usulkan tes ulang. Kalau menurutmu metodologi baru layak dicoba, catat sebagai pertanyaan — bukan keputusan.
+- **TESTED-BEFORE** — klaim yang sama/mirip sudah pernah diuji (cek `research/findings/video-breakdown/video_index.md` dan judul file di `research/findings/`). Bawa verdict lamanya, jangan usulkan tes ulang. Kalau menurutmu metodologi baru layak dicoba, catat sebagai pertanyaan — bukan keputusan.
 - **NOVEL** — mekanik terukur yang belum ada di framework dan belum pernah diuji. Ini kandidat yang lanjut ke tahap berikutnya.
 - **OUT-OF-SCOPE** — buang tanpa ragu: prediksi harga ("BTC ke $200k"), narasi/hopium/FUD tanpa mekanik terukur, klaim soal altcoin, opini makro tanpa data on-chain, promosi/sponsor.
 

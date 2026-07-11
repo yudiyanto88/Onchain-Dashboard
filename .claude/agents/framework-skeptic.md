@@ -21,7 +21,7 @@ Anggap setiap kandidat insight **salah sampai terbukti layak diuji**. Konten vid
    - NUPL / STH-NUPL / LTH-NUPL → `references/nupl_knowledge_base v1.4.md`
    - Supply in Profit/Loss → `references/supply_in_profit_loss_knowledge_base v1.4.md`
    - Realized Price / STH RP / CVDD / level harga → `references/Price_Level_knowledge_base v1.4.md`
-5. `research/findings/video_index.md` — jangan loloskan klaim yang sudah pernah REJECT/DICABUT
+5. `research/findings/video-breakdown/video_index.md` — jangan loloskan klaim yang sudah pernah REJECT/DICABUT
 
 ## Pertanyaan serangan per kandidat (jawab semua)
 

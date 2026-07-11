@@ -11,13 +11,15 @@ Kamu adalah **orchestrator**. Jalankan 6 stage di bawah BERURUTAN. Prinsip utama
 
 Buat task list (TaskCreate) untuk 6 stage supaya progres kelihatan.
 
+**Folder kerja:** semua artefak video breakdown hidup di `research/findings/video-breakdown/` — folder khusus, terpisah dari file riset umum lain di `research/findings/` (K3.md, sopr_*, mvrv_*, dll). Jangan tulis apapun langsung di root `research/findings/`.
+
 ---
 
 ## Stage 0 — Watch
 
 1. Tentukan `<slug>` pendek dari judul video (kebab-case, mis. `lth-distribution-warning`)
 2. Invoke skill `watch` dengan argumen video
-3. Simpan transcript lengkap ke `research/findings/video_<slug>/transcript.md` — sertakan header: judul video, channel, URL, tanggal video, tanggal breakdown
+3. Simpan transcript lengkap ke `research/findings/video-breakdown/video_<slug>/transcript.md` — sertakan header: judul video, channel, URL, tanggal video, tanggal breakdown
 4. Kalau watch gagal (video private/region-lock/dll), STOP dan laporkan ke Yudi — jangan lanjut dengan transcript kosong
 
 ## Stage 1 — Ekstrak (sub-agent `insight-extractor`)
@@ -25,7 +27,7 @@ Buat task list (TaskCreate) untuk 6 stage supaya progres kelihatan.
 Spawn sub-agent `insight-extractor` (synchronous). Prompt harus berisi:
 - Path transcript
 - Fokus khusus dari Yudi (kalau ada di `$ARGUMENTS`)
-- Instruksi baca `references/Decision_Framework v1.md` + `research/findings/video_index.md`
+- Instruksi baca `references/Decision_Framework v1.md` + `research/findings/video-breakdown/video_index.md`
 
 Hasil: daftar klaim terklasifikasi `DUP | TESTED-BEFORE | NOVEL | OUT-OF-SCOPE`.
 Kalau hasilnya 0 klaim NOVEL → langsung lompat ke Stage 4 (findings doc tetap dibuat, isinya "tidak ada yang baru").
@@ -51,7 +53,7 @@ Hasil per kandidat: SUPPORTED / NOT-SUPPORTED / MIXED, dengan n, sebaran cycle, 
 
 ## Stage 4 — Findings doc (kamu sendiri, orchestrator)
 
-Tulis `research/findings/video_<slug>_findings.md`.
+Tulis `research/findings/video-breakdown/video_<slug>_findings.md`.
 
 **ATURAN BAHASA (penting):** Bahasa Indonesia sederhana. Kalimat pendek. Istilah teknis (MVRV, SOPR, dll) tetap English tapi dijelaskan sekali saat pertama muncul. Tidak ada jargon statistik tanpa penjelasan satu kalimat. Bahasa probabilistik selalu ("cenderung", "historically") — tidak pernah "pasti".
 
@@ -90,15 +92,15 @@ Aturan verdict akhir:
 - Uji MIXED → `NEEDS-MORE-DATA` (jangan dipaksa jadi ADD)
 - `TESTED-BEFORE` pakai verdict lama dari video_index
 
-Terakhir: **append satu baris** ke tabel "Video yang sudah dibedah" di `research/findings/video_index.md` (tanggal, judul video, klaim utama + verdict singkat, nama file findings).
+Terakhir: **append satu baris** ke tabel "Video yang sudah dibedah" di `research/findings/video-breakdown/video_index.md` (tanggal, judul video, klaim utama + verdict singkat, nama file findings).
 
 ## Stage 5 — Commit & push
 
 Commit HANYA artefak riset dari run ini:
-- `research/findings/video_<slug>/` (transcript)
-- `research/findings/video_<slug>_findings.md`
-- `research/analyze_*.py` yang baru dibuat + CSV pendukung
-- `research/findings/video_index.md`
+- `research/findings/video-breakdown/video_<slug>/` (transcript)
+- `research/findings/video-breakdown/video_<slug>_findings.md`
+- `research/analyze_*.py` yang baru dibuat (script verifikasi tetap di `research/` root, bukan subfolder video-breakdown — biar reusable untuk riset non-video juga) + CSV pendukung
+- `research/findings/video-breakdown/video_index.md`
 
 Commit message: `research: video breakdown <judul singkat> — <X> ADD, <Y> REJECT, <Z> needs-more-data`. Lalu `git push`.
 
