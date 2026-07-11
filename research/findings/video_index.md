@@ -38,3 +38,4 @@
 
 | Tanggal | Video | Klaim utama + verdict | File findings |
 |---------|-------|----------------------|---------------|
+| 2026-07-11 | On-Chain Mind — "Bitcoin Whales Are Accumulating Right Now" (2025-01-27) | Whale/small-holder divergence, apparent demand & momentum (NEEDS-MORE-DATA, data tidak kita punya); realized profit $ turun (REJECT — kontradiksi KB SOPR); trader profit margin ~NUPL (REJECT — redundan KB NUPL) | `video_whale-accumulation-2025_findings.md` |
