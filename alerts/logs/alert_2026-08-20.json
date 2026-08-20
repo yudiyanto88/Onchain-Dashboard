@@ -1,0 +1,26 @@
+{
+  "timestamp_utc": "2026-08-20T04:27:11.789611+00:00",
+  "data_date": "2026-08-20",
+  "zone": "Z3",
+  "telegram_sent": true,
+  "triggered_count": 1,
+  "triggered_conditions": [
+    {
+      "name": "STH_MVRV_LOW",
+      "detail": "STH-MVRV = 1.032 (< 1.05) saat harga masih di atas STH RP \u2014 K1 signal 3"
+    }
+  ],
+  "snapshot": {
+    "price": 69265.11,
+    "sth_rp": 67125.78,
+    "rp": 52647.75,
+    "lth_rp": 49629.71,
+    "cvdd": 49747.15,
+    "cvdd_ratio": 1.3923,
+    "aviv_mean_px": 88418.09,
+    "aviv_upper_px": 100998.72,
+    "sth_mvrv": 1.0319,
+    "supply_in_profit": 63.83,
+    "fg": 62
+  }
+}
