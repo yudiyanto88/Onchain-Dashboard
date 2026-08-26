@@ -1,5 +1,5 @@
 {
-  "timestamp_utc": "2026-08-25T04:29:50.397967+00:00",
+  "timestamp_utc": "2026-08-26T04:30:38.652312+00:00",
   "data_date": "2026-08-24",
   "zone": "Z3",
   "telegram_sent": true,
@@ -16,6 +16,6 @@
     "aviv_upper_px": 101457.25,
     "sth_mvrv": 1.1411,
     "supply_in_profit": 69.81,
-    "fg": 74
+    "fg": 65
   }
 }
