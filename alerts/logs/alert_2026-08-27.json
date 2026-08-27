@@ -1,0 +1,21 @@
+{
+  "timestamp_utc": "2026-08-27T14:52:25.843881+00:00",
+  "data_date": "2026-08-27",
+  "zone": "Z3",
+  "telegram_sent": true,
+  "triggered_count": 0,
+  "triggered_conditions": [],
+  "snapshot": {
+    "price": 79276.05,
+    "sth_rp": 69568.56,
+    "rp": 53007.21,
+    "lth_rp": 49500.85,
+    "cvdd": 49897.5,
+    "cvdd_ratio": 1.5888,
+    "aviv_mean_px": 89180.88,
+    "aviv_upper_px": 101784.02,
+    "sth_mvrv": 1.1395,
+    "supply_in_profit": 70.37,
+    "fg": 71
+  }
+}
