@@ -1,21 +1,26 @@
 {
-  "timestamp_utc": "2026-09-11T08:24:49.785498+00:00",
+  "timestamp_utc": "2026-09-12T08:13:41.806605+00:00",
   "data_date": "2026-09-11",
   "zone": "Z3",
   "telegram_sent": true,
-  "triggered_count": 0,
-  "triggered_conditions": [],
+  "triggered_count": 1,
+  "triggered_conditions": [
+    {
+      "name": "PULLBACK_5PCT",
+      "detail": "Turun 5.4% dari high 14D $81,218 \u2192 $76,858 \u2014 cek kondisi K5"
+    }
+  ],
   "snapshot": {
-    "price": 77202.94,
-    "sth_rp": 71131.43,
-    "rp": 53222.69,
-    "lth_rp": 49389.71,
-    "cvdd": 50053.87,
-    "cvdd_ratio": 1.5424,
-    "aviv_mean_px": 89952.75,
-    "aviv_upper_px": 102468.65,
-    "sth_mvrv": 1.0855,
-    "supply_in_profit": 64.38,
-    "fg": 56
+    "price": 76857.69,
+    "sth_rp": 71132.07,
+    "rp": 53220.2,
+    "lth_rp": 49385.39,
+    "cvdd": 50055.94,
+    "cvdd_ratio": 1.5354,
+    "aviv_mean_px": 90047.18,
+    "aviv_upper_px": 102576.34,
+    "sth_mvrv": 1.0794,
+    "supply_in_profit": 64.37,
+    "fg": 63
   }
 }
