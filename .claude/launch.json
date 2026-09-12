@@ -1,0 +1,52 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dashboard-lama",
+      "runtimeExecutable": "streamlit",
+      "runtimeArgs": [
+        "run",
+        "app.py",
+        "--server.port",
+        "8501",
+        "--server.headless",
+        "true"
+      ],
+      "port": 8501
+    },
+    {
+      "name": "dashboard-v2",
+      "runtimeExecutable": "streamlit",
+      "runtimeArgs": [
+        "run",
+        "app_v2.py",
+        "--server.port",
+        "8502",
+        "--server.headless",
+        "true",
+        "--theme.base",
+        "dark",
+        "--theme.primaryColor",
+        "#006d77"
+      ],
+      "port": 8502
+    },
+    {
+      "name": "dashboard-v2-uji",
+      "runtimeExecutable": "streamlit",
+      "runtimeArgs": [
+        "run",
+        "app_v2.py",
+        "--server.port",
+        "8503",
+        "--server.headless",
+        "true",
+        "--theme.base",
+        "dark",
+        "--theme.primaryColor",
+        "#006d77"
+      ],
+      "port": 8503
+    }
+  ]
+}
