@@ -29,6 +29,9 @@ Baca dokumen ini dan `CLAUDE.md` sebelum mulai. Bagian **3 (keputusan pending)**
 - Kalau ada pilihan, beri **rekomendasi beserta untung-rugi**, bukan sekadar daftar opsi.
 - **Klaim harus dibuktikan.** Kalau pengukuran meragukan, bilang belum sah dan ulangi dengan cara lain. User beberapa kali menerima koreksi semacam ini dan menghargainya.
 - Kalau diminta mengecilkan/optimasi sesuatu, **pertimbangkan efeknya ke elemen lain** (lebar, tinggi, jarak, rasio huruf), bukan satu sisi saja.
+- **User membuka dashboard uji di browsernya sendiri: http://localhost:8503** (server `dashboard-v2-uji` yang dijalankan sesi Claude Code). Biarkan server itu hidup, restart sesudah mengubah `dashboard/`, dan kalau user bilang "nyalakan localhost", yang dimaksud server itu.
+- **User menguji sendiri lalu melapor dengan foto dan keluhan sekecil piksel** ("tidak sejajar", "belum center", "keluar batas chart"). Keluhan seperti itu hampir selalu benar — **ukur dulu di halaman hidup**, baru perbaiki. Di sesi 13 Sep, dua tebakan pertama tanpa pengukuran meleset.
+- **Selera tampilan user:** kontrol yang ringkas, lambang ketimbang kata, ukuran seragam (tidak ada tombol yang lebih panjang atau pendek dari tetangganya), dan kedudukan lurus dengan elemen di sekitarnya. Pakai ini sebagai titik awal untuk 16 halaman berikutnya.
 
 ---
 
@@ -173,6 +176,8 @@ Periode ke-4 dan seterusnya mengulang ketiga gaya itu dengan garis 0,5 px lebih 
 
 - **Halaman metrik lainnya** dan **navigasi seluruh halaman** (prioritas 3).
 - **Desain judul halaman** — bagian 3.6.
+- **Warna histogram Z-Score belum dikonfirmasi eksplisit.** User menyetujui warna di pratinjau histogram pertama (navy dan teal), tapi saat Z-Score masuk chart yang sama dengan MVRV/LTH, warna itu bentrok dan diganti violet `#7f77dd` dan hijau `#97c459` berdasarkan uji jarak. User sudah melihat dan memakainya tanpa keberatan, tapi belum pernah ditanya langsung. Tanyakan sekali, dengan pratinjau.
+- **Lambang Step dan Band (gambar SVG) duduk 1,2 px berbeda secara vertikal** dari tiga lambang teks di sebelahnya. Di screenshot tidak terlihat dan user belum mengeluh; kalau dilaporkan, geser gambar 1 px ke atas.
 - **Gradasi warna histogram Z-Score** — ditunda user, bagian 5.
 - **Legend padat di layar sempit.** Dengan Z-Score menyala ada enam kelompok plus harga. Di panel browser Claude (504 px) legendnya sampai terdesak habis oleh tombol sorot; di layar user belum ada keluhan. Tinggi baris legend dipaku 40 px, jadi kalau membungkus dua baris, baris kedua terpotong.
 - **Range All tidak selalu memuat seluruh sejarah.** Sesudah ganti Range, chart kadang terbuka di ±70 bar terakhir, dan pernah terlihat memuat penuh lalu mundur sendiri ke bar bawaan ±1 detik kemudian. Ini jalur `fitContent` (tanpa zoom simpanan), bukan jalur pemulihan zoom yang sudah diperbaiki — **sudah begitu sebelum perbaikan 13 Sep**, dan belum diusut. Kalau dikerjakan, mulai dari perilaku yang sama: lebar area gambar berubah sesudah tampilan awal.
@@ -237,6 +242,7 @@ Bukan untuk halaman: `data_master_all_metrics.csv` (file hasil generate) dan `da
 1. Muat skill **dataviz**. Jalankan `scripts/validate_palette.js` dari folder skill itu:
    `node validate_palette.js "<warna1>,<warna2>,...,#F7931A" --mode dark --surface "#131722" --pairs all`
    Selalu ikutkan oranye BTC `#F7931A`. Status FAIL "lightness band" untuk oranye boleh diabaikan, karena itu garis harga utama.
+   - **Catatan 13 Sep:** skrip itu **tidak ditemukan** di mesin ini (skill dataviz tidak terpasang sebagai folder lokal). Sebagai gantinya dipakai hitungan Python sekali pakai — skripnya tidak disimpan di repo, buat ulang kalau perlu: ubah hex ke CIE Lab, hitung jarak ΔE (CIE76) tiap calon terhadap semua warna garis yang ada, lalu ulangi setelah kedua warna disimulasikan deuteranopia dan protanopia (ambil jarak terkecil). Patokan yang dipakai untuk warna Z-Score: jarak normal ≥ ±30 dan jarak buta warna ≥ ±14 dianggap lolos longgar; calon yang jaraknya satu digit terhadap oranye BTC saat buta warna dibuang (mustard `#c9a227` = 2).
 2. **Syarat sengaja dilonggarkan** (permintaan user): cukup dua — tidak mirip oranye BTC, dan masih bisa dibedakan penderita buta warna dengan batas longgar. Syarat lama yang dicabut: MVRV harus paling menonjol, jarak ke warna aksen tombol, dan jarak ke hijau KPI (KPI sudah tidak ada).
 3. **Pelajaran:** jangan paksa semua garis sama terang. Kalau terangnya sama, bedanya tinggal hue — dan hue justru yang hilang bagi mata buta warna. Perbedaan terang yang tipis membantu. Contoh nyata: menggelapkan aqua LTH agar setara navy membuat keduanya makin mirip (ΔE normal turun dari 17 ke 11); solusinya menggeser sedikit ke hijau (`#0b8e89`).
 4. **Persentase redup saat disorot** dihitung per warna supaya semua garis redup punya kontras sama, sekarang **1,70:1** terhadap latar chart `#131722`: MVRV 0,49 · STH 0,44 · LTH 0,39 · BTC 0,28. Rumusnya: cari opasitas α sehingga warna yang dicampur ke latar chart punya kontras itu.
