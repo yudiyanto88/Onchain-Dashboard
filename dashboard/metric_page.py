@@ -219,8 +219,9 @@ def _render_header(family, latest):
     # margin-bottom 16 px membatalkan margin -16 px bawaan wadah teks Streamlit. Tanpa
     # itu baris tombol menimpa judul 1.4 px; dengan itu jaraknya 14.6 px, sama dengan
     # judul lama (terukur: jarak naik 1:1 mengikuti margin ini).
+    # Kelas page-title dipakai aturan :fullscreen di app_v2.py untuk menyembunyikan judul.
     st.markdown(
-        f"<div style='margin:0 0 16px;line-height:1.2;'>"
+        f"<div class='page-title' style='margin:0 0 16px;line-height:1.2;'>"
         f"<span style='display:inline-block;background:#006d77;color:#ffffff;"
         f"font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;"
         f"line-height:1.4;padding:2px 7px;border-radius:4px;'>{family.title}</span>"

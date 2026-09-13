@@ -245,10 +245,15 @@ button[kind="pills"]:hover p { opacity: 0.7 !important; }
 :fullscreen div[data-testid="stToolbar"],
 :fullscreen div[data-testid="stDecoration"] { display: none !important; }
 :fullscreen section[data-testid="stSidebar"] { display: none !important; }
+/* Layar penuh: jarak kiri-kanan bawaan Streamlit (5rem = 80 px per sisi) dipangkas
+   jadi 1rem, dan judul halaman disembunyikan supaya baris tombol naik ke atas dan
+   chart mendapat ruang lebih. Isi dan desain chart tidak berubah. */
 :fullscreen .block-container {
     padding-top: 0.6rem !important; padding-bottom: 0.3rem !important;
+    padding-left: 1rem !important; padding-right: 1rem !important;
     max-width: 100% !important;
 }
+:fullscreen div[data-testid="stElementContainer"]:has(.page-title) { display: none !important; }
 
 /* Header Streamlit melayang di atas konten. Dengan padding dipangkas, judul ikut
    tertutup. Header hanya berisi tombol Deploy dan menu, jadi disembunyikan. */
