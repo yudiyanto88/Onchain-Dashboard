@@ -39,6 +39,22 @@ BTC_MODES = [OVERLAY, PANE, HIDDEN]
 Z_HIDDEN, Z_BOTTOM = "Hidden", "Bottom pane"
 Z_MODES = [Z_HIDDEN, Z_BOTTOM]
 
+# Posisi kotak angka saat kursor di chart (lihat posisikanTooltip di lw_chart).
+# Cursor jadi bawaan (keputusan user 14 Sep 2026): mata tidak bolak-balik ke pojok chart.
+# Satu pilihan untuk semua halaman (selera baca, bukan soal metrik), jadi key-nya tanpa
+# awalan family.key. Pindah halaman lewat st.navigation membuat Streamlit membuang nilai
+# widget (terukur 14 Sep: Fixed di SOPR jadi Cursor lagi di MVRV), jadi pilihannya disimpan
+# di gudang biasa TIP_STORE; widget TIP_KEY hanya cerminan yang disemai ulang tiap halaman.
+TIP_MODES = ["Fixed", "Cursor", "Off"]
+TIP_DEFAULT = "Cursor"
+TIP_KEY = "tooltip_mode"
+TIP_STORE = "tooltip_pref"
+
+
+def _on_tooltip():
+    _keep(TIP_KEY, st.session_state[TIP_STORE])
+    st.session_state[TIP_STORE] = st.session_state[TIP_KEY]
+
 # Metrik memakai sumbu kiri, harga BTC memakai sumbu kanan.
 METRIC_AXIS_DEFAULT = "left"
 BTC_AXIS = "right"
@@ -226,7 +242,7 @@ def _render_header(family, latest):
         f"<div class='page-title' style='margin:0 0 16px;line-height:1.2;'>"
         f"<span style='display:inline-block;background:#006d77;color:#ffffff;"
         f"font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;"
-        f"line-height:1.4;padding:2px 7px;border-radius:4px;'>{family.title}</span>"
+        f"line-height:1.4;padding:2px 7px;border-radius:4px;'>{family.group or family.title}</span>"
         f"<div style='display:flex;align-items:baseline;gap:10px;margin-top:4px;'>"
         f"<span style='font-size:1.15rem;font-weight:600;color:#ffffff;'>{family.subtitle}</span>"
         f"<span style='font-size:0.72rem;color:#8b90a0;font-weight:400;'>"
@@ -266,16 +282,22 @@ def _init_state(family, dmin, dmax):
         f"{k}_extra_periods": [],
         f"{k}_scale_price": family.price_scale_default,
         f"{k}_scale_metric": family.metric_scale_default,
-        f"{k}_btc": OVERLAY,
+        f"{k}_btc": family.btc_mode_default,
         f"{k}_axis_btc": BTC_AXIS,
         f"{k}_extra": Z_HIDDEN,
+        TIP_STORE: TIP_DEFAULT,
         f"{k}_height": 720,
     }
     for key, val in defaults.items():
         st.session_state.setdefault(key, val)
+    st.session_state.setdefault(TIP_KEY, st.session_state[TIP_STORE])
+    # Halaman yang sejak awal memisahkan harga BTC (SOPR) langsung memakai separate_axis,
+    # sama seperti kalau pengguna sendiri memilih Separate pane (_on_btc_mode).
+    separate = st.session_state[f"{k}_btc"] == PANE
     for s in family.series:
         if s.pane != "extra":
-            st.session_state.setdefault(f"{k}_axis_{s.col}", s.axis)
+            axis = s.separate_axis if separate and s.separate_axis else s.axis
+            st.session_state.setdefault(f"{k}_axis_{s.col}", axis)
 
 
 def _smooth_summary(family, short=False):
@@ -426,7 +448,7 @@ def _render_controls(family, dmin, dmax):
     scale_txt = price_s if price_s == metric_s else "Mixed"
 
     # Satu kolom per kotak kontrol; CSS membuat tiap kolom menyusut ke lebar isinya.
-    cols = st.columns(7, vertical_alignment="bottom", gap="small")
+    cols = st.columns(8, vertical_alignment="bottom", gap="small")
 
     with cols[0]:
         with st.popover(f"Range\n\n**{_range_summary(family)}**"):
@@ -511,6 +533,15 @@ def _render_controls(family, dmin, dmax):
         with st.popover(f"Line style\n\n**{_style_summary(family)}**"):
             _render_line_style(family)
 
+    with cols[7]:
+        with st.popover(f"Tooltip\n\n**{st.session_state[TIP_STORE]}**"):
+            st.caption("TOOLTIP")
+            st.segmented_control("Tooltip position", TIP_MODES, key=TIP_KEY,
+                                 on_change=_on_tooltip,
+                                 help="Fixed: top-left corner · Cursor: next to the cursor · "
+                                      "Off: no box",
+                                 label_visibility="collapsed")
+
 
 def render_metric_page(family: MetricFamily):
     df_raw = family.loader()
@@ -560,13 +591,14 @@ def render_metric_page(family: MetricFamily):
             extra.append(Line(sr.label, sr.col, sr.color, "left", width=LINE_WIDTH,
                               group=sr.group or sr.label, dim=sr.dim, kind=sr.kind,
                               short=sr.short, alpha=sr.alpha,
-                              hidden_default=sr.hidden_default, precision=sr.precision))
+                              hidden_default=sr.hidden_default, precision=sr.precision,
+                              whole_from=sr.whole_from))
             continue
         axis = st.session_state[f"{k}_axis_{sr.col}"]
         plan.append(Line(sr.label, sr.col, sr.color, axis, width=LINE_WIDTH,
                          group=sr.group or sr.label, dim=sr.dim, kind=sr.kind,
                          short=sr.short, alpha=sr.alpha, precision=sr.precision,
-                         hidden_default=sr.hidden_default))
+                         hidden_default=sr.hidden_default, whole_from=sr.whole_from))
         if not sr.smoothing:
             continue
         for p in periods:
@@ -575,7 +607,7 @@ def render_metric_page(family: MetricFamily):
                 # Nama "<metrik> <SMA|EMA>(<periode>)" dibaca tooltip untuk kolom periodenya.
                 plan.append(Line(f"{sr.label} {kind}({p})", col, sr.color, axis,
                                  group=sr.label, dim=sr.dim, precision=sr.precision,
-                                 **_smooth_style(family, p)))
+                                 whole_from=sr.whole_from, **_smooth_style(family, p)))
 
     # Garis acuan mengikuti sumbu yang dipakai metrik, bukan dipaku ke satu sisi.
     used_axes = {ln.axis for ln in plan}
@@ -583,8 +615,21 @@ def render_metric_page(family: MetricFamily):
     for ref in family.reference_lines:
         ref_col = f"_ref_{ref.value}"
         df[ref_col] = ref.value
-        plan.insert(0, Line(ref.label, ref_col, "rgba(255,255,255,0.35)",
-                            ref_axis, width=1, style=2))
+        # all_axes: satu garis di setiap sumbu yang memuat metrik (SOPR: LTH-SOPR di kanan).
+        # Kiri didahulukan supaya urutannya tetap sama tiap render.
+        axes = sorted(used_axes) if ref.all_axes and used_axes else [ref_axis]
+        for axis in axes:
+            # Garis acuan jadi seri pertama di sumbunya, dan lightweight-charts mengambil
+            # format angka sumbu dari seri pertama itu. Precision-nya disamakan dengan metrik
+            # di sumbu yang sama; kalau tidak, sumbu SOPR menulis 2 desimal (1.25, bukan 1.250).
+            # Aturan tanpa-desimal (whole_from, LTH-SOPR) ikut juga, supaya sumbu kanan
+            # menulis "1,200" dan bukan "1,200.000".
+            metrik = [ln for ln in plan if ln.axis == axis and ln.group]
+            presisi = max((ln.precision for ln in metrik), default=2)
+            bulat = min((ln.whole_from for ln in metrik if ln.whole_from is not None),
+                        default=None)
+            plan.insert(0, Line(ref.label, ref_col, "rgba(255,255,255,0.35)",
+                                axis, width=1, style=2, precision=presisi, whole_from=bulat))
 
     # Harga BTC tanpa desimal (78,905), di sumbu, label nilai terakhir, dan tooltip.
     price_line = None
@@ -599,4 +644,4 @@ def render_metric_page(family: MetricFamily):
                          group="BTC Price", dim=BTC_DIM, precision=BTC_PRECISION))
 
     charts.render(df, plan, price_line, extra, total_h, metric_mode, price_mode,
-                  f"dash_v2_{k}")
+                  f"dash_v2_{k}", tooltip=st.session_state[TIP_STORE])

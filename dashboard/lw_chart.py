@@ -55,9 +55,9 @@ TEMPLATE = """
   .fsbtn { display: inline-flex; align-items: center; gap: 6px; }
   .fsbtn svg { width: 12px; height: 12px; }
   #panes > div + div { margin-top: __GAP__px; }
-  /* Tooltip: angka di tanggal bawah kursor. Diparkir di pojok kiri atas area gambar dan
-     pindah ke kanan atas kalau kursor mendekat, supaya tidak menutupi garis yang dibaca.
-     Satu baris per metrik; periode smoothing jadi kolom. */
+  /* Tooltip: angka di tanggal bawah kursor. Posisinya dipilih lewat kotak Tooltip
+     (Fixed / Cursor / Off, lihat posisikanTooltip). Satu baris per metrik; periode
+     smoothing jadi kolom. */
   #tip { position: absolute; z-index: 5; pointer-events: none; display: none;
          background: rgba(28, 34, 48, 0.94); border: 1px solid #2a2e39; border-radius: 6px;
          padding: 6px 10px; font-size: 12px; line-height: 1.55; color: #c9d1d9; white-space: nowrap; }
@@ -135,8 +135,13 @@ function dimmed(color, alpha) {
 // Format angka per seri (precision dari registry), dipakai sumbu, label nilai terakhir,
 // dan tooltip. Harga (precision 0) tanpa desimal dengan pemisah ribuan; harga di bawah
 // 100 tetap diberi desimal supaya harga BTC 2010 ($0.05) tidak terbaca "0".
-function angka(v, p) {
+function angka(v, p, bulatDari) {
   if (v === null || v === undefined || !isFinite(v)) return '';
+  // bulatDari (whole_from di registry): angka sebesar ini ke atas ditulis tanpa desimal.
+  // Dipakai LTH-SOPR, yang dekat 1 butuh 3 desimal tapi bisa melonjak ke ratusan.
+  if (bulatDari !== null && bulatDari !== undefined && Math.abs(v) >= bulatDari) {
+    return v.toLocaleString('en-US', { maximumFractionDigits: 0 });
+  }
   let min = p, max = p;
   if (p === 0 && Math.abs(v) < 100) {
     // Skala Log bisa membuat tick semu sedikit di bawah nol di dasar sumbu ("-0.0001"):
@@ -155,8 +160,10 @@ function angka(v, p) {
 }
 function formatSeri(spec) {
   const p = Number.isInteger(spec.precision) ? spec.precision : 2;
-  return { type: 'custom', minMove: p === 0 ? 0.0001 : Math.pow(10, -p), formatter: v => angka(v, p) };
+  return { type: 'custom', minMove: p === 0 ? 0.0001 : Math.pow(10, -p),
+           formatter: v => angka(v, p, spec.whole_from) };
 }
+function angkaSeri(spec, v) { return angka(v, spec.precision, spec.whole_from); }
 
 // Pita smoothing digambar tembus pandang, jadi warna dasarnya sudah mengandung alpha.
 function baseColor(spec) {
@@ -655,18 +662,18 @@ loadLib(0).then(() => {
         for (const h of smoothing) {
           const p = periodeDari(h.spec.name);
           semuaPeriode.add(p);
-          kolom.set(p, angka(nilaiDi(h.spec, i), h.spec.precision));
+          kolom.set(p, angkaSeri(h.spec, nilaiDi(h.spec, i)));
         }
         const contoh = (utama || smoothing[0]).spec;
         baris.push({ label: group, spec: contoh,
-                     nilai: utama ? angka(nilaiDi(utama.spec, i), utama.spec.precision) : '', kolom });
+                     nilai: utama ? angkaSeri(utama.spec, nilaiDi(utama.spec, i)) : '', kolom });
       }
       // Kelompok tanpa garis utama (Rolling Z-Score 1y/2y/4y): satu baris mendatar, tiap
       // anggota yang ON jadi satu kolom dengan judul kecilnya sendiri (1y · 2y · 4y).
       if (lainnya.length > 0) {
         baris.push({ label: group, spec: lainnya[0].spec, jendela: lainnya.map(h => ({
           judul: (h.spec.name.split('(')[1] || h.spec.name).replace(')', ''),
-          nilai: angka(nilaiDi(h.spec, i), h.spec.precision),
+          nilai: angkaSeri(h.spec, nilaiDi(h.spec, i)),
         })) });
       }
     }
@@ -691,8 +698,14 @@ loadLib(0).then(() => {
     tipEl.innerHTML = html + '</table>';
   }
 
-  // Pojok kiri atas area gambar; pindah ke kanan atas kalau kursor mendekati kotak.
+  // Posisi dipilih lewat kotak Tooltip (C.tooltip):
+  //   Fixed  — pojok kiri atas area gambar; pindah ke kanan atas kalau kursor mendekati kotak.
+  //   Cursor — di kiri garis kursor, tengahnya sejajar kursor (gaya ChartInspect). Kalau di
+  //            kiri tidak cukup tempat, pindah ke kanan kursor supaya tidak keluar batas chart.
+  //   Off    — tidak ditampilkan; garis silang dan label sumbu tetap ada.
+  const JARAK_KURSOR = 16;
   let kursorX = null;
+  let kursorY = null;
   function posisikanTooltip() {
     const lebarSumbu = side => {
       const s = panes.main.priceScale(side);
@@ -701,6 +714,16 @@ loadLib(0).then(() => {
     const lebar = tipEl.offsetWidth;
     const kiri = lebarSumbu('left') + 8;
     const kanan = document.body.clientWidth - lebarSumbu('right') - 8 - lebar;
+    if (C.tooltip === 'Cursor' && kursorX !== null && kursorY !== null) {
+      const tinggi = tipEl.offsetHeight;
+      let x = kursorX - JARAK_KURSOR - lebar;
+      if (x < kiri) x = Math.min(kursorX + JARAK_KURSOR, Math.max(kiri, kanan));
+      const atas = panesEl.offsetTop + 4;
+      const bawah = panesEl.offsetTop + panesEl.offsetHeight - tinggi - 4;
+      tipEl.style.left = x + 'px';
+      tipEl.style.top = Math.max(atas, Math.min(bawah, kursorY - tinggi / 2)) + 'px';
+      return;
+    }
     const dekat = kursorX !== null && kursorX < kiri + lebar + 24;
     tipEl.style.left = (dekat ? Math.max(kiri, kanan) : kiri) + 'px';
     tipEl.style.top = (panesEl.offsetTop + 8) + 'px';
@@ -716,6 +739,7 @@ loadLib(0).then(() => {
         if (paneAktif === chart) { tipEl.style.display = 'none'; paneAktif = null; }
         return;
       }
+      if (C.tooltip === 'Off') return;
       paneAktif = chart;
       isiTooltip(i);
       tipEl.style.display = 'block';
@@ -724,9 +748,12 @@ loadLib(0).then(() => {
   }
   panesEl.addEventListener('mousemove', event => {
     kursorX = event.clientX;
+    kursorY = event.clientY;
     if (tipEl.style.display === 'block') posisikanTooltip();
   });
-  panesEl.addEventListener('mouseleave', () => { tipEl.style.display = 'none'; paneAktif = null; kursorX = null; });
+  panesEl.addEventListener('mouseleave', () => {
+    tipEl.style.display = 'none'; paneAktif = null; kursorX = null; kursorY = null;
+  });
 
   // Rentang waktu yang sedang tampil ikut disimpan bersama pilihan legend dan sorot.
   let simpanRangePending = false;
@@ -898,11 +925,14 @@ loadLib(0).then(() => {
 """
 
 
-def _num(value):
+def _num(value, digits=4):
+    """digits: desimal yang dikirim untuk nilai < 1000. Bawaan 4; seri ber-precision
+    lebih tinggi (gap STH-SOPR, 5 desimal) dikirim satu desimal lebih banyak supaya
+    angka yang tampil tidak berasal dari nilai yang sudah dibulatkan."""
     if pd.isna(value):
         return None
     value = float(value)
-    return round(value, 2) if abs(value) >= 1000 else round(value, 4)
+    return round(value, 2) if abs(value) >= 1000 else round(value, digits)
 
 
 def _scale(mode):
@@ -910,7 +940,8 @@ def _scale(mode):
     return {"mode": 1 if mode == "Log" else 0, "autoScale": mode != "Linear"}
 
 
-def render(df, lines, price_line, extra_lines, height, metric_mode, price_mode, store_key):
+def render(df, lines, price_line, extra_lines, height, metric_mode, price_mode, store_key,
+           tooltip="Cursor"):
     """Gambar chart.
 
     price_line: garis harga BTC bila dipisah ke pane sendiri (pane paling atas).
@@ -923,10 +954,12 @@ def render(df, lines, price_line, extra_lines, height, metric_mode, price_mode, 
     if price_line is not None:
         specs.insert(0, dict(vars(price_line), pane="price"))
 
-    columns = {spec["col"] for spec in specs}
+    digits = {}
+    for spec in specs:
+        digits[spec["col"]] = max(digits.get(spec["col"], 4), spec.get("precision", 2) + 1)
     payload = {
         "t": df["Date"].dt.strftime("%Y-%m-%d").tolist(),
-        "cols": {col: [_num(v) for v in df[col]] for col in columns},
+        "cols": {col: [_num(v, n) for v in df[col]] for col, n in digits.items()},
     }
 
     # Sumbu yang isinya hanya harga BTC memakai skala harga. Kalau harga berbagi sumbu
@@ -960,6 +993,7 @@ def render(df, lines, price_line, extra_lines, height, metric_mode, price_mode, 
     config = {
         "store": store_key,
         "panes": daftar_pane,
+        "tooltip": tooltip,   # "Fixed" / "Cursor" / "Off"
         # Tinggi bingkai tetap; tinggi pane dihitung ulang di browser dari tinggi baris
         # legend yang sebenarnya (bisa lebih dari satu baris).
         "frameHeight": total_height,

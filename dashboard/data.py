@@ -72,6 +72,27 @@ def load_price_levels():
     return df.merge(aviv[['Date', 'AVIV Mean', 'AVIV Upper']], on='Date', how='left')
 
 
+@st.cache_data(ttl=3600)
+def load_sopr():
+    """aSOPR, STH-SOPR, LTH-SOPR dari data_momentum.csv, plus gap STH-SOPR.
+
+    Gap memakai rumus KB SOPR v1.4 §12: SMA90 STH-SOPR dikurangi SMA60 dari SMA90 itu
+    (double-smoothed). Rumus ini yang mereproduksi angka KB persis (+0.02447 10 Jan 2021,
+    cross turun 28 Mar 2021 dan 30 Nov 2021). Catatan: alerts/alert_check.py menghitung
+    SMA60 − SMA90, hasilnya berbeda — dilaporkan ke user 13 Sep 2026, belum diputuskan.
+    NUPL di file yang sama sengaja tidak dimuat: halaman sendiri.
+    """
+    df = pd.read_csv("data_momentum.csv")
+    df.rename(columns={
+        'date': 'Date', 'btc_price': 'BTC Price',
+        'asopr': 'aSOPR', 'sth_sopr': 'STH-SOPR', 'lth_sopr': 'LTH-SOPR',
+    }, inplace=True)
+    df = _prepare(df)
+    ma90 = df['STH-SOPR'].rolling(90).mean()
+    df['STH-SOPR Gap'] = ma90 - ma90.rolling(60).mean()
+    return df
+
+
 def date_bounds(df):
     """Tanggal paling awal dan paling akhir yang tersedia di data."""
     return df['Date'].min().date(), df['Date'].max().date()

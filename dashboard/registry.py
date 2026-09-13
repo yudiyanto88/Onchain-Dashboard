@@ -27,6 +27,8 @@ class Series:
     pane: str = "main"                # "main" atau "extra" (pane tambahan paling bawah)
     precision: int = 2                # desimal di sumbu, label nilai terakhir, dan tooltip
                                       # (harga 0; rasio 2; nanti funding rate bisa 5)
+    whole_from: float | None = None   # angka sebesar ini ke atas ditulis tanpa desimal
+                                      # (LTH-SOPR: 1.318 tapi 384, bukan 384.000)
 
 
 @dataclass
@@ -34,27 +36,41 @@ class RefLine:
     """Garis acuan horizontal, misalnya batas netral MVRV di 1.0."""
     value: float
     label: str
+    # False: satu garis di sumbu metrik utama. True: satu garis di setiap sumbu yang
+    # memuat metrik — dipakai SOPR, yang LTH-SOPR-nya punya sumbu sendiri di kanan
+    # dengan batas untung/rugi di 1.0 yang letaknya berbeda dari sumbu kiri.
+    all_axes: bool = False
 
 
 @dataclass
 class MetricFamily:
     key: str
-    title: str
-    subtitle: str
+    title: str      # nama pendek di menu sidebar ("MVRV")
+    subtitle: str   # judul besar halaman ("MVRV Oscillators")
     loader: Callable
     series: list[Series]
+    # Kelompok menu sidebar, juga lencana teal di atas judul halaman ("Valuation").
+    # Pengelompokan jenis metrik, dipilih user 14 Sep 2026.
+    group: str = ""
+    # Alamat halaman (localhost:8503/sopr): reload tetap di halaman yang sama.
+    url_path: str = ""
     reference_lines: list[RefLine] = field(default_factory=list)
     metric_scale_default: str = "Auto"
     price_scale_default: str = "Log"
     # Nama kotak kontrol untuk pane tambahan paling bawah (seri pane="extra"),
     # misalnya "Z-Score" atau nanti "Net flow". Kotaknya hanya muncul kalau ada seri itu.
     extra_label: str = "Bottom pane"
+    # Keadaan awal kotak BTC price ("Overlay" / "Separate pane" / "Hidden").
+    # Nilainya sama dengan pilihan di metric_page.
+    btc_mode_default: str = "Overlay"
 
 
 MARKET_VALUATION = MetricFamily(
-    key="market_valuation",
-    title="Market Valuation",
+    key="market_valuation",   # tetap: dipakai key localStorage dash_v2_market_valuation
+    title="MVRV",
     subtitle="MVRV Oscillators",
+    group="Valuation",
+    url_path="mvrv",
     loader=data.load_mvrv,
     series=[
         # Navy/rust/teal dibuat setara terangnya supaya tidak ada garis yang mendominasi.
@@ -107,6 +123,8 @@ PRICE_LEVELS = MetricFamily(
     key="price_levels",
     title="Price Levels",
     subtitle="On-chain Cost Basis",
+    group="Valuation",
+    url_path="price-levels",
     loader=data.load_price_levels,
     # Semua level satuannya harga: satu sumbu (kanan) bersama BTC. Skala bawaan linear
     # ("Auto" = linear yang menyesuaikan zoom; "Linear" di kontrol = rentang dikunci).
@@ -145,5 +163,45 @@ PRICE_LEVELS = MetricFamily(
 )
 
 
-# Urutan di sini = urutan menu sidebar.
-FAMILIES = {f.title: f for f in [MARKET_VALUATION, PRICE_LEVELS]}
+SOPR = MetricFamily(
+    key="sopr",
+    title="SOPR",
+    subtitle="Spent Output Profit Ratio",
+    group="Profitability",
+    url_path="sopr",
+    loader=data.load_sopr,
+    # LTH-SOPR harian melonjak sampai puluhan, bahkan di 2024 (30) dan 2025 (24), jadi tidak
+    # boleh berbagi sumbu dengan aSOPR/STH-SOPR (0,9–1,2). Karena itu harga BTC dipisah ke
+    # pane sendiri sejak awal dan LTH-SOPR memakai sumbu kanan; skala Log supaya LTH 0,50
+    # tetap terbaca di dekat puncak. Dekat 1,0 skala Log praktis sama dengan linear.
+    # Dipilih user 13 Sep 2026 (tata letak B dari tiga pratinjau).
+    # Pane Gap mati sejak awal (keputusan user 14 Sep 2026), apa pun mode harga BTC.
+    btc_mode_default="Separate pane",
+    metric_scale_default="Log",
+    price_scale_default="Log",
+    series=[
+        # Warna ikut kohort seperti dua halaman sebelumnya: semua holder navy, STH rust,
+        # LTH teal. SOPR 3 desimal: nilainya selalu dekat 1,00 (0,995 dan 1,004).
+        Series("aSOPR", "aSOPR", color="#0070a6", axis="left", dim=0.49,
+               short="aSOPR", precision=3),
+        Series("STH-SOPR", "STH-SOPR", color="#bf5546", axis="left", dim=0.44,
+               short="STH", precision=3),
+        # Di atas 100 (2011, 2013) tanpa desimal: sumbunya tidak menulis "1,200.000".
+        Series("LTH-SOPR", "LTH-SOPR", color="#0b8e89", axis="left", dim=0.39,
+               separate_axis="right", short="LTH", precision=3, whole_from=100),
+        # Gap SMA90 − SMA60(SMA90), rumus KB SOPR §12 (lihat data.load_sopr). Batang ikut
+        # warna induknya (rust STH), sama seperti Z-Score ikut navy MVRV. 5 desimal: KB
+        # menulis nilai seperti +0.00096. dim 0.41 x alpha 0.80 = redup 1.44:1, setara Z-Score.
+        Series("STH-SOPR Gap", "STH-SOPR Gap", color="#bf5546", axis="left", dim=0.41,
+               kind="histogram", smoothing=False, short="Gap", alpha=0.80,
+               pane="extra", precision=5),
+    ],
+    # Batas untung/rugi (definisi SOPR, bukan ambang framework), di sumbu kiri dan kanan.
+    reference_lines=[RefLine(1.0, "Break-even (1.0)", all_axes=True)],
+    extra_label="SOPR Gap",
+)
+
+
+# Urutan di sini = urutan menu sidebar; kelompok muncul menurut halaman pertamanya.
+# Halaman pertama jadi halaman bawaan (alamat localhost:8503/).
+FAMILIES = {f.title: f for f in [MARKET_VALUATION, PRICE_LEVELS, SOPR]}

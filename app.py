@@ -18,28 +18,41 @@ st.set_page_config(
 st.markdown("""
 <style>
 section[data-testid="stSidebar"] { background-color: #151924; }
-section[data-testid="stSidebar"] div.stRadio > div[role="radiogroup"] { gap: 10px; }
-section[data-testid="stSidebar"] div.stRadio > div[role="radiogroup"] > label {
-    background-color: #1a1d24; padding: 12px 16px !important; border-radius: 8px !important;
-    border-left: 4px solid transparent; margin: 0 !important; cursor: pointer;
-    transition: all 0.2s ease-in-out;
+
+/* Menu sidebar (st.navigation, 14 Sep 2026). Bawaan Streamlit menaruh menu di paling atas
+   sidebar; wadahnya dijadikan flex supaya tulisan merek (isi sidebar dari app.py) tetap di
+   atas menu. Garis pemisah bawaan di bawah menu tidak diperlukan lagi. */
+[data-testid="stSidebarContent"] { display: flex !important; flex-direction: column !important; }
+[data-testid="stSidebarHeader"] { order: 0; }
+[data-testid="stSidebarUserContent"] { order: 1; padding-top: 0 !important; padding-bottom: 8px !important; }
+[data-testid="stSidebarNav"] { order: 2; padding-bottom: 24px !important; }
+[data-testid="stSidebarNavSeparator"] { display: none !important; }
+
+/* Judul kelompok (Valuation, Profitability): teal terang #2aa6b0, huruf kecil kapital.
+   Pilihan user dari empat pratinjau: beda warna, bukan cuma beda terang, jadi tidak terbaca
+   sebagai menu yang sedang tidak aktif, dan senada dengan lencana kategori di judul halaman.
+   Teal gelap #006d77 tidak dipakai untuk huruf (kontras 2,9:1 di sidebar). */
+[data-testid="stNavSectionHeader"],
+[data-testid="stNavSectionHeader"] p,
+[data-testid="stNavSectionHeader"] [data-testid="stIconMaterial"] {
+    color: #2aa6b0 !important; font-size: 11px !important; font-weight: 600 !important;
+    letter-spacing: 0.1em; text-transform: uppercase; line-height: 16px !important;
 }
-section[data-testid="stSidebar"] div.stRadio > div[role="radiogroup"] > label:hover {
-    background-color: #262a35;
+/* Huruf pertama judul kelompok lurus dengan huruf pertama nama menu (garis kiri 3 px +
+   jarak dalam 10 px pada link). Terukur sebelum ini: judul x=20, nama menu x=33. */
+[data-testid="stNavSectionHeader"] { padding-left: 13px !important; }
+
+/* Menu halaman: tulisan abu terang, menu aktif bergaris kiri teal gelap dengan latar
+   #102e39 (teal 25% di atas sidebar) — sama dengan menu radio v2 sebelumnya. */
+[data-testid="stSidebarNavLink"] {
+    border-left: 3px solid transparent; border-radius: 6px !important; padding: 0 10px !important;
 }
-/* Streamlit 1.63 menandai opsi terpilih dengan data-selected (dulu data-checked).
-   Teal gelap #006d77 warna utama dashboard: garis tepi teal, latar teal 25% di atas sidebar. */
-section[data-testid="stSidebar"] div.stRadio > div[role="radiogroup"] > label[data-selected="true"] {
-    border-left: 4px solid #006d77 !important; background-color: #102e39 !important;
+[data-testid="stSidebarNavLink"] span { font-size: 15px !important; color: #c9d1d9 !important; }
+[data-testid="stSidebarNavLink"]:hover { background-color: #1e2330 !important; }
+[data-testid="stSidebarNavLink"][aria-current="page"] {
+    background-color: #102e39 !important; border-left-color: #006d77;
 }
-section[data-testid="stSidebar"] div.stRadio > div[role="radiogroup"] p {
-    font-size: 1.15rem !important; font-weight: 600 !important;
-    margin: 0 !important; color: #ffffff !important;
-}
-/* Bulatan radio disembunyikan. Di 1.63 bulatan itu saudara teks menu, bukan anak pertama label. */
-section[data-testid="stSidebar"] div.stRadio label div:has(> [data-testid="stMarkdownContainer"]) > div:not([data-testid]) {
-    display: none !important;
-}
+[data-testid="stSidebarNavLink"][aria-current="page"] span { color: #ffffff !important; font-weight: 600 !important; }
 
 div[data-testid="stSelectbox"] *, div[data-testid="stRadio"] *,
 div[data-testid="stToggle"] *, div[data-testid="stNumberInput"] *,
@@ -271,11 +284,26 @@ with st.sidebar:
     # warna huruf cuma 2.9:1 di latar sidebar, teal terang 6.0:1.
     st.markdown("<h3 style='text-align:center;color:#2aa6b0;font-weight:800;font-size:1.3rem;"
                 "margin-top:-15px;'>ON-CHAIN DASHBOARD v2</h3>", unsafe_allow_html=True)
-    st.markdown("<br>", unsafe_allow_html=True)
 
-    selected = st.radio("Menu", list(FAMILIES), label_visibility="collapsed")
+# Menu: navigasi bawaan Streamlit (cara B, dipilih user 14 Sep 2026). Tiap halaman punya
+# alamat sendiri (localhost:8503/sopr), jadi reload tetap di halaman yang sama dan halaman
+# bisa di-bookmark. Menggantikan st.radio, yang selalu kembali ke halaman pertama saat reload.
+def _halaman(family):
+    def buka():
+        render_metric_page(family)
+    # st.Page mengambil nama fungsi untuk nama bawaan; dibuat unik per halaman.
+    buka.__name__ = f"page_{family.key}"
+    return buka
 
-render_metric_page(FAMILIES[selected])
+
+kelompok = {}
+for i, family in enumerate(FAMILIES.values()):
+    kelompok.setdefault(family.group, []).append(
+        st.Page(_halaman(family), title=family.title, url_path=family.url_path,
+                default=(i == 0)))
+
+# expanded=True: tanpa ini Streamlit menyembunyikan halaman ke-11 dst. di balik "View more".
+st.navigation(kelompok, position="sidebar", expanded=True).run()
 
 
 # Tombol layar penuh hidup di dalam chart (dashboard/lw_chart.py), bukan di sini.
