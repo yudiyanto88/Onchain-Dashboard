@@ -46,6 +46,7 @@ BTC_AXIS = "right"
 BTC_COLOR = "#F7931A"
 BTC_DIM = 0.28      # opasitas BTC saat seri lain disorot (kontras 1.70:1, sama dengan metrik)
 LINE_WIDTH = 1.5    # semua garis utama, termasuk BTC
+BTC_PRECISION = 0   # harga BTC tanpa desimal
 
 # Bentuk garis yang bisa dipilih untuk tiap garis smoothing.
 LINE_STYLES = {
@@ -558,19 +559,20 @@ def render_metric_page(family: MetricFamily):
             extra.append(Line(sr.label, sr.col, sr.color, "left", width=LINE_WIDTH,
                               group=sr.group or sr.label, dim=sr.dim, kind=sr.kind,
                               short=sr.short, alpha=sr.alpha,
-                              hidden_default=sr.hidden_default))
+                              hidden_default=sr.hidden_default, precision=sr.precision))
             continue
         axis = st.session_state[f"{k}_axis_{sr.col}"]
         plan.append(Line(sr.label, sr.col, sr.color, axis, width=LINE_WIDTH,
                          group=sr.group or sr.label, dim=sr.dim, kind=sr.kind,
-                         short=sr.short, alpha=sr.alpha))
+                         short=sr.short, alpha=sr.alpha, precision=sr.precision))
         if not sr.smoothing:
             continue
         for p in periods:
             col = f"{sr.col}__{kind}{p}"
             if col in df.columns:
+                # Nama "<metrik> <SMA|EMA>(<periode>)" dibaca tooltip untuk kolom periodenya.
                 plan.append(Line(f"{sr.label} {kind}({p})", col, sr.color, axis,
-                                 group=sr.label, dim=sr.dim,
+                                 group=sr.label, dim=sr.dim, precision=sr.precision,
                                  **_smooth_style(family, p)))
 
     # Garis acuan mengikuti sumbu yang dipakai metrik, bukan dipaku ke satu sisi.
@@ -582,16 +584,17 @@ def render_metric_page(family: MetricFamily):
         plan.insert(0, Line(ref.label, ref_col, "rgba(255,255,255,0.35)",
                             ref_axis, width=1, style=2))
 
+    # Harga BTC tanpa desimal (78,905), di sumbu, label nilai terakhir, dan tooltip.
     price_line = None
     if btc_mode == PANE:
         price_line = Line("BTC Price", "BTC Price", BTC_COLOR, "right", width=LINE_WIDTH,
-                          group="BTC Price", dim=BTC_DIM)
+                          group="BTC Price", dim=BTC_DIM, precision=BTC_PRECISION)
     elif btc_mode == OVERLAY:
         # Sumbu harga bisa dipilih (bawaan: kanan). Sumbu yang hanya berisi harga memakai
         # skala harga; kalau harga berbagi sumbu dengan metrik, skala metrik yang dipakai.
         plan.append(Line("BTC Price", "BTC Price", BTC_COLOR,
                          st.session_state[f"{k}_axis_btc"], width=LINE_WIDTH,
-                         group="BTC Price", dim=BTC_DIM))
+                         group="BTC Price", dim=BTC_DIM, precision=BTC_PRECISION))
 
     charts.render(df, plan, price_line, extra, total_h, metric_mode, price_mode,
                   f"dash_v2_{k}")

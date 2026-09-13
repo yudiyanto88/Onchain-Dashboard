@@ -25,6 +25,8 @@ class Series:
     group: str | None = None          # kelompok legend; bawaannya label sendiri
     hidden_default: bool = False      # lahir dalam keadaan mati di legend
     pane: str = "main"                # "main" atau "extra" (pane tambahan paling bawah)
+    precision: int = 2                # desimal di sumbu, label nilai terakhir, dan tooltip
+                                      # (harga 0; rasio 2; nanti funding rate bisa 5)
 
 
 @dataclass

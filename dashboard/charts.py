@@ -25,6 +25,7 @@ class Line:
     dim: float = 0.3           # opasitas saat seri lain disorot
     kind: str = "line"         # "line" atau "histogram" (batang dari garis nol)
     short: str | None = None   # nama pendek di tombol sorot
+    precision: int = 2         # desimal di sumbu, label nilai terakhir, dan tooltip
 
 
 def render(df, lines, price_line, extra_lines, height, metric_mode, price_mode, key):

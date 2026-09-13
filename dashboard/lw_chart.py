@@ -55,6 +55,20 @@ TEMPLATE = """
   .fsbtn { display: inline-flex; align-items: center; gap: 6px; }
   .fsbtn svg { width: 12px; height: 12px; }
   #panes > div + div { margin-top: __GAP__px; }
+  /* Tooltip: angka di tanggal bawah kursor. Diparkir di pojok kiri atas area gambar dan
+     pindah ke kanan atas kalau kursor mendekat, supaya tidak menutupi garis yang dibaca.
+     Satu baris per metrik; periode smoothing jadi kolom. */
+  #tip { position: absolute; z-index: 5; pointer-events: none; display: none;
+         background: rgba(28, 34, 48, 0.94); border: 1px solid #2a2e39; border-radius: 6px;
+         padding: 6px 10px; font-size: 12px; line-height: 1.55; color: #c9d1d9; white-space: nowrap; }
+  #tip .tgl { color: #fff; font-weight: 600; margin-bottom: 2px; }
+  #tip table { border-collapse: collapse; }
+  #tip td, #tip th { padding: 0 0 0 14px; text-align: right; font-variant-numeric: tabular-nums; }
+  #tip td:first-child, #tip th:first-child { padding-left: 0; text-align: left; }
+  #tip th { font-weight: 400; color: #8b949e; font-size: 11px; }
+  #tip .v { color: #fff; font-weight: 600; }
+  #tip .tsw { display: inline-block; width: 14px; height: 0; border-top: 2px solid; vertical-align: 4px; margin-right: 6px; }
+  #tip .tbox { display: inline-block; width: 11px; height: 9px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
   #err { color: #DA3633; padding: 16px; }
 </style>
 <div id="bar">
@@ -64,6 +78,7 @@ TEMPLATE = """
   <div id="hl"><span class="hllabel">Highlight</span></div>
 </div>
 <div id="panes"></div>
+<div id="tip"></div>
 <div id="err"></div>
 <script>
 const D = __DATA__;
@@ -115,6 +130,24 @@ function dimmed(color, alpha) {
   if (!color.startsWith('#')) return color;
   const [r, g, b] = [1, 3, 5].map(i => parseInt(color.slice(i, i + 2), 16));
   return `rgba(${r},${g},${b},${alpha})`;
+}
+
+// Format angka per seri (precision dari registry), dipakai sumbu, label nilai terakhir,
+// dan tooltip. Harga (precision 0) tanpa desimal dengan pemisah ribuan; harga di bawah
+// 100 tetap diberi desimal supaya harga BTC 2010 ($0.05) tidak terbaca "0".
+function angka(v, p) {
+  if (v === null || v === undefined || !isFinite(v)) return '';
+  let min = p, max = p;
+  if (p === 0 && Math.abs(v) < 100) {
+    // Di bawah 1 sampai 4 desimal tapi nol di belakang dibuang: 0.60 dan 0.0495, bukan 0.6000.
+    min = 2;
+    max = Math.abs(v) < 1 ? 4 : 2;
+  }
+  return v.toLocaleString('en-US', { minimumFractionDigits: min, maximumFractionDigits: max });
+}
+function formatSeri(spec) {
+  const p = Number.isInteger(spec.precision) ? spec.precision : 2;
+  return { type: 'custom', minMove: p === 0 ? 0.0001 : Math.pow(10, -p), formatter: v => angka(v, p) };
 }
 
 // Pita smoothing digambar tembus pandang, jadi warna dasarnya sudah mengandung alpha.
@@ -180,6 +213,7 @@ loadLib(0).then(() => {
       title: spec.group ? spec.name : '',
       priceLineVisible: false,
       lastValueVisible: !!spec.group,
+      priceFormat: formatSeri(spec),
     };
     // Batang digambar dari garis nol, jadi nilai negatif turun ke bawah sendiri.
     const line = spec.kind === 'histogram'
@@ -565,6 +599,106 @@ loadLib(0).then(() => {
   }
 
   apply();
+
+  // ---------------------------------------------------------------- tooltip
+  // Isi: garis yang ON di legend; kalau Highlight aktif, hanya kelompok yang disorot.
+  // BTC Price selalu tampil. Seri pane bawah hanya ada kalau pane-nya menyala (kalau
+  // Hidden, serinya memang tidak dikirim). Garis acuan (tanpa group) tidak ikut.
+  const tipEl = document.getElementById('tip');
+  const panesEl = document.getElementById('panes');
+  const indeksTanggal = new Map(D.t.map((t, i) => [t, i]));
+  const BULAN = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const HARGA = 'BTC Price';
+  // Regex ditulis tanpa backslash: TEMPLATE adalah string Python biasa, dan backslash di
+  // dalamnya memicu peringatan escape sequence di Python.
+  const periodeDari = nama => { const m = /[(]([0-9]+)[)]$/.exec(nama); return m ? +m[1] : null; };
+  const teksWaktu = t => typeof t === 'string' ? t
+    : `${t.year}-${String(t.month).padStart(2, '0')}-${String(t.day).padStart(2, '0')}`;
+  const nilaiDi = (spec, i) => { const v = D.cols[spec.col][i]; return v === null ? null : v; };
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+
+  function contohWarna(spec) {
+    return spec.kind === 'histogram'
+      ? `<span class="tbox" style="background:${baseColor(spec)}"></span>`
+      : `<span class="tsw" style="border-color:${spec.color}"></span>`;
+  }
+
+  function isiTooltip(i) {
+    const baris = [];
+    const semuaPeriode = new Set();
+    for (const group of groups) {
+      if (state.highlights.length > 0 && group !== HARGA && !state.highlights.includes(group)) continue;
+      const anggota = legendItems.filter(h => h.spec.group === group && !state.hidden.includes(h.spec.name));
+      if (anggota.length === 0) continue;
+      const utama = anggota.find(h => h.spec.name === group);
+      const smoothing = anggota.filter(h => h !== utama && periodeDari(h.spec.name) !== null);
+      const lainnya = anggota.filter(h => h !== utama && !smoothing.includes(h));
+      if (utama || smoothing.length > 0) {
+        const kolom = new Map();
+        for (const h of smoothing) {
+          const p = periodeDari(h.spec.name);
+          semuaPeriode.add(p);
+          kolom.set(p, angka(nilaiDi(h.spec, i), h.spec.precision));
+        }
+        const contoh = (utama || smoothing[0]).spec;
+        baris.push({ label: group, spec: contoh,
+                     nilai: utama ? angka(nilaiDi(utama.spec, i), utama.spec.precision) : '', kolom });
+      }
+      // Kelompok tanpa garis utama (Rolling Z-Score 1y/2y/4y): tiap anggota satu baris.
+      for (const h of lainnya) {
+        baris.push({ label: h.spec.name, spec: h.spec,
+                     nilai: angka(nilaiDi(h.spec, i), h.spec.precision), kolom: new Map() });
+      }
+    }
+    const periode = [...semuaPeriode].sort((a, b) => a - b);
+    const [y, m, d] = D.t[i].split('-');
+    let html = `<div class="tgl">${d} ${BULAN[+m - 1]} ${y}</div><table>`;
+    if (periode.length > 0) {
+      html += '<tr><th></th><th>Value</th>' + periode.map(p => `<th>${p}d</th>`).join('') + '</tr>';
+    }
+    for (const b of baris) {
+      html += `<tr><td>${contohWarna(b.spec)}${esc(b.label)}</td><td class="v">${b.nilai}</td>`
+        + periode.map(p => `<td class="v">${b.kolom.get(p) || ''}</td>`).join('') + '</tr>';
+    }
+    tipEl.innerHTML = html + '</table>';
+  }
+
+  // Pojok kiri atas area gambar; pindah ke kanan atas kalau kursor mendekati kotak.
+  let kursorX = null;
+  function posisikanTooltip() {
+    const lebarSumbu = side => {
+      const s = panes.main.priceScale(side);
+      return s.options().visible ? s.width() : 0;
+    };
+    const lebar = tipEl.offsetWidth;
+    const kiri = lebarSumbu('left') + 8;
+    const kanan = document.body.clientWidth - lebarSumbu('right') - 8 - lebar;
+    const dekat = kursorX !== null && kursorX < kiri + lebar + 24;
+    tipEl.style.left = (dekat ? Math.max(kiri, kanan) : kiri) + 'px';
+    tipEl.style.top = (panesEl.offsetTop + 8) + 'px';
+  }
+
+  let paneAktif = null;
+  for (const chart of charts) {
+    chart.subscribeCrosshairMove(param => {
+      const i = param && param.time && param.point ? indeksTanggal.get(teksWaktu(param.time)) : undefined;
+      if (i === undefined) {
+        // Hanya pane yang sedang memegang tooltip yang boleh menyembunyikannya; saat kursor
+        // pindah pane, pane lama melapor "kosong" setelah pane baru sudah mengisinya.
+        if (paneAktif === chart) { tipEl.style.display = 'none'; paneAktif = null; }
+        return;
+      }
+      paneAktif = chart;
+      isiTooltip(i);
+      tipEl.style.display = 'block';
+      posisikanTooltip();
+    });
+  }
+  panesEl.addEventListener('mousemove', event => {
+    kursorX = event.clientX;
+    if (tipEl.style.display === 'block') posisikanTooltip();
+  });
+  panesEl.addEventListener('mouseleave', () => { tipEl.style.display = 'none'; paneAktif = null; kursorX = null; });
 
   // Rentang waktu yang sedang tampil ikut disimpan bersama pilihan legend dan sorot.
   let simpanRangePending = false;
