@@ -31,7 +31,10 @@ class Line:
     steps: bool = False        # garis tangga (lineType WithSteps)
     alpha: float = 1.0         # < 1 = pita tembus pandang
     group: str | None = None   # seri induk untuk legend & sorot; None = garis acuan
+    hidden_default: bool = False  # lahir dalam keadaan mati di legend
     dim: float = 0.3           # opasitas saat seri lain disorot
+    kind: str = "line"         # "line" atau "histogram" (batang dari garis nol)
+    short: str | None = None   # nama pendek di tombol sorot
 
 
 # Pola garis lightweight-charts diterjemahkan ke nama pola Plotly.
@@ -52,14 +55,22 @@ def _log(mode):
 
 # ------------------------------------------------------------- lightweight
 
-def render_lightweight(df, lines, price_line, height, metric_mode, price_mode, key):
+def render_lightweight(df, lines, price_line, extra_lines, height,
+                       metric_mode, price_mode, key):
     """Legend dan sorot diproses di browser; key dipakai untuk menyimpan pilihan."""
-    lw_chart.render(df, lines, price_line, height, metric_mode, price_mode, key)
+    lw_chart.render(df, lines, price_line, extra_lines, height,
+                    metric_mode, price_mode, key)
 
 
 # ------------------------------------------------------------------ plotly
 
 def _plotly_trace(df, ln, axis_name):
+    if ln.kind == "histogram":
+        return go.Bar(
+            x=df["Date"], y=df[ln.col], name=ln.name, yaxis=axis_name,
+            marker=dict(color=_rgba(ln.color, ln.alpha)),
+            hovertemplate="%{y:.4f}<extra>" + ln.name + "</extra>",
+        )
     return go.Scattergl(
         x=df["Date"], y=df[ln.col], name=ln.name, yaxis=axis_name,
         mode="lines",
@@ -83,7 +94,9 @@ def _plotly_base(height):
     )
 
 
-def render_plotly(df, lines, price_line, height, metric_mode, price_mode, key):
+def render_plotly(df, lines, price_line, extra_lines, height, metric_mode, price_mode, key):
+    # Plotly belum mengenal pane tambahan; garisnya digabung ke chart metrik.
+    lines = list(lines) + list(extra_lines or [])
     axis_type = "log" if _log(metric_mode) else "linear"
     price_type = "log" if _log(price_mode) else "linear"
     grid = dict(gridcolor=GRID, zeroline=False, showspikes=True,

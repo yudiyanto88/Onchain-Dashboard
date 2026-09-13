@@ -3,12 +3,18 @@
 Satu fungsi render_metric_page() melayani semua keluarga metrik.
 Perbaikan layout di sini langsung berlaku untuk seluruh halaman.
 """
+import base64
+
 import streamlit as st
 from . import charts, data
 from .charts import ENGINES, LIGHTWEIGHT, Line
 from .registry import MetricFamily
 
 PRESETS = ["1M", "3M", "6M", "1Y", "4Y", "All"]
+# Ditampilkan huruf kecil (1m, 1y) supaya seragam dengan periode smoothing (7d)
+# dan jendela Rolling Z-Score (1y). Nilai di baliknya tetap, jadi tanggal tidak berubah.
+def _preset_label(preset):
+    return preset if preset == "All" else preset.lower()
 DEFAULT_PRESET = "All"
 
 SMOOTH_KINDS = ["SMA", "EMA"]
@@ -22,14 +28,16 @@ SCALE_MODES = [AUTO, LINEAR, LOG]
 # Tinggi chart bisa disetel karena tinggi layar tiap orang berbeda.
 HEIGHTS = [600, 720, 860, 1000]
 
-# Layar normal atau penuh.
-SCREEN_MODES = ["Normal", "Full"]
-
 # Cara harga BTC ditampilkan. Overlay didahulukan karena jadi default.
 OVERLAY = "Overlay"         # harga digabung ke chart metrik, sumbu kanan
 PANE = "Separate pane"      # harga di chart sendiri di atas chart metrik
 HIDDEN = "Hidden"           # harga tidak ditampilkan
 BTC_MODES = [OVERLAY, PANE, HIDDEN]
+
+# Pane tambahan paling bawah (Z-Score). Pane dibangun dari sisi Python, jadi saklarnya
+# tidak bisa ikut legend yang hidup di dalam chart.
+Z_HIDDEN, Z_BOTTOM = "Hidden", "Bottom pane"
+Z_MODES = [Z_HIDDEN, Z_BOTTOM]
 
 # Metrik memakai sumbu kiri, harga BTC memakai sumbu kanan.
 METRIC_AXIS_DEFAULT = "left"
@@ -48,6 +56,39 @@ LINE_STYLES = {
     "Band": dict(alpha=0.60),
 }
 STYLE_NAMES = list(LINE_STYLES)
+# Nama saja tidak memberi tahu bentuk garisnya, jadi pilihan ditampilkan sebagai lambang
+# bentuknya. Nama tetap tersedia lewat keterangan kecil di sudut kontrol.
+# Solid, Dotted, dan Dashed ditulis sebagai kode (huruf monospace, tepat empat karakter)
+# supaya semua selebar sama. Step dan Band digambar sebagai gambar garis sungguhan:
+# huruf tidak bisa membuat tangga yang rapi, dan tidak bisa tembus pandang seperti pita
+# di chart. Ukuran gambarnya 31 x 12 px, selebar empat karakter monospace.
+STYLE_GLYPHS = {
+    "Solid": "────",   # ────
+    "Dotted": "····",  # ····
+    "Dashed": "╌╌╌╌",  # ╌╌╌╌
+}
+
+
+def _svg_ikon(isi):
+    svg = ('<svg xmlns="http://www.w3.org/2000/svg" width="31" height="12" '
+           f'viewBox="0 0 31 12">{isi}</svg>')
+    return "data:image/svg+xml;base64," + base64.b64encode(svg.encode()).decode()
+
+
+STYLE_ICONS = {
+    # satu anak tangga naik, garis saja tanpa isi
+    "Step": _svg_ikon('<path d="M1 9.5 H14 V2.5 H30" fill="none" stroke="#c9d1d9" '
+                      'stroke-width="1.2"/>'),
+    # balok tebal dengan transparansi yang sama dengan pita di chart (alpha 0.60)
+    "Band": _svg_ikon('<line x1="1" y1="6" x2="30" y2="6" stroke="#c9d1d9" '
+                      f'stroke-width="4.5" stroke-opacity="{LINE_STYLES["Band"]["alpha"]}"/>'),
+}
+
+
+def _style_label(name):
+    if name in STYLE_ICONS:
+        return f"![{name}]({STYLE_ICONS[name]})"
+    return f"`{STYLE_GLYPHS[name]}`"
 WIDTH_MIN, WIDTH_MAX, WIDTH_STEP = 0.5, 5.0, 0.25
 
 # Urutan pemberian gaya saat sebuah periode dinyalakan: titik-titik, tangga, lalu pita.
@@ -152,6 +193,8 @@ def _render_line_style(family):
         st.caption(f"{kind} {period}D")
         st.segmented_control(f"Style {period}", STYLE_NAMES, key=f"{k}_lstyle_{period}",
                              on_change=_keep, args=(f"{k}_lstyle_{period}", entry["name"]),
+                             format_func=_style_label,
+                             help="Solid · Dotted · Dashed · Step · Band",
                              label_visibility="collapsed")
         # Angkanya ditampilkan oleh label bawaan slider, yang ikut bergerak dengan kenop.
         st.slider(f"Width {period}", min_value=WIDTH_MIN, max_value=WIDTH_MAX,
@@ -198,7 +241,7 @@ def _on_btc_mode(family):
     _keep(f"{k}_btc", OVERLAY)
     separate = st.session_state[f"{k}_btc"] == PANE
     for s in family.series:
-        if s.separate_axis:
+        if s.separate_axis and s.pane != "extra":
             st.session_state[f"{k}_axis_{s.col}"] = s.separate_axis if separate else s.axis
 
 
@@ -216,14 +259,15 @@ def _init_state(family, dmin, dmax):
         f"{k}_scale_metric": family.metric_scale_default,
         f"{k}_btc": OVERLAY,
         f"{k}_axis_btc": BTC_AXIS,
-        f"{k}_screen": "Normal",
+        f"{k}_extra": Z_HIDDEN,
         f"{k}_height": 720,
         f"{k}_engine": LIGHTWEIGHT,
     }
     for key, val in defaults.items():
         st.session_state.setdefault(key, val)
     for s in family.series:
-        st.session_state.setdefault(f"{k}_axis_{s.col}", s.axis)
+        if s.pane != "extra":
+            st.session_state.setdefault(f"{k}_axis_{s.col}", s.axis)
 
 
 def _smooth_summary(family, short=False):
@@ -242,7 +286,7 @@ def _range_summary(family):
     k = family.key
     preset = st.session_state[f"{k}_preset"]
     if preset:
-        return preset
+        return _preset_label(preset)
     return (f"{st.session_state[f'{k}_from']:%d %b %y}"
             f" - {st.session_state[f'{k}_to']:%d %b %y}")
 
@@ -274,7 +318,8 @@ def _axis_control(label, key, fallback, disabled=False):
 def _axis_summary(family):
     """Nilai di kotak Display: sisi sumbu yang dipakai garis metrik, atau Mixed."""
     k = family.key
-    sides = {st.session_state[f"{k}_axis_{s.col}"] for s in family.series}
+    sides = {st.session_state[f"{k}_axis_{s.col}"]
+             for s in family.series if s.pane != "extra"}
     if len(sides) == 1:
         return "Left" if sides.pop() == "left" else "Right"
     return "Mixed"
@@ -381,7 +426,7 @@ def _render_controls(family, dmin, dmax):
             # "AXIS"); label bawaan widget bentuknya berbeda sendiri.
             st.caption("PRESET")
             st.segmented_control("Preset", PRESETS, key=f"{k}_preset", on_change=on_preset,
-                                 label_visibility="collapsed")
+                                 format_func=_preset_label, label_visibility="collapsed")
             # From dan To disejajarkan supaya popover tidak memanjang ke bawah.
             date_cols = st.columns(2, gap="small")
             with date_cols[0]:
@@ -417,6 +462,18 @@ def _render_controls(family, dmin, dmax):
                                  label_visibility="collapsed")
 
     with cols[4]:
+        # Kotak ini hanya muncul kalau keluarga metriknya memang punya seri pane tambahan.
+        # Pane dibangun dari sisi Python, jadi saklarnya tidak bisa ikut legend yang
+        # hidup di dalam chart.
+        if any(sr.pane == "extra" for sr in family.series):
+            with st.popover(f"Z-Score\n\n**{st.session_state[f'{k}_extra']}**"):
+                st.caption("EXTRA PANE")
+                st.segmented_control("Z-Score pane", Z_MODES, key=f"{k}_extra",
+                                     on_change=_keep, args=(f"{k}_extra", Z_HIDDEN),
+                                     label_visibility="collapsed")
+                st.caption("Own pane below the chart, always linear.")
+
+    with cols[5]:
         with st.popover(f"Display\n\n**{_axis_summary(family)}**"):
             st.caption("CHART HEIGHT")
             st.segmented_control("Height", HEIGHTS, key=f"{k}_height",
@@ -428,6 +485,8 @@ def _render_controls(family, dmin, dmax):
             # membuat bagian ini tiga kali lebih tinggi daripada isinya, dan popover jadi
             # lebih tinggi daripada chart saat halaman punya banyak garis.
             for s in family.series:
+                if s.pane == "extra":
+                    continue   # pane tambahan punya sumbunya sendiri
                 # segmented_control, bukan st.radio, supaya bentuknya sama dengan kontrol lain.
                 _axis_control(s.label, f"{k}_axis_{s.col}", s.axis)
             # Harga BTC juga bisa dipindah sumbu. Berguna untuk halaman yang metriknya
@@ -439,21 +498,16 @@ def _render_controls(family, dmin, dmax):
             if not overlay:
                 st.caption("Only for BTC price = Overlay.")
 
-    with cols[5]:
+    with cols[6]:
         with st.popover(f"Chart\n\n**{st.session_state[f'{k}_engine']}**"):
             st.segmented_control("Engine", ENGINES, key=f"{k}_engine",
                                  on_change=_keep, args=(f"{k}_engine", LIGHTWEIGHT),
                                  label_visibility="collapsed")
 
-    with cols[6]:
+    with cols[7]:
         with st.popover(f"Line style\n\n**{_style_summary(family)}**"):
             _render_line_style(family)
 
-    with cols[7]:
-        # Kotak tombol dua pilihan, senada dengan kontrol lain (dulu toggle).
-        st.segmented_control("Screen", SCREEN_MODES, key=f"{k}_screen",
-                             on_change=_keep, args=(f"{k}_screen", "Normal"),
-                             label_visibility="collapsed")
 
 
 def render_metric_page(family: MetricFamily):
@@ -469,7 +523,8 @@ def render_metric_page(family: MetricFamily):
     k = family.key
 
     # Tanggal terakhir yang benar-benar punya nilai metrik, bukan sekadar baris tanggal.
-    latest = df_raw.dropna(subset=[s.col for s in family.series], how="all")['Date'].max()
+    latest = df_raw.dropna(subset=[s.col for s in family.series if s.pane != "extra"],
+                           how="all")['Date'].max()
     _render_header(family, latest)
     _render_controls(family, dmin, dmax)
 
@@ -479,7 +534,7 @@ def render_metric_page(family: MetricFamily):
     df = data.apply_filters(
         df_raw, kind, periods,
         st.session_state[f"{k}_from"], st.session_state[f"{k}_to"],
-        [s.col for s in family.series],
+        [s.col for s in family.series if s.smoothing],
     )
     if df.empty:
         st.warning("No data in this date range.")
@@ -494,10 +549,25 @@ def render_metric_page(family: MetricFamily):
 
     # Semua garis dikirim ke chart; menyalakan dan mematikannya diurus legend di browser.
     plan = []
+    extra = []
+    pane_extra = st.session_state[f"{k}_extra"] == Z_BOTTOM
     for sr in family.series:
+        if sr.pane == "extra":
+            # Pane tambahan mati: serinya tidak dikirim sama sekali, bukan sekadar
+            # disembunyikan — supaya sumbu pane metrik tidak ikut menghitungnya.
+            if not pane_extra:
+                continue
+            extra.append(Line(sr.label, sr.col, sr.color, "left", width=LINE_WIDTH,
+                              group=sr.group or sr.label, dim=sr.dim, kind=sr.kind,
+                              short=sr.short, alpha=sr.alpha,
+                              hidden_default=sr.hidden_default))
+            continue
         axis = st.session_state[f"{k}_axis_{sr.col}"]
         plan.append(Line(sr.label, sr.col, sr.color, axis, width=LINE_WIDTH,
-                         group=sr.label, dim=sr.dim))
+                         group=sr.group or sr.label, dim=sr.dim, kind=sr.kind,
+                         short=sr.short, alpha=sr.alpha))
+        if not sr.smoothing:
+            continue
         for p in periods:
             col = f"{sr.col}__{kind}{p}"
             if col in df.columns:
@@ -525,21 +595,10 @@ def render_metric_page(family: MetricFamily):
                          st.session_state[f"{k}_axis_btc"], width=LINE_WIDTH,
                          group="BTC Price", dim=BTC_DIM))
 
-    if st.session_state[f"{k}_screen"] == "Full":
-        # Jaring pengaman: kalau fullscreen browser ditolak, kerangka Streamlit
-        # tetap disembunyikan sehingga chart praktis memenuhi jendela.
-        st.markdown("""
-        <style>
-        header[data-testid="stHeader"], div[data-testid="stToolbar"] { display: none !important; }
-        section[data-testid="stSidebar"] { display: none !important; }
-        .block-container { padding-top: 0.6rem !important; max-width: 100% !important; }
-        </style>
-        """, unsafe_allow_html=True)
-
     engine = st.session_state[f"{k}_engine"]
     if engine == LIGHTWEIGHT:
-        charts.render_lightweight(df, plan, price_line, total_h, metric_mode, price_mode,
-                                  f"dash_v2_{k}")
+        charts.render_lightweight(df, plan, price_line, extra, total_h,
+                                  metric_mode, price_mode, f"dash_v2_{k}")
     else:
-        charts.render_plotly(df, plan, price_line, total_h, metric_mode, price_mode,
+        charts.render_plotly(df, plan, price_line, extra, total_h, metric_mode, price_mode,
                              f"chart_{k}_plotly_{btc_mode[:3]}_{sig}")

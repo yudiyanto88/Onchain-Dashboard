@@ -18,6 +18,13 @@ class Series:
     axis: str = "left"                # sumbu bawaan: "left" atau "right"
     dim: float = 0.3                  # opasitas saat seri lain disorot
     separate_axis: str | None = None  # sumbu saat harga BTC dipindah ke pane sendiri
+    kind: str = "line"                # "line" atau "histogram"
+    smoothing: bool = True            # ikut digandakan oleh kontrol Smoothing
+    short: str | None = None          # nama di tombol sorot; bawaannya kata pertama label
+    alpha: float = 1.0                # < 1 = tembus pandang (dipakai batang histogram)
+    group: str | None = None          # kelompok legend; bawaannya label sendiri
+    hidden_default: bool = False      # lahir dalam keadaan mati di legend
+    pane: str = "main"                # "main" atau "extra" (pane tambahan paling bawah)
 
 
 @dataclass
@@ -62,6 +69,31 @@ MARKET_VALUATION = MetricFamily(
         # jadi saat sumbu kanan kosong ia dipindah ke sana supaya punya skala sendiri.
         Series("LTH MVRV", "LTH MVRV", color="#0b8e89", axis="left", dim=0.39,
                separate_axis="right"),
+        # Z-Score digambar sebagai batang dari garis nol, bukan garis: bentuknya
+        # langsung membedakannya dari tiga rasio di atas. Tidak ikut smoothing —
+        # yang rolling sudah merupakan penghalusan, dan yang full-history bergerak
+        # seiring MVRV Ratio yang penghalusannya sudah tersedia sendiri.
+        # Warna dipilih yang paling jauh dari empat warna garis yang sudah ada,
+        # termasuk saat disimulasikan buta warna (violet 39/18, hijau 58/16).
+        # Nama pendek ditentukan sendiri: bawaannya kata pertama, dan ketiga seri
+        # MVRV ini akan sama-sama menulis "MVRV" di tombol sorot.
+        # Z-Score tinggal di pane sendiri paling bawah, menyala lewat kotak Z-Score.
+        # Batangnya tembus pandang supaya dua kelompok bisa menyala bersamaan.
+        Series("MVRV Z-Score", "MVRV Z-Score", color="#7f77dd", axis="left",
+               dim=0.45, kind="histogram", smoothing=False, short="Z", alpha=0.55,
+               pane="extra"),
+        # Tiga jendela rolling satu kelompok legend: namanya keterangan, angka
+        # jendelanya kotak kecil yang bisa diklik sendiri-sendiri — sama seperti
+        # angka periode smoothing. Hanya 1Y yang menyala di awal.
+        Series("Rolling Z-Score (1y)", "MVRV Z-Score 1Y", color="#97c459", axis="left",
+               dim=0.45, kind="histogram", smoothing=False, short="Z roll", alpha=0.55,
+               pane="extra", group="Rolling Z-Score"),
+        Series("Rolling Z-Score (2y)", "MVRV Z-Score 2Y", color="#97c459", axis="left",
+               dim=0.45, kind="histogram", smoothing=False, alpha=0.55,
+               pane="extra", group="Rolling Z-Score", hidden_default=True),
+        Series("Rolling Z-Score (4y)", "MVRV Z-Score 4Y", color="#97c459", axis="left",
+               dim=0.45, kind="histogram", smoothing=False, alpha=0.55,
+               pane="extra", group="Rolling Z-Score", hidden_default=True),
     ],
     reference_lines=[RefLine(1.0, "Neutral (1.0)")],
 )

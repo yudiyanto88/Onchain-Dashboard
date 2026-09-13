@@ -4,7 +4,6 @@ Berdiri sendiri di samping app.py. Jalankan dengan:
     streamlit run app_v2.py --server.port 8502
 """
 import streamlit as st
-import streamlit.components.v1 as components
 
 from dashboard.metric_page import render_metric_page
 from dashboard.registry import FAMILIES
@@ -138,11 +137,6 @@ div[data-testid="stButton"] button[kind="primary"] {
 }
 [data-testid="stButtonGroup"] button[role="radio"][aria-checked="true"] * { color: #ffffff !important; }
 
-/* Toggle Full screen saat aktif: lintasan teal gelap bergaris tepi teal, bukan merah. */
-[data-testid="stCheckbox"] label:has(input[role="switch"]:checked) > div:not([data-testid]) {
-    background-color: rgba(0, 109, 119, 0.40) !important;
-    box-shadow: inset 0 0 0 1px #006d77 !important;
-}
 div[data-testid="stButton"] button p {
     font-size: 0.82rem !important; margin: 0 !important; white-space: nowrap !important;
 }
@@ -175,7 +169,6 @@ div[data-testid="stSlider"] div:has(> div > input[type="range"]) {
 [data-testid="stButtonGroup"] button[data-focus-visible],
 div[data-testid="stButton"] button:focus-visible,
 button[data-testid="stPopoverButton"]:focus-visible,
-[data-testid="stCheckbox"] label:focus-visible,
 [data-testid="stRadioOption"]:focus-visible,
 div[data-testid="stSlider"] div[data-focus-visible] {
     box-shadow: 0 0 0 0.2rem rgba(0, 109, 119, 0.5) !important;
@@ -202,6 +195,12 @@ div[data-testid="stSlider"] div[data-focus-visible] {
     line-height: 1.25 !important;
 }
 [data-testid="stButtonGroup"] button p { font-size: 12px !important; line-height: 1.25 !important; }
+/* Lambang gaya garis ditulis sebagai kode supaya memakai huruf monospace dan semua
+   lambang selebar sama. Kotak abu bawaan kode dihilangkan, warnanya ikut tombol. */
+[data-testid="stButtonGroup"] button code {
+    background: transparent !important; padding: 0 !important; border: 0 !important;
+    color: inherit !important; font-size: 13px !important; letter-spacing: 0 !important;
+}
 div[data-testid="stButton"] button {
     height: 26px !important; min-height: 0 !important; line-height: 1.25 !important;
 }
@@ -281,61 +280,8 @@ with st.sidebar:
 render_metric_page(FAMILIES[selected])
 
 
-# Toggle "Full screen" hanya mengatur tinggi chart dari sisi Python. Fullscreen
-# browser wajib dipicu oleh gestur pengguna, jadi tidak bisa dijalankan setelah
-# rerun. Skrip ini memasang pendengar klik langsung pada toggle di halaman induk,
-# sehingga requestFullscreen() berjalan di dalam gestur klik itu sendiri.
-_FULLSCREEN_SCRIPT = """
-<script>
-const doc = window.parent.document;
-
-// Dua tombol dipasangi pendengar: Full meminta layar penuh, Normal keluar darinya.
-// Sebelumnya hanya tombol Full yang dipasangi, jadi menekan Normal tidak pernah
-// mengembalikan browser dari layar penuh.
-//
-// Iframe skrip ini dibuat ulang setiap kali Streamlit rerun, dan pendengar klik yang
-// dipasang konteks lama ikut mati bersama iframe-nya — sementara tombolnya tetap elemen
-// DOM yang sama. Penanda tetap ('1') karena itu membuat skrip baru mengira tombolnya
-// sudah terpasang, lalu melewatinya: sesudah rerun pertama tidak ada lagi pendengar yang
-// hidup. Itu sebabnya Full (klik pertama, sebelum rerun apa pun) bekerja sedangkan Normal
-// tidak pernah. Penanda sekarang bernomor unik per muatan skrip, jadi konteks yang sedang
-// hidup selalu memasang pendengarnya sendiri.
-const ID = 'fs' + Math.random().toString(36).slice(2);
-function findScreenButtons() {
-  for (const grup of doc.querySelectorAll('[data-testid="stButtonGroup"]')) {
-    const tombol = [...grup.querySelectorAll('button')];
-    const full = tombol.find(b => b.innerText.trim() === 'Full');
-    const normal = tombol.find(b => b.innerText.trim() === 'Normal');
-    if (full && normal) return { full, normal };
-  }
-  return null;
-}
-
-function attach() {
-  const tombol = findScreenButtons();
-  if (!tombol) return;
-  for (const [nama, el] of Object.entries(tombol)) {
-    if (el.dataset.fsBound === ID) continue;
-    el.dataset.fsBound = ID;
-    el.addEventListener('click', () => {
-      try {
-        if (nama === 'full' && !doc.fullscreenElement) {
-          doc.documentElement.requestFullscreen();
-        } else if (nama === 'normal' && doc.fullscreenElement) {
-          doc.exitFullscreen();
-        }
-      } catch (e) { /* browser menolak: tombol tetap mengatur tinggi chart */ }
-    }, true);
-  }
-}
-
-attach();
-new MutationObserver(attach).observe(doc.body, {childList: true, subtree: true});
-</script>
-"""
-# st.iframe menggantikan components.html yang dijadwalkan dihapus Streamlit.
-_embed = getattr(st, "iframe", None)
-if _embed is not None:
-    _embed(_FULLSCREEN_SCRIPT, height=1)
-else:
-    components.html(_FULLSCREEN_SCRIPT, height=0)
+# Tombol layar penuh hidup di dalam chart (dashboard/lw_chart.py), bukan di sini.
+# Kliknya sudah merupakan gestur pengguna, jadi requestFullscreen() bisa dipanggil
+# langsung dan tidak perlu skrip penyisip yang memasang pendengar ke tombol Streamlit.
+# Yang tersisa di file ini cuma aturan :fullscreen di atas, yang menyembunyikan
+# kerangka Streamlit saat browser benar-benar masuk layar penuh.

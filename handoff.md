@@ -1,6 +1,6 @@
 # Handoff — Upgrade Dashboard Streamlit (v2)
 
-Ditulis ulang: 13 September 2026. Untuk dilanjutkan di sesi Claude Code berikutnya.
+Ditulis ulang: 13 September 2026 (pembaruan kedua). Untuk dilanjutkan di sesi Claude Code berikutnya.
 (Versi sebelumnya ditulis 11 dan 12 September 2026; isinya sudah dilebur ke sini.)
 
 Baca dokumen ini dan `CLAUDE.md` sebelum mulai. Bagian **3 (keputusan pending)** harus ditanyakan ke user dulu — jangan langsung diterapkan.
@@ -43,8 +43,16 @@ Gaya navigator TradingView: chart mini berisi seluruh sejarah, dengan kotak gese
 ### 3.3 Memindahkan kontrol Line style ke dalam chart — masih terbuka
 Tujuannya supaya mengubah gaya garis tidak memuat ulang chart. User sempat memilih "kerjakan", lalu sepakat menunggu: keluhan aslinya adalah zoom hilang saat reload, dan itu sudah diperbaiki 13 Sep. Setelah dipakai beberapa hari, tanyakan lagi apakah masih terasa perlu. Penjelasan lengkap ada di bagian 7.
 
-### 3.4 Bentuk halaman MVRV Z-Score — sedang dibahas
-User setuju Z-Score **dipisah** dari chart MVRV (alasan: Z-Score punya nilai negatif, jadi rusak diam-diam kalau sumbunya dipasang Log — lihat bagian 5). Yang belum diputuskan: halaman baru sendiri, satu halaman dengan dua chart bertumpuk, atau satu halaman dengan tombol pengalih antara chart MVRV dan chart Z-Score. Isi yang disepakati: MVRV Ratio + Z-Score full-history + (menyusul) Z-Score rolling 1 tahun.
+### 3.4 Bentuk MVRV Z-Score — sudah diputuskan dan dikerjakan 13 Sep 2026
+Z-Score tinggal di **pane ketiga paling bawah** pada halaman Market Valuation, dinyalakan lewat kotak **Z-Score** (Hidden / Bottom pane). Rinciannya di bagian 4. Sempat dicoba digabung ke chart MVRV sebagai histogram — ditolak user karena terlalu padat dan skala Log mengacaukan semuanya. Ide halaman terpisah dan tombol pengalih chart tidak dipakai.
+
+### 3.6 Desain judul halaman — ditahan sampai Z-Score beres, sekarang boleh ditanyakan
+User menilai subjudul "MVRV Oscillators" di bawah lencana "Market Valuation" kurang tegas sebagai tanda halaman MVRV. Tiga usulan sudah dipratinjau lewat widget inline:
+- **A** — nama halaman jadi tipografi dengan garis aksen tipis.
+- **B** — kategori jadi tulisan kecil di atas, nama metrik naik jadi judul besar.
+- **C** (rekomendasi Claude) — bentuk jejak "Market Valuation / **MVRV Oscillators**".
+
+Catatan: pratinjau itu dibuat saat ide "tab pengalih chart" masih hidup. Karena Z-Score akhirnya jadi pane ketiga, bagian tab di pratinjau tidak berlaku lagi — **buat pratinjau ulang tanpa tab** sebelum user memilih.
 
 ### 3.5 Kotak L / R untuk pilihan sumbu — ditahan
 Ide user: tombol Left/Right diganti dua kotak kecil "L" dan "R" bergaya kotak angka periode di legend. Hasil ukur: **tidak menghemat lebar sama sekali** (lebar popover ditentukan baris CHART HEIGHT, bukan baris axis), hanya menghemat tinggi ±14 px per baris. Ditahan sampai ada halaman dengan garis banyak — bukan khusus HODL Waves, metrik lain juga bisa. Kalau dipakai, pakai untuk semua halaman sekaligus.
@@ -56,24 +64,25 @@ Ide user: tombol Left/Right diganti dua kotak kecil "L" dan "R" bergaya kotak an
 ### File dan struktur
 | File | Isi |
 |---|---|
-| `app_v2.py` | Entry point v2, sidebar, seluruh CSS global, skrip layar penuh. Port 8502. |
+| `app_v2.py` | Entry point v2, sidebar, seluruh CSS global (termasuk aturan `:fullscreen`). Port 8502. |
 | `dashboard/registry.py` | Konfigurasi keluarga metrik (`MetricFamily`, `Series`, `RefLine`). Menambah halaman = menambah satu `MetricFamily`. |
 | `dashboard/metric_page.py` | Tata letak halaman: header, kontrol, gaya garis smoothing, rencana garis. |
 | `dashboard/charts.py` | Memilih mesin chart (Lightweight / Plotly). Dataclass `Line`. |
-| `dashboard/lw_chart.py` | Chart lightweight-charts yang digambar langsung di browser via `st.iframe`. Legend, sorot, geser sumbu, zoom tersimpan, tangga adaptif. |
-| `dashboard/data.py` | Loader CSV, SMA/EMA, filter tanggal. |
+| `dashboard/lw_chart.py` | Chart lightweight-charts yang digambar langsung di browser via `st.iframe`. Pane dibangun dari daftar (harga / metrik / tambahan), legend, sorot, geser sumbu, zoom tersimpan, tangga adaptif, tombol layar penuh. |
+| `dashboard/data.py` | Loader CSV, SMA/EMA, filter tanggal, Z-Score rolling 1Y/2Y/4Y. |
 
-Hanya **Market Valuation** yang sudah dibuat (`data_mvrv.csv`: MVRV, STH MVRV, LTH MVRV + garis acuan Neutral 1,0).
+Hanya **Market Valuation** yang sudah dibuat (`data_mvrv.csv`: MVRV, STH MVRV, LTH MVRV + garis acuan Neutral 1,0, plus MVRV Z-Score dan Rolling Z-Score di pane tambahan).
 
 ### Kontrol di halaman (8 kotak, semuanya bergaya sama)
-- **Range** — preset 1M/3M/6M/1Y/4Y/All plus tanggal From/To yang disejajarkan satu baris. Default **All**.
+- **Range** — preset **1m / 3m / 6m / 1y / 4y / All** (huruf kecil sejak 13 Sep supaya seragam dengan "7d" dan "1y"; nilai di baliknya tetap "1M" dst.) plus tanggal From/To yang disejajarkan satu baris. Default **All**.
 - **Smoothing** — tab SMA/EMA, kisi 3×3 (Off, 7d, 14d, 30d, 60d, 90d, 200d, 365d, 730d), input periode sendiri + tombol Add. Multi-periode.
 - **Scale** — Auto/Linear/Log terpisah untuk metrik (kiri) dan BTC (kanan).
 - **BTC price** — Overlay (default) / Separate pane / Hidden.
+- **Z-Score** — Hidden (default) / Bottom pane. Kotak ini hanya muncul untuk keluarga metrik yang punya seri `pane="extra"`. Saat Hidden, seri Z-Score **tidak dikirim sama sekali** (bukan sekadar disembunyikan), supaya sumbu pane metrik tidak ikut menghitungnya.
 - **Display** — tinggi chart 600/720/860/1000 px + sumbu kiri/kanan per garis, **termasuk BTC Price** (ditambah 13 Sep). Tiap baris: nama di kiri, tombol Left/Right di kanan. Kotak BTC Price mati sendiri saat mode harga bukan Overlay ("Only for BTC price = Overlay"), karena di Separate pane harga punya pane sendiri. Nilai di kotak Display menulis Left / Right / Mixed dan **sengaja tidak menghitung BTC** — kalau ikut dihitung, keadaan bawaan (metrik kiri, harga kanan) selalu menulis "Mixed" dan jadi tidak berarti apa-apa.
 - **Chart** — Lightweight (default) / Plotly.
-- **Line style** — per garis smoothing: bentuk (Solid, Dotted, Dashed, Step, Band) dan tebal (slider 0,5–5 px, langkah 0,25). Nilai di kotak menulis Off / Default / Custom, plus tombol **Reset to default**.
-- **Screen** — kotak tombol Normal / Full (dulu toggle).
+- **Line style** — per garis smoothing: bentuk dan tebal (slider 0,5–5 px, langkah 0,25). Nilai di kotak menulis Off / Default / Custom, plus tombol **Reset to default**. Bentuk ditampilkan **sebagai lambang saja**, namanya ada di tooltip tanda tanya: Solid `────`, Dotted `····`, Dashed `╌╌╌╌` (teks monospace lewat format kode, tepat empat karakter), Step dan Band berupa **gambar SVG 31×12 px** (Step: satu anak tangga naik, garis saja; Band: balok 4,5 px dengan transparansi sama dengan pita di chart, 0,60). Kelima tombol terukur sama lebar, 49 px.
+- Kotak **Screen sudah dihapus** — tombol layar penuh pindah ke dalam chart (lihat Perilaku).
 
 ### Gaya garis smoothing (bawaan)
 Gaya diberikan menurut urutan periode dan **menempel pada periodenya** — mematikan periode lain tidak menggeser gaya periode yang masih menyala.
@@ -100,21 +109,28 @@ Periode ke-4 dan seterusnya mengulang ketiga gaya itu dengan garis 0,5 px lebih 
 
 ### Perilaku
 - **Legend dikelompokkan per metrik**: satu label untuk garis utama, lalu angka periode smoothing sebagai titik kecil yang bisa diklik sendiri-sendiri. Empat kelompok muat satu baris tanpa geser samping; kalau kepanjangan, membungkus ke baris berikutnya.
+- **Kelompok legend tanpa garis utama** (dipakai Rolling Z-Score): kalau tidak ada seri yang namanya persis nama kelompok, nama kelompok jadi keterangan (bukan tombol) dan semua anggotanya jadi kotak angka: "Rolling Z-Score **1y · 2y · 4y**". Angka di kotak dinaikkan 1 px (tinta "1y" sempat meleset 1,5 px ke bawah karena ekor huruf y; sekarang 0,5 px).
+- **Seri boleh lahir dalam keadaan mati** (`hidden_default=True`, dipakai 2y dan 4y). Chart menyimpan daftar `seen` di `localStorage`; nilai bawaan hanya diterapkan pada seri yang belum pernah muncul, jadi pilihan user tidak ditimpa di kunjungan berikutnya.
+- **Tombol sorot memakai nama pendek** dari registry (`short`) kalau ada: None · MVRV · STH · LTH · BTC · **Z** · **Z roll**. Tanpa `short`, bawaannya kata pertama label — dan tiga seri berawalan "MVRV" jadi kembar.
 - **Mode sorot bisa lebih dari satu garis.** Klik lagi untuk mematikan, None mengosongkan. Garis yang tidak disorot diredupkan pada kontras 1,70:1 (MVRV 0,49 · STH 0,44 · LTH 0,39 · BTC 0,28).
 - **Menarik chart atas-bawah menggeser sumbu milik garis yang disorot** (bisa dua sumbu sekaligus, jarak sama). Tanpa sorotan, perilaku bawaan library. Klik dua kali mengembalikan semua sumbu ke Auto. Penguncian baru terjadi kalau tarikan jelas vertikal (≥ 6 px dan lebih tegak daripada mendatar), supaya menggeser ke samping tidak mengunci sumbu.
 - **Zoom dan posisi bertahan** saat Streamlit menggambar ulang chart, termasuk saat berganti Overlay ↔ Separate pane. Disimpan sebagai posisi bar (bukan tanggal) di `localStorage`, dengan sidik data supaya tombol Range tetap menang. Cara kerjanya: zoom simpanan dipasang ulang sampai rentang yang tampil benar-benar cocok, dan fase pemulihan itu tetap hidup sampai lebar sumbu harga mengendap (±2 detik) — lihat bagian 10 kenapa memeriksa sekali di awal tidak cukup. Fase berhenti begitu pengguna menyentuh chart, dan menyerah setelah 6 detik supaya zoom baru tetap bisa disimpan.
-- **Tombol Screen bekerja dua arah.** Full masuk layar penuh browser, Normal keluar. Kuncinya penanda `fsBound` bernomor unik per muatan skrip — lihat bagian 10.
+- **Tombol layar penuh ada di dalam chart**, ujung kanan baris sorot, dipisah garis tipis. Satu tombol bersimbol: "Full" masuk layar penuh, berganti jadi "Exit" saat aktif; Esc juga keluar dan tombolnya ikut menyesuaikan (`fullscreenchange`). Klik di dalam chart sudah merupakan gestur pengguna, jadi `requestFullscreen()` dipanggil langsung — tidak ada status di Python, tidak ada skrip penyisip. User sudah mengujinya di browser sendiri dan menyatakannya sesuai.
+- **Saat layar penuh, chart mengisi sisa tinggi jendela.** Tinggi iframe dan wadahnya ditimpa sementara, pane dibagi ulang menurut perbandingan tinggi awalnya, lalu dikembalikan persis saat keluar. Ikut menyesuaikan kalau ukuran jendela berubah.
+- **Baris legend dan tombol diluruskan ke area gambar**, bukan ke tepi iframe: jarak kiri = lebar sumbu kiri, jarak kanan = lebar sumbu kanan, **minimal 10 px** (tanpa minimal itu, saat semua metrik di sumbu kiri, tombol Full menempel ke batas chart — ditemukan user).
 - **Garis tangga adaptif**: di bawah 6 piksel per hari polanya berubah jadi putus panjang, di atas itu kembali jadi tangga penuh. Data tidak diubah.
 - **LTH otomatis pindah ke sumbu kanan** saat BTC dipisah ke pane sendiri, dan kembali ke kiri saat Overlay.
 - Legend on/off dan mode sorot bekerja di browser tanpa reload, tersimpan di `localStorage` key `dash_v2_<family.key>`.
 - Klik di dalam chart dan tombol Escape menutup popover yang terbuka.
-- Mode Separate pane: zoom, geser, dan lebar sumbu kedua pane tersinkron.
+- **Pane dibangun dari daftar**, bukan dipaku dua: `price` (harga BTC bila dipisah) → `main` (metrik) → `extra` (Z-Score). Zoom, geser, dan lebar sumbu semua pane tersinkron; sumbu waktu hanya di pane paling bawah. Pembagian tinggi: tiga pane 30/45/25 %, harga+metrik 45/55 %, metrik+Z-Score 70/30 %. Pane `extra` **selalu linear** — Z-Score melewati nol, jadi Log tidak berlaku; hasilnya Log di pane metrik aman lagi dipakai.
+- **MVRV Z-Score**: histogram violet `#7f77dd`, transparan 55 %. **Rolling Z-Score 1y/2y/4y**: histogram hijau `#97c459`, transparan 55 %, dihitung di `data.py` dari MVRV Ratio terhadap rata-rata dan simpangan 365/730/1460 hari (data 2y mulai 2013, 4y mulai 2014). Keduanya **tanpa smoothing** (`smoothing=False`). Warna dipilih lewat jarak Lab terhadap empat warna garis yang ada, termasuk simulasi buta warna (violet 39/18, hijau 58/16; kandidat mustard dibuang karena jaraknya cuma 2 dari oranye BTC saat buta warna).
 
 ### Teknis
 - Streamlit di laptop user: **1.63.0**, dikunci `streamlit==1.63.0` di `requirements.txt`.
 - Dashboard v2 **wajib dijalankan dengan tema teal gelap** (lihat bagian 11). Tanpa itu, warna aksen kembali merah dan latar popover jadi putih.
 - `app.py` lama diuji di 1.63.0: 12 halaman tanpa error. Diubah sekali atas permintaan user (wrapper `renderLightweightCharts` + `minBarSpacing`).
 - `components.html` sudah diganti `st.iframe` (dengan fallback).
+- **Field baru `Series` di registry** (13 Sep): `kind` ("line"/"histogram"), `smoothing`, `short`, `alpha`, `group`, `hidden_default`, `pane` ("main"/"extra"). `Line` di `charts.py` ikut membawa `kind`, `short`, `hidden_default`. `lw_chart.render()` sekarang menerima `extra_lines`.
 
 ---
 
@@ -136,7 +152,12 @@ Periode ke-4 dan seterusnya mengulang ketiga gaya itu dengan garis 0,5 px lebih 
 - **Tingkat terang legend, angka periode, dan mode sorot sengaja berbeda** (kontras 14,5 / 10,0 / 5,8 : 1). Itu hierarki: isi chart → anak isi → alat. Menyamakannya juga memperkecil beda antara tombol sorot aktif (putih, 17,9:1) dan yang tidak aktif. Dibahas 13 Sep, diputuskan tetap.
 - **Label "Highlight" tetap setara tombol di sebelahnya** (12 px `#8B949E`). Versi redup 11 px `#6E7681` sudah dicoba dan ditolak: jadi sulit dibaca.
 - **Kotak Display tidak menghitung BTC** — lihat bagian 4.
-- **MVRV Z-Score dipisah dari chart MVRV.** Alasan utama bukan kerapian tapi skala: Z-Score punya nilai negatif (terendah −0,66), jadi begitu sumbunya dipasang Log — yang justru berguna untuk rentang panjang — bagian negatifnya hilang tanpa peringatan. Bentuk halamannya masih dibahas (bagian 3.4).
+- **MVRV Z-Score di pane ketiga, bukan di chart MVRV dan bukan halaman terpisah.** Alasan utama bukan kerapian tapi skala: Z-Score punya nilai negatif (terendah −0,66), jadi begitu sumbunya dipasang Log bagian negatifnya hilang tanpa peringatan. Digabung ke chart MVRV sudah dicoba dan ditolak (terlalu padat).
+- **Histogram Z-Score polos satu warna.** Gradasi warna menurut nilai (gaya ChartInspect) ditunda; bisa dibuat dengan warna per titik di `addHistogramSeries`, tapi gradasi di dalam satu batang tidak bisa.
+- **Tidak ada pita "Extreme Overvaluation" berambang tetap.** KB MVRV v1.4 §5.3B: ambang ekstrem Z-Score turun struktural tiap siklus (9,24 → 3,66 → 2,53) karena dilusi sejarah, jadi pita di angka tetap menyesatkan. Kalau suatu saat butuh penanda zona, itu keputusan framework — baca Decision Framework v2 dulu, jangan diselipkan ke pekerjaan tampilan.
+- **Z-Score full-history untuk aturan, rolling untuk mata.** Jendela rolling bisa dipilih (1y/2y/4y), tapi mengganti jendela tidak membuatnya jadi sinyal — kesimpulan KB berlaku untuk metodenya, bukan untuk angka 365 hari.
+- **Tombol layar penuh satu saja, di dalam chart**, keluar lewat Esc. Kotak Screen di baris kontrol dihapus.
+- **Line style tanpa nama, lambang saja** (nama di tooltip). Step = pilihan B (satu anak tangga naik).
 
 ---
 
@@ -151,23 +172,25 @@ Periode ke-4 dan seterusnya mengulang ketiga gaya itu dengan garis 0,5 px lebih 
 ## 7. Belum dikerjakan
 
 - **Halaman metrik lainnya** dan **navigasi seluruh halaman** (prioritas 3).
-- **Halaman MVRV Z-Score** — bentuknya belum diputuskan (bagian 3.4). Datanya sudah siap: `load_mvrv()` sudah menamai `mvrv_zscore` jadi "MVRV Z-Score", tinggal didaftarkan sebagai `Series`. Butuh **warna garis baru** → jalankan uji palet dulu (bagian 9) dan tunjukkan pratinjau sebelum dipasang. Z-Score rolling 1 tahun harus dihitung sendiri dari `mvrv_ratio` dan **wajib diberi label sebagai alat bantu visual**, bukan sinyal terpisah (KB MVRV v1.4 § Catatan Tambahan).
+- **Desain judul halaman** — bagian 3.6.
+- **Gradasi warna histogram Z-Score** — ditunda user, bagian 5.
+- **Legend padat di layar sempit.** Dengan Z-Score menyala ada enam kelompok plus harga. Di panel browser Claude (504 px) legendnya sampai terdesak habis oleh tombol sorot; di layar user belum ada keluhan. Tinggi baris legend dipaku 40 px, jadi kalau membungkus dua baris, baris kedua terpotong.
 - **Range All tidak selalu memuat seluruh sejarah.** Sesudah ganti Range, chart kadang terbuka di ±70 bar terakhir, dan pernah terlihat memuat penuh lalu mundur sendiri ke bar bawaan ±1 detik kemudian. Ini jalur `fitContent` (tanpa zoom simpanan), bukan jalur pemulihan zoom yang sudah diperbaiki — **sudah begitu sebelum perbaikan 13 Sep**, dan belum diusut. Kalau dikerjakan, mulai dari perilaku yang sama: lebar area gambar berubah sesudah tampilan awal.
-- **Riwayat masalah tombol layar penuh (sudah selesai 13 Sep, disimpan sebagai catatan).** Cara kerjanya:
+- **Riwayat masalah tombol layar penuh (selesai, lalu seluruh mekanismenya diganti tombol di dalam chart — disimpan sebagai catatan).** Cara kerja lama:
   1. Kotak **Screen** (Normal | Full) hanya mengubah `st.session_state[f"{k}_screen"]`. Saat "Full", `render_metric_page()` menyuntikkan CSS yang menyembunyikan sidebar, header, dan toolbar Streamlit sehingga chart memenuhi jendela.
   2. Layar penuh browser **tidak bisa dipanggil dari Python**, karena `requestFullscreen()` wajib dipanggil di dalam gestur klik. Jadi `app_v2.py` menyisipkan `_FULLSCREEN_SCRIPT` lewat `st.iframe`; skrip itu berjalan di dalam iframe, mengambil `window.parent.document`, mencari kelompok tombol yang berisi "Full" dan "Normal", lalu memasang pendengar klik fase-capture pada keduanya (`attach()` + `MutationObserver`, penanda `dataset.fsBound`).
   3. "Full" memanggil `doc.documentElement.requestFullscreen()`, "Normal" memanggil `doc.exitFullscreen()`.
   - **Sebab yang terbukti:** klik Full/Normal itu sendiri membuat Streamlit membangun ulang iframe skrip (mode Full menambah satu blok CSS, jadi urutan elemen bergeser). Konteks JavaScript lama mati bersama iframe-nya, tapi tombolnya tetap elemen DOM yang sama dan penanda `fsBound = '1'` ikut menempel — skrip baru mengira sudah terpasang lalu melewatinya. Sesudah rerun pertama tidak ada lagi pendengar yang hidup: Full (klik pertama) bekerja, Normal tidak pernah. Penanda `fsBound = 1` justru bukti pendengar mati, bukan bukti terpasang.
   - **Perbaikannya:** penanda diberi nomor unik per muatan skrip (`const ID = 'fs' + Math.random()...`), jadi konteks yang sedang hidup selalu memasang pendengarnya sendiri. Pendengar mati dari iframe lama tetap menempel tapi tidak pernah berbunyi.
   - **Catatan uji:** layar penuh sungguhan tidak bisa diuji dari panel browser Claude — panel itu memblokir Fullscreen API (`TypeError: Permissions check failed`, bahkan dari halaman utama). Yang bisa diuji dari sana cuma pemasangan ulang pendengarnya. User yang mengonfirmasi hasil akhirnya di browser sendiri.
-  - **Masih terbuka:** kalau keluar layar penuh lewat tombol Esc, kotak Screen tetap menunjuk "Full". Sinkronisasi lewat `fullscreenchange` (±4 baris) sudah ditawarkan, belum diminta.
-- **Mesin Plotly ketinggalan.** Fitur baru hanya ada di Lightweight: legend berkelompok, mode sorot, geser sumbu, zoom tersimpan, tangga adaptif. Plotly hanya ikut bentuk garis, tebal, dan pita.
+  - **Akhir cerita:** atas usul user, tombolnya dipindah ke dalam chart. Kotak Screen, `_FULLSCREEN_SCRIPT` (58 baris), state `{k}_screen`, dan blok CSS penyembunyi kerangka dibuang semua; yang tersisa hanya aturan `:fullscreen` di `app_v2.py`.
+- **Mesin Plotly ketinggalan.** Fitur baru hanya ada di Lightweight: legend berkelompok, mode sorot, geser sumbu, zoom tersimpan, tangga adaptif, pane tambahan, tombol layar penuh. Plotly hanya ikut bentuk garis, tebal, pita, dan histogram (`go.Bar`); garis pane tambahan digabung ke chart metrik.
 - **Slider rentang di bawah chart** — lihat 3.2.
 - **Memindahkan Line style ke dalam chart** — lihat 3.3. Sebabnya: semua kontrol hidup di Python, dan setiap klik membuat Streamlit menggambar ulang komponen chart (iframe baru). Legend dan sorot tidak memuat ulang karena sudah hidup di dalam chart. Range dan Smoothing tidak bisa dipindah kecuali rata-rata bergerak dihitung di browser.
-- **Sudah commit (13 Sep), belum push, belum deploy.** Commit pertama berisi `app_v2.py`, `dashboard/`, `.claude/launch.json`, `handoff.md`, dan `requirements.txt`. `.claude/settings.local.json` sengaja tidak ikut (pengaturan lokal). Perubahan repo lain yang belum di-commit (CLAUDE.md, `auto_update.py`, `references/`, puluhan file `research/`) **tidak disentuh** — itu pekerjaan user sendiri. Streamlit Cloud masih menjalankan `app.py`. Deploy v2 masuk akal setelah halaman-halamannya lengkap, dan itu keputusan user. Catatan: di Streamlit Cloud, tema teal gelap harus dipasang lewat `.streamlit/config.toml` — dan file itu dipakai bersama `app.py`, jadi tampilan dashboard lama ikut berubah. Tanyakan dulu.
+- **Sudah commit dua kali (13 Sep), belum push, belum deploy.** Commit pertama (`d0623dd`) berisi `app_v2.py`, `dashboard/`, `.claude/launch.json`, `handoff.md`, dan `requirements.txt`; commit kedua berisi pane Z-Score, tombol layar penuh di dalam chart, dan perapian kontrol. `.claude/settings.local.json` sengaja tidak ikut (pengaturan lokal). Perubahan repo lain yang belum di-commit (CLAUDE.md, `auto_update.py`, `references/`, puluhan file `research/`) **tidak disentuh** — itu pekerjaan user sendiri. Streamlit Cloud masih menjalankan `app.py`. Deploy v2 masuk akal setelah halaman-halamannya lengkap, dan itu keputusan user. Catatan: di Streamlit Cloud, tema teal gelap harus dipasang lewat `.streamlit/config.toml` — dan file itu dipakai bersama `app.py`, jadi tampilan dashboard lama ikut berubah. Tanyakan dulu.
 - **Bersih-bersih kode:**
   - CSS `button[kind="pills"]` di `app_v2.py` tidak terpakai lagi (legend pindah ke dalam chart);
-  - CSS toggle `stCheckbox` tidak terpakai lagi (toggle Full screen sudah diganti kotak tombol);
+  - ada tiga aturan `div[data-testid="stButton"] button p` yang saling menumpuk di `app_v2.py` (font-size, margin, line-height) — bekerja, tapi sebaiknya disatukan;
   - `default_selection` / `default_series()` di `registry.py` tidak terpakai.
 - **Ide untuk nanti:** memantau LTV intraday memakai harga 10 menit dari ChartInspect (bagian 10). Harga terendah intraday lebih relevan untuk risiko likuidasi daripada harga penutupan harian.
 
@@ -232,6 +255,9 @@ Bukan untuk halaman: `data_master_all_metrics.csv` (file hasil generate) dan `da
 - **Wadah teks (`stMarkdownContainer`) punya `margin-bottom: -16px`.** Tinggi tata letaknya jadi 16 px lebih pendek daripada kotak yang terlihat. Kalau dipakai bersama `st.columns(vertical_alignment="center")`, isinya jatuh 8 px di bawah garis tengah. Batalkan dengan `margin-bottom: 16px` pada div sendiri.
 - **Tinggi tombol dipaku 32 px oleh Streamlit.** `min-height` dan `padding` tidak bisa mengecilkannya; `height` harus ditimpa langsung.
 - **Teks `st.button` dipasang sebagai baris *inline*** di kotak baris yang lebih tinggi daripada hurufnya, jadi duduk di garis dasar (2,3 px di bawah tengah) sementara `st.segmented_control` duduk 0,5 px di atas tengah. Perbaikannya `display:block` + `line-height` pada `p` di dalam tombol.
+- **Label `st.segmented_control` menerima Markdown gambar, termasuk data URI SVG** (`![nama](data:image/svg+xml;base64,...)`), dan lebar tombolnya tidak berubah. Sudah diuji. Gambar tidak ikut berganti warna putih saat opsinya dipilih — kotaknya tetap menyala teal, jadi tanda pilihan tetap jelas.
+- **Supaya lambang teks selebar sama, tulis sebagai kode** (`` `────` ``): Streamlit memakai Source Code Pro (monospace), jadi empat karakter apa pun = 31,2 px. Kotak abu bawaan kode dihilangkan lewat CSS `[data-testid="stButtonGroup"] button code`.
+- **Legend di dalam chart tidak bisa membuat pane.** Pane dibangun saat chart digambar dari sisi Python, jadi saklar pane (kotak Z-Score) harus kontrol Python, bukan tombol legend.
 - **Caption punya `margin-bottom: -16px` bawaan.** Wadahnya jadi lebih pendek dari tulisannya dan tertimpa elemen di bawah. Dinetralkan di CSS popover.
 - **Memberi opsi `--theme.*` apa pun membuat tema dasar jadi terang.** Wajib menyertakan `--theme.base dark`.
 - **Isi popover dirender di portal terpisah**; CSS tidak bisa diturunkan dari `div[data-testid="stPopover"]`. Pakai `[data-testid="stPopoverBody"]`.
@@ -249,6 +275,7 @@ Bukan untuk halaman: `data_master_all_metrics.csv` (file hasil generate) dan `da
 - **Sinkron zoom Separate pane** memakai seri jangkar tak terlihat di tiap pane (jumlah bar sama) plus sinkron logical range, dengan pengaman "hanya geser kalau rentangnya beda".
 - **Pola garis hanya lima:** Solid, Dotted, Dashed, LargeDashed, SparseDotted. Panjang putusnya ikut tebal garis.
 - **`lineType`**: Simple / WithSteps / Curved. Tangga hanya terlihat kalau satu bar memakan beberapa piksel.
+- **`priceScale().width()` bernilai 0 sampai chart benar-benar menggambar.** Perataan baris legend ke area gambar karena itu diulang tiap 150 ms selama 4 detik pertama. Di panel browser Claude yang sering membeku nilainya bisa tetap 0 sampai ada gerakan mouse — itu artefak panel, bukan bug.
 - **Lebar area gambar baru mengendap 1–2 detik sesudah chart tampil**, karena lebar sumbu harga menyesuaikan panjang label ("300000.00" vs "1.50") dan kedua pane disamakan. Chart mempertahankan **lebar bar**, bukan rentangnya, jadi area yang menyusut menggeser tepi kiri. Inilah sebab zoom mengecil sedikit demi sedikit tiap kali berganti Overlay ↔ Separate pane (2931 → 3104 → 3268 → 3422 dalam tiga kali ganti). Memeriksa sekali sesudah memasang zoom **tidak cukup** — geserannya datang belakangan, saat pemeriksaan sudah selesai.
 - **Tidak ada perintah mengatur rentang sumbu harga di v4.** Rentang dikunci lewat `autoscaleInfoProvider` pada semua garis di sumbu itu. v5 (5.2.1) punya `IPriceScaleApi.setVisibleRange`, tapi upgrade mengubah hampir seluruh kode chart.
 - **Menarik angka sumbu = mengubah skala** (`handleScale`), bukan menggeser. Menarik area gambar hanya menggeser sumbu "utama" pane, dan hanya kalau autoscale-nya mati.
@@ -259,6 +286,8 @@ Bukan untuk halaman: `data_master_all_metrics.csv` (file hasil generate) dan `da
 - **Menguji di panel browser Claude tidak selalu bisa dipercaya.** Pembacaan lewat API chart kadang tidak mencerminkan yang tergambar (lebar panel berubah, frame dibekukan, perintah zoom programatik jadi no-op). Yang terbukti andal: **screenshot** + **gulungan mouse sungguhan** (`WheelEvent`) + membaca `localStorage`.
   - Frame chart membeku kalau panel lama tidak menerima input sungguhan; `setVisibleLogicalRange` jadi no-op **diam-diam**. Satu gulungan mouse sungguhan membangunkannya, sesudah itu perintah programatik bekerja lagi. Klik JavaScript ke widget Streamlit (`el.click()`) tetap bekerja walau frame chart beku — itu cara paling andal untuk menjalankan uji berulang.
   - **Panel browser Claude memblokir Fullscreen API sepenuhnya.** Apa pun yang menyangkut layar penuh sungguhan harus diuji user di browsernya sendiri.
+  - **Panel browser Claude tidak bisa membuka berkas lokal (`file://`).** Untuk pratinjau pakai widget inline (`show_widget`) dengan data yang disampel ringkas, misalnya mingguan, bukan berkas HTML.
+  - **Mengukur apakah tulisan benar-benar di tengah:** kotak baris (`Range.getBoundingClientRect()`) bisa terlihat rata padahal tintanya tidak — huruf berekor seperti "y" menarik tinta ke bawah. Ukur tinta lewat `canvas.measureText()` (`actualBoundingBoxAscent/Descent`) dan hitung posisi garis dasar dari `line-height`.
   - Pola uji yang terbukti berguna: pasang pengambil cuplikan di halaman induk (`setInterval` 25–40 ms) yang mencatat rentang tiap chart + isi `localStorage`, lalu jalankan pergantian mode lewat klik JavaScript. Itu yang memunculkan urutan "zoom terpasang di 1,1 detik → lebar menyusut di 2,1 detik → nilai geser tersimpan di 2,4 detik".
 - Screenshot kadang timeout kalau jendela aplikasi tertutup jendela lain.
 - **Kalau chart terbuka di zoom aneh, atau sorot/legend tersisa dari percobaan lama**, kosongkan penyimpanannya: `localStorage.removeItem('dash_v2_market_valuation')` lalu muat ulang halaman. Key-nya `dash_v2_<family.key>`, berisi `highlights`, `hidden`, `bars`, dan `sig`.
@@ -291,7 +320,7 @@ Konfigurasi yang sama ada di `.claude/launch.json`: `dashboard-lama` (8501), `da
 
 1. Baca `CLAUDE.md` dan dokumen ini.
 2. Jalankan `dashboard-v2-uji`, buka halaman Market Valuation, dan lihat sendiri keadaannya sebelum mengubah apa pun.
-3. Lanjutkan ke **Price Levels** (bagian 3.1), atau ke **halaman MVRV Z-Score** kalau bentuknya sudah diputuskan (bagian 3.4).
+3. Tanyakan **desain judul halaman** (bagian 3.6) dengan pratinjau ulang tanpa tab, lalu lanjutkan ke **Price Levels** (bagian 3.1).
 4. Untuk urusan tampilan apa pun, buat widget pratinjau dengan data asli lebih dulu, lalu tunggu pilihan user. Untuk warna garis baru, jalankan uji palet di bagian 9 sebelum menunjukkan pratinjau.
 5. Sesudah mengubah apa pun di `dashboard/`, **restart server** — modul yang sudah dimuat tidak dibaca ulang.
 6. Kalau ada keluhan tampilan yang terdengar kecil ("kurang rata", "kebesaran"), **ukur dulu di halaman hidup** lewat `getBoundingClientRect` dan `getComputedStyle`, jangan menebak dari kode. Semua perbaikan tata letak 13 Sep ketemu dengan cara itu, dan dua tebakan pertama meleset.

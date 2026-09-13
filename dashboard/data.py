@@ -17,6 +17,10 @@ def _prepare(df):
               .drop_duplicates(subset=['Date'], keep='last'))
 
 
+# Jendela rolling untuk Z-Score, dalam hari kalender.
+ROLLING_WINDOWS = {"1Y": 365, "2Y": 730, "4Y": 1460}
+
+
 @st.cache_data(ttl=3600)
 def load_mvrv():
     df = pd.read_csv("data_mvrv.csv")
@@ -25,7 +29,14 @@ def load_mvrv():
         'mvrv_ratio': 'MVRV', 'sth_mvrv': 'STH MVRV', 'lth_mvrv': 'LTH MVRV',
         'mvrv_zscore': 'MVRV Z-Score',
     }, inplace=True)
-    return _prepare(df)
+    df = _prepare(df)
+    # Z-Score rolling tidak ada di CSV: dihitung dari MVRV Ratio terhadap rata-rata dan
+    # simpangan sekian hari terakhir. Menurut KB MVRV v1.4 (Catatan Tambahan) angka ini
+    # alat bantu visual, bukan sinyal yang berdiri sendiri — jendela mana pun yang dipakai.
+    for tahun, hari in ROLLING_WINDOWS.items():
+        jendela = df['MVRV'].rolling(hari)
+        df[f'MVRV Z-Score {tahun}'] = (df['MVRV'] - jendela.mean()) / jendela.std()
+    return df
 
 
 def date_bounds(df):

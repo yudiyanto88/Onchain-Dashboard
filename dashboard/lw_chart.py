@@ -24,7 +24,9 @@ TEMPLATE = """
   #legend { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 1px 10px;
             align-content: center; overflow: hidden; }
   .lgroup { display: inline-flex; align-items: center; gap: 3px; flex: none; }
-  .lgdot { font-size: 11px; padding: 1px 5px; border: 1px solid #232838; border-radius: 5px;
+  /* Jarak atas 0 dan bawah 2 px, bukan 1/1: tinta "1y" (ekor y) jatuh 1,5 px di bawah
+     tengah kotak dan "30" 0,5 px. Dinaikkan 1 px supaya keduanya terlihat di tengah. */
+  .lgdot { font-size: 11px; padding: 0 5px 2px; border: 1px solid #232838; border-radius: 5px;
            line-height: 1.2; color: #b9c3cd; }
   #hl { display: flex; gap: 4px; align-items: center; flex: none; }
   /* Sempat diredupkan ke 11px #6E7681 supaya beda dari tombol di sebelahnya; dicoba dan
@@ -37,8 +39,10 @@ TEMPLATE = """
   .off { opacity: 0.62; text-decoration: line-through; }
   .hl { color: #8B949E; border-color: #232838; }
   .hl.on { background: rgba(0, 109, 119, 0.40); border-color: #006d77; color: #fff; }
-  #top { height: __TOP__px; margin-bottom: __GAP__px; }
-  #main { height: __MAIN__px; }
+  .fssep { width: 1px; height: 16px; background: #232838; margin: 0 4px; flex: none; }
+  .fsbtn { display: inline-flex; align-items: center; gap: 6px; }
+  .fsbtn svg { width: 12px; height: 12px; }
+  #panes > div + div { margin-top: __GAP__px; }
   #err { color: #DA3633; padding: 16px; }
 </style>
 <div id="bar">
@@ -47,8 +51,7 @@ TEMPLATE = """
        dari tombol di sebelahnya supaya tidak terbaca sebagai tombol yang sedang mati. -->
   <div id="hl"><span class="hllabel">Highlight</span></div>
 </div>
-<div id="top"></div>
-<div id="main"></div>
+<div id="panes"></div>
 <div id="err"></div>
 <script>
 const D = __DATA__;
@@ -126,20 +129,21 @@ loadLib(0).then(() => {
   const panes = {};
   const charts = [];
 
-  // Di mode Separate pane kedua pane wajib punya sumbu kiri dan kanan yang sama.
-  // Kalau pane harga hanya bersumbu kanan dan pane metrik hanya bersumbu kiri, area
-  // gambarnya bergeser sehingga tanggal yang sama jatuh di posisi berbeda.
-  const multi = C.topHeight > 0;
-  if (multi) {
-    panes.top = LC.createChart(document.getElementById('top'),
-      chartOptions(C.topHeight, C.topScale, C.topScale, C.showLeft, true, false));
-    charts.push(panes.top);
-  } else {
-    document.getElementById('top').style.display = 'none';
-  }
-  panes.main = LC.createChart(document.getElementById('main'),
-    chartOptions(C.mainHeight, C.leftScale, C.rightScale, C.showLeft, C.showRight || multi, true));
-  charts.push(panes.main);
+  // Pane dibangun dari daftar C.panes, urut dari atas ke bawah: harga (bila dipisah),
+  // metrik, lalu pane tambahan seperti Z-Score. Semua pane wajib menampilkan sisi sumbu
+  // yang sama — kalau tidak, area gambarnya bergeser dan tanggal yang sama jatuh di
+  // posisi berbeda antar-pane. Sumbu waktu hanya digambar di pane paling bawah.
+  const wadahPane = document.getElementById('panes');
+  C.panes.forEach((p, i) => {
+    const div = document.createElement('div');
+    div.id = p.id;
+    div.style.height = p.height + 'px';
+    wadahPane.appendChild(div);
+    const chart = LC.createChart(div, chartOptions(
+      p.height, p.left, p.right, C.showLeft, C.showRight, i === C.panes.length - 1));
+    panes[p.id] = chart;
+    charts.push(chart);
+  });
 
   // Seri jangkar tak terlihat di setiap pane: semua pane punya jumlah bar yang sama,
   // sehingga zoom dan geser antar-pane tersinkron tepat.
@@ -158,17 +162,22 @@ loadLib(0).then(() => {
     for (let i = 0; i < D.t.length; i++) {
       if (values[i] !== null) points.push({ time: D.t[i], value: values[i] });
     }
-    const line = panes[spec.pane].addLineSeries({
+    const umum = {
       color: baseColor(spec),
-      lineWidth: spec.width,
-      lineStyle: spec.style,
-      lineType: spec.steps ? 1 : 0,
-      priceScaleId: spec.pane === 'top' ? 'right' : spec.axis,
+      priceScaleId: spec.pane === 'price' ? 'right' : spec.axis,
       title: spec.group ? spec.name : '',
       priceLineVisible: false,
       lastValueVisible: !!spec.group,
-      crosshairMarkerVisible: !!spec.group,
-    });
+    };
+    // Batang digambar dari garis nol, jadi nilai negatif turun ke bawah sendiri.
+    const line = spec.kind === 'histogram'
+      ? panes[spec.pane].addHistogramSeries(Object.assign({ base: 0 }, umum))
+      : panes[spec.pane].addLineSeries(Object.assign({
+          lineWidth: spec.width,
+          lineStyle: spec.style,
+          lineType: spec.steps ? 1 : 0,
+          crosshairMarkerVisible: !!spec.group,
+        }, umum));
     line.setData(points);
     handles.push({ spec, line });
   }
@@ -245,25 +254,45 @@ loadLib(0).then(() => {
 
   // Lebar sumbu ikut panjang label ("180000.00" vs "1.50"), jadi disamakan ke yang
   // paling lebar di tiap sisi. Diulang setelah zoom/geser karena label bisa berubah.
+  // Legend dan tombol diluruskan dengan area gambar, bukan dengan tepi iframe. Tanpa ini
+  // tombol paling kanan berdiri di atas strip sumbu harga — terlihat keluar dari kotak chart.
+  // Jarak minimal tetap dijaga: kalau semua metrik dipindah ke sumbu kiri, sumbu kanan
+  // hilang dan lebarnya jadi 0 — tanpa jarak minimal tombol paling kanan menempel ke
+  // tepi dan terlihat keluar dari batas chart.
+  const JARAK_TEPI_MIN = 10;
+  function rapikanBar() {
+    const sisi = s => Math.max(s.options().visible ? s.width() : 0, JARAK_TEPI_MIN);
+    const bar = document.getElementById('bar');
+    bar.style.paddingLeft = sisi(panes.main.priceScale('left')) + 'px';
+    bar.style.paddingRight = sisi(panes.main.priceScale('right')) + 'px';
+  }
+
   let syncPending = false;
   function syncScaleWidths() {
     syncPending = false;
-    for (const side of ['left', 'right']) {
-      const scales = charts.map(chart => chart.priceScale(side)).filter(s => s.options().visible);
-      if (scales.length < 2) continue;
-      const target = Math.max(...scales.map(s => s.width()));
-      if (target <= 0) continue;
-      for (const s of scales) {
-        if (s.options().minimumWidth !== target) s.applyOptions({ minimumWidth: target });
+    if (charts.length > 1) {
+      for (const side of ['left', 'right']) {
+        const scales = charts.map(chart => chart.priceScale(side)).filter(s => s.options().visible);
+        if (scales.length < 2) continue;
+        const target = Math.max(...scales.map(s => s.width()));
+        if (target <= 0) continue;
+        for (const s of scales) {
+          if (s.options().minimumWidth !== target) s.applyOptions({ minimumWidth: target });
+        }
       }
     }
+    rapikanBar();
   }
   function scheduleScaleSync() {
-    if (charts.length < 2 || syncPending) return;
+    if (syncPending) return;
     syncPending = true;
     requestAnimationFrame(() => requestAnimationFrame(syncScaleWidths));
   }
   scheduleScaleSync();
+  // Lebar sumbu harga baru diketahui sesudah chart menggambar, jadi perataan bar
+  // diulang beberapa detik pertama — sekali di boot saja hasilnya masih nol.
+  const pollBar = setInterval(rapikanBar, 150);
+  setTimeout(() => clearInterval(pollBar), 4000);
 
   if (charts.length > 1) {
     // Pemberitahuan zoom datang tertunda, jadi penanda "sedang sinkron" tidak bisa diandalkan.
@@ -296,9 +325,21 @@ loadLib(0).then(() => {
   const saved = readState();
   const savedHighlights = Array.isArray(saved.highlights) ? saved.highlights
     : (saved.highlight && saved.highlight !== 'none' ? [saved.highlight] : []);
+  // Seri yang ditandai hidden_default lahir dalam keadaan mati, tapi hanya sekali:
+  // daftar "seen" mencatat seri yang pernah muncul, jadi kalau pengguna menyalakannya
+  // pilihan itu tidak ditimpa lagi di kunjungan berikutnya.
+  const dikenal = Array.isArray(saved.seen) ? saved.seen : [];
+  const tersembunyi = Array.isArray(saved.hidden) ? saved.hidden.slice() : [];
+  for (const h of legendItems) {
+    if (h.spec.hidden_default && !dikenal.includes(h.spec.name)
+        && !tersembunyi.includes(h.spec.name)) {
+      tersembunyi.push(h.spec.name);
+    }
+  }
   const state = Object.assign({}, saved, {
     highlights: savedHighlights.filter(group => groups.includes(group)),
-    hidden: Array.isArray(saved.hidden) ? saved.hidden : [],
+    hidden: tersembunyi,
+    seen: [...new Set(dikenal.concat(legendItems.map(h => h.spec.name)))],
   });
   delete state.highlight;   // sisa format lama, sudah digantikan highlights
 
@@ -317,21 +358,36 @@ loadLib(0).then(() => {
 
   for (const group of groups) {
     const anggota = legendItems.filter(h => h.spec.group === group);
-    const utama = anggota.find(h => h.spec.name === group) || anggota[0];
+    // Ada dua bentuk kelompok:
+    //   1. ada seri yang namanya persis nama kelompok (MVRV + titik periode smoothing)
+    //      -> nama kelompok jadi tombol yang menyalakan seri itu.
+    //   2. tidak ada (Rolling Z-Score 1y/2y/4y) -> nama kelompok cuma keterangan,
+    //      dan semua anggotanya muncul sebagai kotak angka yang bisa diklik sendiri.
+    const utama = anggota.find(h => h.spec.name === group);
+    const contoh = utama || anggota[0];
     const wadah = document.createElement('span');
     wadah.className = 'lgroup';
 
-    const button = document.createElement('button');
+    const button = document.createElement(utama ? 'button' : 'span');
     button.className = 'lg';
     const swatch = document.createElement('span');
     swatch.className = 'sw';
-    swatch.style.borderTop = `${utama.spec.alpha < 1 ? 3 : 2}px `
-      + `${utama.spec.style === 1 ? 'dotted' : utama.spec.style ? 'dashed' : 'solid'} `
-      + `${baseColor(utama.spec)}`;
+    if (contoh.spec.kind === 'histogram') {
+      swatch.style.height = '9px';
+      swatch.style.width = '11px';
+      swatch.style.borderRadius = '2px';
+      swatch.style.background = baseColor(contoh.spec);
+    } else {
+      swatch.style.borderTop = `${contoh.spec.alpha < 1 ? 3 : 2}px `
+        + `${contoh.spec.style === 1 ? 'dotted' : contoh.spec.style ? 'dashed' : 'solid'} `
+        + `${baseColor(contoh.spec)}`;
+    }
     button.append(swatch, document.createTextNode(group));
-    button.onclick = () => toggleHidden(utama.spec.name);
+    if (utama) {
+      button.onclick = () => toggleHidden(utama.spec.name);
+      legendButtons.push({ button, handle: utama });
+    }
     wadah.appendChild(button);
-    legendButtons.push({ button, handle: utama });
 
     for (const handle of anggota) {
       if (handle === utama) continue;
@@ -350,10 +406,17 @@ loadLib(0).then(() => {
   }
 
   const hlEl = document.getElementById('hl');
+  // Nama pendek dari registry dipakai kalau ada; tanpa itu dua seri yang namanya
+  // berawalan sama ("MVRV Z-Score" dan "MVRV Z-Score 1Y") jadi kembar di tombol.
+  const namaPendek = {};
+  for (const h of handles) {
+    if (h.spec.group && h.spec.short) namaPendek[h.spec.group] = h.spec.short;
+  }
   const hlButtons = ['none'].concat(groups).map(group => {
     const button = document.createElement('button');
     button.className = 'hl';
-    button.textContent = group === 'none' ? 'None' : group.split(' ')[0];
+    button.textContent = group === 'none' ? 'None' : (namaPendek[group] || group.split(' ')[0]);
+    button.title = group === 'none' ? 'Clear highlight' : group;
     // None mematikan semua sorotan; tombol garis menyala/mati setiap diklik.
     button.onclick = () => {
       if (group === 'none') state.highlights = [];
@@ -364,6 +427,81 @@ loadLib(0).then(() => {
     hlEl.appendChild(button);
     return { button, group };
   });
+
+  // Tombol layar penuh hidup di dalam chart, bukan di baris kontrol Streamlit.
+  // Kliknya sudah merupakan gestur pengguna, jadi requestFullscreen() boleh dipanggil
+  // langsung — tidak perlu skrip penyisip yang memasang pendengar ke tombol Streamlit,
+  // dan tidak ada status di Python yang bisa hilang saat satu putaran terpotong.
+  // Kerangka Streamlit disembunyikan oleh aturan CSS :fullscreen di app_v2.py.
+  const IKON_PENUH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>';
+  const IKON_KELUAR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>';
+  const docInduk = () => { try { return window.parent.document; } catch (e) { return null; } };
+  const sedangPenuh = () => { const d = docInduk(); return !!(d && d.fullscreenElement); };
+
+  // Saat layar penuh, chart ikut memanjang mengisi sisa tinggi jendela. Tinggi iframe
+  // ditetapkan Streamlit lewat gaya inline pada iframe dan wadahnya, jadi keduanya
+  // ditimpa sementara lalu dikembalikan persis seperti semula saat keluar.
+  const bingkai = window.frameElement;
+  const wadahBingkai = bingkai ? bingkai.parentElement : null;
+  const tinggiBingkaiAwal = bingkai ? bingkai.style.height : '';
+  const tinggiWadahAwal = wadahBingkai ? wadahBingkai.style.height : '';
+
+  const tinggiAwal = C.panes.map(p => p.height);
+  const totalTinggiAwal = tinggiAwal.reduce((a, b) => a + b, 0);
+  function terapkanTinggi(total) {
+    let sisa = total;
+    C.panes.forEach((p, i) => {
+      const h = i === C.panes.length - 1 ? sisa
+        : Math.round(total * tinggiAwal[i] / totalTinggiAwal);
+      sisa -= h;
+      document.getElementById(p.id).style.height = h + 'px';
+      panes[p.id].applyOptions({ height: h });
+    });
+  }
+
+  function sesuaikanTinggiLayar() {
+    if (!bingkai) return;
+    if (sedangPenuh()) {
+      const atas = bingkai.getBoundingClientRect().top;
+      const tersedia = Math.max(320, (window.parent.innerHeight || 0) - atas - 8);
+      bingkai.style.height = tersedia + 'px';
+      if (wadahBingkai) wadahBingkai.style.height = tersedia + 'px';
+      const jarakAntarPane = __GAP__ * (C.panes.length - 1);
+      terapkanTinggi(tersedia - __TOOLBAR__ - jarakAntarPane);
+    } else {
+      bingkai.style.height = tinggiBingkaiAwal;
+      if (wadahBingkai) wadahBingkai.style.height = tinggiWadahAwal;
+      terapkanTinggi(totalTinggiAwal);
+    }
+    scheduleScaleSync();
+  }
+
+  const fsSep = document.createElement('span');
+  fsSep.className = 'fssep';
+  const fsBtn = document.createElement('button');
+  fsBtn.className = 'hl fsbtn';
+  function perbaruiFs() {
+    const penuh = sedangPenuh();
+    fsBtn.innerHTML = (penuh ? IKON_KELUAR : IKON_PENUH) + (penuh ? 'Exit' : 'Full');
+    fsBtn.title = penuh ? 'Leave full screen (Esc)' : 'Full screen';
+    sesuaikanTinggiLayar();
+  }
+  fsBtn.onclick = () => {
+    const d = docInduk();
+    if (!d) return;
+    // Janji dari kedua perintah ini bisa ditolak browser; ditangkap supaya tidak
+    // muncul sebagai error yang tidak tertangani di console.
+    const janji = d.fullscreenElement ? d.exitFullscreen() : d.documentElement.requestFullscreen();
+    if (janji && janji.catch) janji.catch(() => {});
+  };
+  perbaruiFs();
+  hlEl.append(fsSep, fsBtn);
+  // Esc keluar dari layar penuh tanpa melewati tombol ini, jadi tampilannya
+  // disesuaikan dari peristiwa dokumen induk, bukan dari klik. Ukuran jendela juga
+  // diikuti supaya chart tetap pas saat layar penuh dipindah ke monitor lain.
+  const dInduk = docInduk();
+  if (dInduk) dInduk.addEventListener('fullscreenchange', perbaruiFs);
+  try { window.parent.addEventListener('resize', sesuaikanTinggiLayar); } catch (e) {}
 
   function apply() {
     for (const { button, handle } of legendButtons) {
@@ -435,7 +573,7 @@ loadLib(0).then(() => {
   // Library 4.x tidak punya perintah untuk mengatur rentang sumbu harga, jadi rentangnya
   // dikunci lewat autoscaleInfoProvider pada semua garis di sumbu tersebut.
   // Klik dua kali di chart mengembalikan semua sumbu ke Auto.
-  const sideOf = spec => spec.pane === 'top' ? 'right' : spec.axis;
+  const sideOf = spec => spec.pane === 'price' ? 'right' : spec.axis;
   const seriesOn = (pane, side) =>
     handles.filter(h => h.spec.pane === pane && sideOf(h.spec) === side).map(h => h.line);
   const locked = new Map();
@@ -568,11 +706,18 @@ def _scale(mode):
     return {"mode": 1 if mode == "Log" else 0, "autoScale": mode != "Linear"}
 
 
-def render(df, lines, price_line, height, metric_mode, price_mode, store_key):
-    """Gambar chart; price_line berisi Line harga BTC bila dipisah ke pane sendiri."""
+def render(df, lines, price_line, extra_lines, height, metric_mode, price_mode, store_key):
+    """Gambar chart.
+
+    price_line: garis harga BTC bila dipisah ke pane sendiri (pane paling atas).
+    extra_lines: garis untuk pane tambahan paling bawah (mis. Z-Score), atau kosong.
+    Tinggi dibagi menurut jumlah pane; perbandingannya dipakai lagi saat layar penuh.
+    """
+    extra_lines = extra_lines or []
     specs = [dict(vars(ln), pane="main") for ln in lines]
+    specs += [dict(vars(ln), pane="extra") for ln in extra_lines]
     if price_line is not None:
-        specs.insert(0, dict(vars(price_line), pane="top"))
+        specs.insert(0, dict(vars(price_line), pane="price"))
 
     columns = {spec["col"] for spec in specs}
     payload = {
@@ -580,8 +725,6 @@ def render(df, lines, price_line, height, metric_mode, price_mode, store_key):
         "cols": {col: [_num(v) for v in df[col]] for col in columns},
     }
 
-    top_height = int(height * 0.45) if price_line is not None else 0
-    main_height = height - top_height
     # Sumbu yang isinya hanya harga BTC memakai skala harga. Kalau harga berbagi sumbu
     # dengan metrik (halaman yang metriknya sendiri berupa harga), skala metrik yang
     # dipakai supaya satu sumbu tidak punya dua aturan.
@@ -590,28 +733,42 @@ def render(df, lines, price_line, height, metric_mode, price_mode, store_key):
         metrik = any(ln.axis == side and ln.group != "BTC Price" for ln in lines)
         return price_mode if harga and not metrik else metric_mode
 
+    # Pembagian tinggi: pane harga dan pane tambahan mengambil porsi tetap, sisanya
+    # untuk pane metrik yang tetap jadi yang terbesar.
+    porsi_harga = 0.30 if price_line is not None and extra_lines else 0.45
+    tinggi_harga = int(height * porsi_harga) if price_line is not None else 0
+    tinggi_extra = int(height * (0.25 if price_line is not None else 0.30)) if extra_lines else 0
+
+    daftar_pane = []
+    if price_line is not None:
+        daftar_pane.append({"id": "price", "height": tinggi_harga,
+                            "left": _scale(price_mode), "right": _scale(price_mode)})
+    daftar_pane.append({"id": "main", "height": height - tinggi_harga - tinggi_extra,
+                        "left": _scale(_mode_sumbu("left")), "right": _scale(_mode_sumbu("right"))})
+    if extra_lines:
+        # Pane Z-Score selalu linear: angkanya melewati nol, jadi skala log tidak berlaku.
+        daftar_pane.append({"id": "extra", "height": tinggi_extra,
+                            "left": _scale("Auto"), "right": _scale("Auto")})
+
+    banyak_pane = len(daftar_pane) > 1
     config = {
         "store": store_key,
-        "topHeight": top_height,
-        "mainHeight": main_height,
-        "topScale": _scale(price_mode),
-        "leftScale": _scale(_mode_sumbu("left")),
-        "rightScale": _scale(_mode_sumbu("right")),
-        "showLeft": any(ln.axis == "left" for ln in lines),
-        "showRight": any(ln.axis == "right" for ln in lines),
+        "panes": daftar_pane,
+        # Semua pane menampilkan sisi sumbu yang sama supaya area gambarnya sejajar.
+        "showLeft": any(ln.axis == "left" for ln in lines) or banyak_pane,
+        "showRight": any(ln.axis == "right" for ln in lines) or banyak_pane,
     }
 
+    jarak = PANE_GAP * (len(daftar_pane) - 1)
     html = (TEMPLATE
             .replace("__TOOLBAR__", str(TOOLBAR_H))
-            .replace("__TOP__", str(top_height))
-            .replace("__MAIN__", str(main_height))
-            .replace("__GAP__", str(PANE_GAP if top_height else 0))
+            .replace("__GAP__", str(PANE_GAP))
             .replace("__DATA__", json.dumps(payload, separators=(",", ":")))
             .replace("__SPECS__", json.dumps(specs))
             .replace("__CONFIG__", json.dumps(config))
             .replace("__URLS__", json.dumps(LWC_URLS)))
 
-    total_height = TOOLBAR_H + height + (PANE_GAP if top_height else 0)
+    total_height = TOOLBAR_H + height + jarak
     # st.iframe menggantikan components.html yang dijadwalkan dihapus Streamlit.
     embed = getattr(st, "iframe", None)
     if embed is not None:
