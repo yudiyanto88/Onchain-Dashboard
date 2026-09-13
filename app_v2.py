@@ -26,9 +26,10 @@ section[data-testid="stSidebar"] div.stRadio > div[role="radiogroup"] > label {
 section[data-testid="stSidebar"] div.stRadio > div[role="radiogroup"] > label:hover {
     background-color: #262a35;
 }
-/* Streamlit 1.63 menandai opsi terpilih dengan data-selected (dulu data-checked). */
+/* Streamlit 1.63 menandai opsi terpilih dengan data-selected (dulu data-checked).
+   Teal gelap #006d77 warna utama dashboard: garis tepi teal, latar teal 25% di atas sidebar. */
 section[data-testid="stSidebar"] div.stRadio > div[role="radiogroup"] > label[data-selected="true"] {
-    border-left: 4px solid #a855f7 !important; background-color: #2a203b !important;
+    border-left: 4px solid #006d77 !important; background-color: #102e39 !important;
 }
 section[data-testid="stSidebar"] div.stRadio > div[role="radiogroup"] p {
     font-size: 1.15rem !important; font-weight: 600 !important;
@@ -269,7 +270,9 @@ div[data-testid="stPill"] button {
 with st.sidebar:
     st.markdown("<h1 style='text-align:center;color:#ffffff;font-size:2.2rem;'>Yudiyanto</h1>",
                 unsafe_allow_html=True)
-    st.markdown("<h3 style='text-align:center;color:#a855f7;font-weight:800;font-size:1.3rem;"
+    # Tulisan memakai teal terang #2aa6b0 (hue sama dengan #006d77): teal gelap sebagai
+    # warna huruf cuma 2.9:1 di latar sidebar, teal terang 6.0:1.
+    st.markdown("<h3 style='text-align:center;color:#2aa6b0;font-weight:800;font-size:1.3rem;"
                 "margin-top:-15px;'>ON-CHAIN DASHBOARD v2</h3>", unsafe_allow_html=True)
     st.markdown("<br>", unsafe_allow_html=True)
 

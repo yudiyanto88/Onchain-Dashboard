@@ -73,14 +73,18 @@ MARKET_VALUATION = MetricFamily(
         # langsung membedakannya dari tiga rasio di atas. Tidak ikut smoothing —
         # yang rolling sudah merupakan penghalusan, dan yang full-history bergerak
         # seiring MVRV Ratio yang penghalusannya sudah tersedia sendiri.
-        # Warna dipilih yang paling jauh dari empat warna garis yang sudah ada,
-        # termasuk saat disimulasikan buta warna (violet 39/18, hijau 58/16).
         # Nama pendek ditentukan sendiri: bawaannya kata pertama, dan ketiga seri
         # MVRV ini akan sama-sama menulis "MVRV" di tombol sorot.
         # Z-Score tinggal di pane sendiri paling bawah, menyala lewat kotak Z-Score.
         # Batangnya tembus pandang supaya dua kelompok bisa menyala bersamaan.
-        Series("MVRV Z-Score", "MVRV Z-Score", color="#7f77dd", axis="left",
-               dim=0.45, kind="histogram", smoothing=False, short="Z", alpha=0.55,
+        # Warna Z-Score ikut induknya (navy MVRV): pane-nya terpisah dari garis MVRV,
+        # jadi tidak bisa tertukar. Navy lebih gelap dari hijau Rolling, jadi dibuat
+        # lebih pekat (0.80, kontras 2.54:1 ke latar chart; pada 0.55 cuma 1.83:1).
+        # Pasangan navy + violet ditolak: sama-sama biru gelap saat bertumpuk
+        # (jarak Lab 24 untuk mata normal, 10 saat buta warna; navy + hijau 61/59).
+        # dim 0.45 x alpha 0.80 = redup 1.44:1, setara violet lama (1.40:1).
+        Series("MVRV Z-Score", "MVRV Z-Score", color="#0070a6", axis="left",
+               dim=0.45, kind="histogram", smoothing=False, short="Z", alpha=0.80,
                pane="extra"),
         # Tiga jendela rolling satu kelompok legend: namanya keterangan, angka
         # jendelanya kotak kecil yang bisa diklik sendiri-sendiri — sama seperti

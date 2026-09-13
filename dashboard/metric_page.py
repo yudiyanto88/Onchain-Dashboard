@@ -210,18 +210,24 @@ def _render_line_style(family):
 
 def _render_header(family, latest):
     """Judul halaman plus tanggal data terakhir, untuk mendeteksi update harian yang macet."""
-    # Judul memakai latar teal gelap (warna aksen tombol) dengan teks putih:
-    # teks teal gelap di latar gelap terlalu redup untuk dibaca.
-    # Kotak lencana dibiarkan lurus dengan kotak tombol di bawahnya; subjudul yang
-    # digeser 10 px, sebesar jarak dalam lencana, supaya huruf pertama judul dan
-    # subjudul berada di satu garis.
+    # Nama metrik jadi judul besar supaya jelas halaman apa ini; kategori (nama menu
+    # sidebar) jadi lencana kecil di atasnya. Lencana memakai latar teal gelap, warna
+    # utama dashboard, dengan teks putih: teal gelap sebagai warna huruf terlalu redup.
+    # Judul 1.15rem tebal 600, sama dengan menu sidebar, seperti teks tebal lainnya.
+    # Kotak lencana dan huruf pertama judul lurus dengan kotak tombol dan tepi chart.
+    # Dibuat dari div, bukan h3, supaya Streamlit tidak menambah ikon tautan judul.
+    # margin-bottom 16 px membatalkan margin -16 px bawaan wadah teks Streamlit. Tanpa
+    # itu baris tombol menimpa judul 1.4 px; dengan itu jaraknya 14.6 px, sama dengan
+    # judul lama (terukur: jarak naik 1:1 mengikuti margin ini).
     st.markdown(
-        f"<h3 style='color:#ffffff;margin:0;font-weight:700;font-size:1.05rem;'>"
-        f"<span style='background:#006d77;padding:2px 10px;border-radius:6px;'>"
-        f"{family.title}</span><br>"
-        f"<span style='font-size:0.8rem;color:#d1d4dc;margin-left:10px;'>{family.subtitle}</span>"
-        f"<span style='font-size:0.72rem;color:#8b90a0;font-weight:400;margin-left:10px;'>"
-        f"Latest data: {latest:%d %b %Y}</span></h3>",
+        f"<div style='margin:0 0 16px;line-height:1.2;'>"
+        f"<span style='display:inline-block;background:#006d77;color:#ffffff;"
+        f"font-size:11px;font-weight:600;letter-spacing:0.12em;text-transform:uppercase;"
+        f"line-height:1.4;padding:2px 7px;border-radius:4px;'>{family.title}</span>"
+        f"<div style='display:flex;align-items:baseline;gap:10px;margin-top:4px;'>"
+        f"<span style='font-size:1.15rem;font-weight:600;color:#ffffff;'>{family.subtitle}</span>"
+        f"<span style='font-size:0.72rem;color:#8b90a0;font-weight:400;'>"
+        f"Latest data: {latest:%d %b %Y}</span></div></div>",
         unsafe_allow_html=True)
 
 

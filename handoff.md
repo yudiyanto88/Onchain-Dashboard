@@ -1,6 +1,6 @@
 # Handoff — Upgrade Dashboard Streamlit (v2)
 
-Ditulis ulang: 13 September 2026 (pembaruan kedua). Untuk dilanjutkan di sesi Claude Code berikutnya.
+Ditulis ulang: 13 September 2026 (pembaruan ketiga: judul B2, teal warna utama, warna Z-Score). Untuk dilanjutkan di sesi Claude Code berikutnya.
 (Versi sebelumnya ditulis 11 dan 12 September 2026; isinya sudah dilebur ke sini.)
 
 Baca dokumen ini dan `CLAUDE.md` sebelum mulai. Bagian **3 (keputusan pending)** harus ditanyakan ke user dulu — jangan langsung diterapkan.
@@ -49,13 +49,8 @@ Tujuannya supaya mengubah gaya garis tidak memuat ulang chart. User sempat memil
 ### 3.4 Bentuk MVRV Z-Score — sudah diputuskan dan dikerjakan 13 Sep 2026
 Z-Score tinggal di **pane ketiga paling bawah** pada halaman Market Valuation, dinyalakan lewat kotak **Z-Score** (Hidden / Bottom pane). Rinciannya di bagian 4. Sempat dicoba digabung ke chart MVRV sebagai histogram — ditolak user karena terlalu padat dan skala Log mengacaukan semuanya. Ide halaman terpisah dan tombol pengalih chart tidak dipakai.
 
-### 3.6 Desain judul halaman — ditahan sampai Z-Score beres, sekarang boleh ditanyakan
-User menilai subjudul "MVRV Oscillators" di bawah lencana "Market Valuation" kurang tegas sebagai tanda halaman MVRV. Tiga usulan sudah dipratinjau lewat widget inline:
-- **A** — nama halaman jadi tipografi dengan garis aksen tipis.
-- **B** — kategori jadi tulisan kecil di atas, nama metrik naik jadi judul besar.
-- **C** (rekomendasi Claude) — bentuk jejak "Market Valuation / **MVRV Oscillators**".
-
-Catatan: pratinjau itu dibuat saat ide "tab pengalih chart" masih hidup. Karena Z-Score akhirnya jadi pane ketiga, bagian tab di pratinjau tidak berlaku lagi — **buat pratinjau ulang tanpa tab** sebelum user memilih.
+### 3.6 Desain judul halaman — sudah diputuskan dan dikerjakan 13 Sep 2026
+User menilai subjudul "MVRV Oscillators" di bawah lencana "Market Valuation" kurang tegas sebagai tanda halaman MVRV. Pratinjau ulang tanpa tab: A (garis aksen), B (kategori kecil di atas, metrik jadi judul besar), C (jejak "Market Valuation / MVRV Oscillators"). Tanpa tab, alasan utama C hilang (lencana tidak lagi sekaligus jadi tab aktif) dan kotak teal padatnya mirip tombol aktif. User memilih **B**, lalu varian **B2** (kategori jadi lencana teal kecil), dengan judul **18,4 px tebal 600** (sama dengan menu sidebar). Rinciannya di bagian 4.
 
 ### 3.5 Kotak L / R untuk pilihan sumbu — ditahan
 Ide user: tombol Left/Right diganti dua kotak kecil "L" dan "R" bergaya kotak angka periode di legend. Hasil ukur: **tidak menghemat lebar sama sekali** (lebar popover ditentukan baris CHART HEIGHT, bukan baris axis), hanya menghemat tinggi ±14 px per baris. Ditahan sampai ada halaman dengan garis banyak — bukan khusus HODL Waves, metrik lain juga bisa. Kalau dipakai, pakai untuk semua halaman sekaligus.
@@ -100,8 +95,10 @@ Periode ke-4 dan seterusnya mengulang ketiga gaya itu dengan garis 0,5 px lebih 
 
 ### Tampilan
 - Warna garis: MVRV navy `#0070a6`, STH rust `#bf5546`, LTH teal `#0b8e89`, BTC oranye `#F7931A`. Semua garis utama 1,5 px.
-- Aksen kontrol: **teal gelap `#006d77`** dengan latar 40% + garis tepi + teks putih. Sidebar dan menu tetap ungu `#a855f7`.
-- Judul halaman: teks putih di atas **latar teal gelap**, plus tulisan kecil "Latest data: <tanggal>".
+- **Teal gelap `#006d77` warna utama dashboard** (keputusan user 13 Sep 2026). Aksen kontrol: latar teal 40% + garis tepi + teks putih.
+  - `#006d77` **tidak dipakai sebagai warna huruf**: kontrasnya 3,1:1 di latar halaman `#0e1117` dan 2,9:1 di sidebar `#151924`. Pakai sebagai isian, garis tepi, lencana, atau garis aksen; tulisan di atasnya putih (6,1:1). Kalau tulisan memang harus berwarna teal, pakai teal terang `#2aa6b0` (hue sama, 6,0:1 di sidebar).
+  - **Sidebar ikut teal** (13 Sep): menu aktif bergaris kiri `#006d77` dengan latar `#102e39` (teal 25% di atas sidebar); tulisan "ON-CHAIN DASHBOARD v2" `#2aa6b0`. Ungu `#a855f7` sudah tidak dipakai di v2.
+- **Judul halaman (gaya B2, 13 Sep):** kategori (`family.title`, sama dengan nama menu sidebar) jadi lencana kecil — 11 px, huruf besar, renggang 0,12em, tebal 600, putih di atas `#006d77`, sudut 4 px. Di bawahnya nama metrik (`family.subtitle`) jadi judul **1,15rem (18,4 px) tebal 600 putih**, sama dengan menu sidebar, dengan "Latest data: <tanggal>" sebaris di kanan (0,72rem `#8b90a0`, rata garis dasar). Dibangun dari `div`, bukan `h3`, supaya Streamlit tidak menambah ikon tautan. Terukur: tepi kiri lencana, judul, tombol, dan chart sama-sama di x=380 (viewport 1440); jarak judul ke tombol 14,6 px (sama dengan judul lama).
 - Popover ringkas: jarak tepi 12–14 px, judul kecil 11 px, tombol 12 px / tinggi minimal 26 px.
 - Kotak tanggal tanpa latar abu, isinya rata tengah, kalender bawaan browser diwarnai lewat `accent-color`.
 - Baris KPI **sudah dibuang**.
@@ -126,7 +123,9 @@ Periode ke-4 dan seterusnya mengulang ketiga gaya itu dengan garis 0,5 px lebih 
 - Legend on/off dan mode sorot bekerja di browser tanpa reload, tersimpan di `localStorage` key `dash_v2_<family.key>`.
 - Klik di dalam chart dan tombol Escape menutup popover yang terbuka.
 - **Pane dibangun dari daftar**, bukan dipaku dua: `price` (harga BTC bila dipisah) → `main` (metrik) → `extra` (Z-Score). Zoom, geser, dan lebar sumbu semua pane tersinkron; sumbu waktu hanya di pane paling bawah. Pembagian tinggi: tiga pane 30/45/25 %, harga+metrik 45/55 %, metrik+Z-Score 70/30 %. Pane `extra` **selalu linear** — Z-Score melewati nol, jadi Log tidak berlaku; hasilnya Log di pane metrik aman lagi dipakai.
-- **MVRV Z-Score**: histogram violet `#7f77dd`, transparan 55 %. **Rolling Z-Score 1y/2y/4y**: histogram hijau `#97c459`, transparan 55 %, dihitung di `data.py` dari MVRV Ratio terhadap rata-rata dan simpangan 365/730/1460 hari (data 2y mulai 2013, 4y mulai 2014). Keduanya **tanpa smoothing** (`smoothing=False`). Warna dipilih lewat jarak Lab terhadap empat warna garis yang ada, termasuk simulasi buta warna (violet 39/18, hijau 58/16; kandidat mustard dibuang karena jaraknya cuma 2 dari oranye BTC saat buta warna).
+- **MVRV Z-Score**: histogram **navy `#0070a6`** (ikut warna induknya, MVRV), **pekat 80 %**. **Rolling Z-Score 1y/2y/4y**: histogram hijau `#97c459`, transparan 55 %, dihitung di `data.py` dari MVRV Ratio terhadap rata-rata dan simpangan 365/730/1460 hari (data 2y mulai 2013, 4y mulai 2014). Keduanya **tanpa smoothing** (`smoothing=False`). Dikonfirmasi user 13 Sep 2026 (lihat bagian 5).
+  - Kenapa navy 80 %, bukan 55 %: navy lebih gelap dari hijau; pada 55 % kontrasnya ke latar chart cuma 1,83:1, pada 80 % 2,54:1. Redup saat mode sorot (`dim` 0,45 × 0,80) = 1,44:1, setara violet lama (1,40:1), jadi `dim` tidak diubah.
+  - Warna lama sebelum 13 Sep: violet `#7f77dd` untuk Z-Score (dipilih lewat jarak Lab, 39/18 terhadap garis yang ada).
 
 ### Teknis
 - Streamlit di laptop user: **1.63.0**, dikunci `streamlit==1.63.0` di `requirements.txt`.
@@ -144,8 +143,11 @@ Periode ke-4 dan seterusnya mengulang ketiga gaya itu dengan garis 0,5 px lebih 
 - **OHLC di-skip.** ChartInspect memang tidak punya OHLC (bagian 10).
 - **Baris KPI dibuang**, diganti tulisan "Latest data".
 - **Palet garis final:** MVRV navy, STH rust, LTH teal `#0b8e89` (bukan aqua terang). Ketiganya dipilih supaya setara terang; syarat warna sengaja dilonggarkan (user menarik permintaan "MVRV harus paling menonjol").
-- **Aksen kontrol teal gelap `#006d77`**, gaya latar 40%. Sidebar dan judul sidebar tetap ungu.
-- **Judul halaman berlatar teal**, bukan teks teal (teks teal gelap di latar gelap kontrasnya hanya 3,1).
+- **Teal gelap `#006d77` warna utama seluruh dashboard**, termasuk sidebar (13 Sep 2026, menggantikan keputusan lama "sidebar tetap ungu"). Aksen kontrol gaya latar 40%.
+- **Teal gelap tidak pernah jadi warna huruf** (kontras 3,1 / 2,9). Teal dipakai sebagai latar, garis, atau lencana; tulisan teal memakai `#2aa6b0`.
+- **Judul halaman gaya B2**: lencana kategori teal kecil + nama metrik sebagai judul 18,4 px tebal 600. Gaya A (garis aksen) dan C (jejak dengan lencana di nama metrik) ditolak.
+- **Histogram MVRV Z-Score navy 80 %, Rolling hijau.** Usulan navy + violet sudah diuji dan ditolak: sama-sama biru gelap saat bertumpuk (jarak Lab 24 untuk mata normal, 10 saat buta warna; navy + hijau 61/59).
+- **Uji buta warna = cek cepat, bukan syarat mutlak** (disepakati 13 Sep). Gunanya terutama menangkap warna yang bedanya cuma corak dengan terang mirip, yang juga sulit dibedakan mata normal saat garis tipis/redup. Jadi penting kalau dashboard dibuka untuk umum.
 - **Gaya smoothing:** titik-titik → tangga → pita, seperti tabel di bagian 4. Gaya menempel pada periodenya.
 - **Simbol/marker untuk membedakan garis smoothing ditolak user** (terlalu ramai).
 - **Legend berkelompok per metrik** (bukan satu label per garis).
@@ -175,8 +177,7 @@ Periode ke-4 dan seterusnya mengulang ketiga gaya itu dengan garis 0,5 px lebih 
 ## 7. Belum dikerjakan
 
 - **Halaman metrik lainnya** dan **navigasi seluruh halaman** (prioritas 3).
-- **Desain judul halaman** — bagian 3.6.
-- **Warna histogram Z-Score belum dikonfirmasi eksplisit.** User menyetujui warna di pratinjau histogram pertama (navy dan teal), tapi saat Z-Score masuk chart yang sama dengan MVRV/LTH, warna itu bentrok dan diganti violet `#7f77dd` dan hijau `#97c459` berdasarkan uji jarak. User sudah melihat dan memakainya tanpa keberatan, tapi belum pernah ditanya langsung. Tanyakan sekali, dengan pratinjau.
+- ~~Desain judul halaman~~ dan ~~warna histogram Z-Score~~ — selesai 13 Sep 2026 (bagian 3.6, 4, 5).
 - **Lambang Step dan Band (gambar SVG) duduk 1,2 px berbeda secara vertikal** dari tiga lambang teks di sebelahnya. Di screenshot tidak terlihat dan user belum mengeluh; kalau dilaporkan, geser gambar 1 px ke atas.
 - **Gradasi warna histogram Z-Score** — ditunda user, bagian 5.
 - **Legend padat di layar sempit.** Dengan Z-Score menyala ada enam kelompok plus harga. Di panel browser Claude (504 px) legendnya sampai terdesak habis oleh tombol sorot; di layar user belum ada keluhan. Tinggi baris legend dipaku 40 px, jadi kalau membungkus dua baris, baris kedua terpotong.
@@ -326,7 +327,7 @@ Konfigurasi yang sama ada di `.claude/launch.json`: `dashboard-lama` (8501), `da
 
 1. Baca `CLAUDE.md` dan dokumen ini.
 2. Jalankan `dashboard-v2-uji`, buka halaman Market Valuation, dan lihat sendiri keadaannya sebelum mengubah apa pun.
-3. Tanyakan **desain judul halaman** (bagian 3.6) dengan pratinjau ulang tanpa tab, lalu lanjutkan ke **Price Levels** (bagian 3.1).
+3. Lanjutkan ke **Price Levels** (bagian 3.1). Judul halaman dan warna Z-Score sudah beres; pakai gaya judul B2 dan aturan teal di bagian 4–5 untuk halaman baru.
 4. Untuk urusan tampilan apa pun, buat widget pratinjau dengan data asli lebih dulu, lalu tunggu pilihan user. Untuk warna garis baru, jalankan uji palet di bagian 9 sebelum menunjukkan pratinjau.
 5. Sesudah mengubah apa pun di `dashboard/`, **restart server** — modul yang sudah dimuat tidak dibaca ulang.
 6. Kalau ada keluhan tampilan yang terdengar kecil ("kurang rata", "kebesaran"), **ukur dulu di halaman hidup** lewat `getBoundingClientRect` dan `getComputedStyle`, jangan menebak dari kode. Semua perbaikan tata letak 13 Sep ketemu dengan cara itu, dan dua tebakan pertama meleset.
