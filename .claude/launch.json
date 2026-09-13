@@ -6,7 +6,7 @@
       "runtimeExecutable": "streamlit",
       "runtimeArgs": [
         "run",
-        "app.py",
+        "archive/app_v1.py",
         "--server.port",
         "8501",
         "--server.headless",
@@ -19,7 +19,7 @@
       "runtimeExecutable": "streamlit",
       "runtimeArgs": [
         "run",
-        "app_v2.py",
+        "app.py",
         "--server.port",
         "8502",
         "--server.headless",
@@ -36,7 +36,7 @@
       "runtimeExecutable": "streamlit",
       "runtimeArgs": [
         "run",
-        "app_v2.py",
+        "app.py",
         "--server.port",
         "8503",
         "--server.headless",

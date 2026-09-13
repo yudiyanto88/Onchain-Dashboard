@@ -60,7 +60,7 @@ def load_data() -> pd.DataFrame:
 
     # AVIV ratio & bands per tanggal. NOTE: ChartInspect's own price_at_aviv_mean /
     # price_at_aviv_plus_1_sigma columns use active_realized_price as base, yang salah
-    # (base yang benar = btc_price / aviv_ratio) — lihat fix di app.py load_data_aviv().
+    # (base yang benar = btc_price / aviv_ratio) — lihat fix di archive/app_v1.py load_data_aviv() dan dashboard/data.py.
     # Di sini kita hitung sendiri dari kolom mentah, bukan ambil kolom turunan ChartInspect.
     aviv = _load_tail(REPO_ROOT / "data_aviv.csv", LOOKBACK)[
                ["date", "aviv_ratio", "aviv_mean", "aviv_upper_1sd"]]

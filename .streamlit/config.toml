@@ -1,0 +1,6 @@
+# Tema dashboard v2: dasar gelap, warna utama teal gelap #006d77.
+# Tanpa file ini, di Streamlit Cloud warna aksen kembali merah bawaan dan popover jadi putih.
+# (Lokal: opsi --theme.* di baris perintah juga harus menyertakan --theme.base dark.)
+[theme]
+base = "dark"
+primaryColor = "#006d77"

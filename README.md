@@ -24,7 +24,8 @@ Repo di-rapikan 8 Juli 2026 — root cuma isi script produksi, data, dan config.
 ### Script Utama (root)
 | File | Fungsi |
 |------|--------|
-| `app.py` | Streamlit dashboard |
+| `app.py` | Streamlit dashboard v2 (halaman dari `dashboard/registry.py`, tema di `.streamlit/config.toml`). Dashboard v1 diarsipkan di `archive/app_v1.py` |
+| `dashboard/` | Renderer v2: `metric_page.py` (kontrol & tata letak), `lw_chart.py` (chart), `data.py` (loader), `registry.py` (daftar halaman & garis) |
 | `auto_update.py` | Pipeline data harian (15 pipeline, dipicu GitHub Actions) |
 | `requirements.txt` | Python dependencies |
 | `CLAUDE.md` | Instruksi konteks untuk Claude Code session |
@@ -63,4 +64,4 @@ GitHub Actions menjalankan `auto_update.py` setiap hari. Pipeline berjalan 15 ta
 
 - `data_exchange.csv` — endpoint ChartInspect berhenti update sejak Februari 2026
 - `data_master_all_metrics.csv` — file generated, di-overwrite setiap run, jangan dijadikan sumber analisis utama
-- `data_aviv.csv` — kolom turunan bawaan ChartInspect (`price_at_aviv_mean`, `price_at_aviv_plus_1_sigma`, dst) pakai basis harga yang salah (inflasi ~9-10%). `app.py` dan `alerts/alert_check.py` sudah menghitung ulang sendiri dari kolom mentah (`btc_price / aviv_ratio × aviv_mean`) — jangan pakai kolom `price_at_aviv_*` langsung di script baru
+- `data_aviv.csv` — kolom turunan bawaan ChartInspect (`price_at_aviv_mean`, `price_at_aviv_plus_1_sigma`, dst) pakai basis harga yang salah (inflasi ~9-10%). `dashboard/data.py` (v2), `archive/app_v1.py`, dan `alerts/alert_check.py` sudah menghitung ulang sendiri dari kolom mentah (`btc_price / aviv_ratio × aviv_mean`) — jangan pakai kolom `price_at_aviv_*` langsung di script baru
