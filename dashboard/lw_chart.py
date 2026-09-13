@@ -20,21 +20,33 @@ TEMPLATE = """
 <style>
   html, body { margin: 0; background: #131722; overflow: hidden; }
   body { font: 12px Inter, system-ui, sans-serif; color: #c9d1d9; }
-  #bar { display: flex; align-items: center; gap: 12px; height: __TOOLBAR__px; box-sizing: border-box; }
-  #legend { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; gap: 1px 10px;
-            align-content: center; overflow: hidden; }
+  /* Tinggi baris ini ikut isinya: kalau legend atau tombol sorot tidak muat satu baris,
+     baris baru ditambahkan dan tinggi pane chart dikurangi sebesar itu (lihat
+     sesuaikanTinggi di bawah), jadi tinggi total chart tetap dan legend tidak terpotong.
+     Satu baris tetap setinggi __TOOLBAR__ px seperti sebelumnya. */
+  #bar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px;
+         min-height: __TOOLBAR__px; padding-top: 4px; padding-bottom: 4px; box-sizing: border-box; }
+  /* Legend minimal 320 px; kalau sisa tempat lebih sempit, kelompok tombol sorot yang
+     turun ke baris sendiri (rata kanan), bukan legend yang diperas jadi banyak baris. */
+  #legend { flex: 1 1 320px; min-width: 0; display: flex; flex-wrap: wrap; gap: 4px 10px;
+            align-content: center; }
   .lgroup { display: inline-flex; align-items: center; gap: 3px; flex: none; }
   /* Jarak atas 0 dan bawah 2 px, bukan 1/1: tinta "1y" (ekor y) jatuh 1,5 px di bawah
      tengah kotak dan "30" 0,5 px. Dinaikkan 1 px supaya keduanya terlihat di tengah. */
   .lgdot { font-size: 11px; padding: 0 5px 2px; border: 1px solid #232838; border-radius: 5px;
            line-height: 1.2; color: #b9c3cd; }
-  #hl { display: flex; gap: 4px; align-items: center; flex: none; }
+  #hl { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; align-items: center;
+        flex: 0 1 auto; margin-left: auto; }
   /* Sempat diredupkan ke 11px #6E7681 supaya beda dari tombol di sebelahnya; dicoba dan
      ditolak karena jadi sulit dibaca. Dibiarkan setara tombol. */
   .hllabel { font-size: 12px; color: #8B949E; margin-right: 2px; }
   button { cursor: pointer; font: 12px Inter, system-ui, sans-serif; background: transparent;
            border: 1px solid transparent; border-radius: 6px; padding: 3px 8px; color: #e2e8ef; }
   .lg { display: inline-flex; align-items: center; gap: 6px; flex: none; }
+  /* Nama kelompok tanpa garis utama (Rolling Z-Score) berupa keterangan, bukan tombol.
+     Jarak dalam dan garis tepinya disamakan dengan tombol, supaya contoh warnanya mulai
+     di posisi yang sama dengan baris di atasnya saat kelompok ini membuka baris baru. */
+  span.lg { padding: 3px 8px; border: 1px solid transparent; }
   .sw { width: 14px; height: 0; display: inline-block; }
   .off { opacity: 0.62; text-decoration: line-through; }
   .hl { color: #8B949E; border-color: #232838; }
@@ -260,11 +272,16 @@ loadLib(0).then(() => {
   // hilang dan lebarnya jadi 0 — tanpa jarak minimal tombol paling kanan menempel ke
   // tepi dan terlihat keluar dari batas chart.
   const JARAK_TEPI_MIN = 10;
+  let tinggiSiap = false;   // true setelah fungsi tinggi pane di bawah terdefinisi
   function rapikanBar() {
     const sisi = s => Math.max(s.options().visible ? s.width() : 0, JARAK_TEPI_MIN);
     const bar = document.getElementById('bar');
     bar.style.paddingLeft = sisi(panes.main.priceScale('left')) + 'px';
     bar.style.paddingRight = sisi(panes.main.priceScale('right')) + 'px';
+    // Jarak kiri-kanan bisa membuat legend membungkus ke baris baru. ResizeObserver
+    // pada baris ini seharusnya menangkapnya, tapi tidak berbunyi kalau frame sedang
+    // tidak digambar; pemeriksaan di sini (ikut timer rapikanBar) jadi cadangannya.
+    if (tinggiSiap) sesuaikanTinggiLayar();
   }
 
   let syncPending = false;
@@ -312,9 +329,19 @@ loadLib(0).then(() => {
     }
   }
 
+  // Chart mempertahankan lebar bar, bukan rentangnya. Kalau chart melebar (mis. masuk
+  // layar penuh) saat seluruh sejarah sedang tampil, tepi kiri melewati data pertama dan
+  // muncul celah kosong. Jadi kalau sebelum berubah lebar seluruh data tampil, chart
+  // dipaskan ulang; kalau pengguna sedang zoom ke rentang pendek, zoom-nya dibiarkan.
+  const tampilSemua = () => {
+    const r = panes.main.timeScale().getVisibleLogicalRange();
+    return !!r && r.from <= 0.5 && r.to >= D.t.length - 1.5;
+  };
   new ResizeObserver(() => {
+    const semua = tampilanAwalSelesai && tampilSemua();
     charts.forEach(chart => chart.applyOptions({ width: document.body.clientWidth }));
     if (!tampilanAwalSelesai) tampilkanAwal();
+    else if (semua) charts.forEach(chart => chart.timeScale().fitContent());
     scheduleScaleSync();
   }).observe(document.body);
 
@@ -448,7 +475,11 @@ loadLib(0).then(() => {
 
   const tinggiAwal = C.panes.map(p => p.height);
   const totalTinggiAwal = tinggiAwal.reduce((a, b) => a + b, 0);
+  let totalTerpasang = null;
   function terapkanTinggi(total) {
+    total = Math.max(120, Math.round(total));
+    if (total === totalTerpasang) return false;   // tidak ada yang berubah: jangan gambar ulang
+    totalTerpasang = total;
     let sisa = total;
     C.panes.forEach((p, i) => {
       const h = i === C.panes.length - 1 ? sisa
@@ -457,24 +488,35 @@ loadLib(0).then(() => {
       document.getElementById(p.id).style.height = h + 'px';
       panes[p.id].applyOptions({ height: h });
     });
+    return true;
   }
 
+  // Tinggi pane = tinggi bingkai - tinggi baris legend yang sebenarnya - jarak antar-pane.
+  // Baris legend bisa lebih dari satu (layar sempit, garis banyak); tambahannya diambil
+  // dari pane, bukan dari bingkai, jadi tinggi total chart di halaman tidak berubah dan
+  // pane paling bawah (dengan sumbu waktunya) tidak terdorong keluar bingkai.
+  const barEl = document.getElementById('bar');
   function sesuaikanTinggiLayar() {
-    if (!bingkai) return;
-    if (sedangPenuh()) {
+    let tinggiBingkai = C.frameHeight;
+    if (bingkai && sedangPenuh()) {
       const atas = bingkai.getBoundingClientRect().top;
-      const tersedia = Math.max(320, (window.parent.innerHeight || 0) - atas - 8);
-      bingkai.style.height = tersedia + 'px';
-      if (wadahBingkai) wadahBingkai.style.height = tersedia + 'px';
-      const jarakAntarPane = __GAP__ * (C.panes.length - 1);
-      terapkanTinggi(tersedia - __TOOLBAR__ - jarakAntarPane);
-    } else {
+      tinggiBingkai = Math.max(320, (window.parent.innerHeight || 0) - atas - 8);
+      bingkai.style.height = tinggiBingkai + 'px';
+      if (wadahBingkai) wadahBingkai.style.height = tinggiBingkai + 'px';
+    } else if (bingkai) {
       bingkai.style.height = tinggiBingkaiAwal;
       if (wadahBingkai) wadahBingkai.style.height = tinggiWadahAwal;
-      terapkanTinggi(totalTinggiAwal);
     }
-    scheduleScaleSync();
+    // Sinkron sumbu hanya kalau tinggi benar-benar berubah: rapikanBar memanggil fungsi
+    // ini, dan sinkron sumbu memanggil rapikanBar — tanpa syarat ini keduanya berputar.
+    if (terapkanTinggi(tinggiBingkai - barEl.offsetHeight - __GAP__ * (C.panes.length - 1))) {
+      scheduleScaleSync();
+    }
   }
+  tinggiSiap = true;
+  // Tinggi baris legend berubah saat lebar chart berubah atau jarak kiri-kanannya
+  // diluruskan ke sumbu (rapikanBar), jadi tinggi pane dihitung ulang setiap kali.
+  new ResizeObserver(() => sesuaikanTinggiLayar()).observe(barEl);
 
   const fsSep = document.createElement('span');
   fsSep.className = 'fssep';
@@ -751,15 +793,19 @@ def render(df, lines, price_line, extra_lines, height, metric_mode, price_mode, 
                             "left": _scale("Auto"), "right": _scale("Auto")})
 
     banyak_pane = len(daftar_pane) > 1
+    jarak = PANE_GAP * (len(daftar_pane) - 1)
+    total_height = TOOLBAR_H + height + jarak
     config = {
         "store": store_key,
         "panes": daftar_pane,
+        # Tinggi bingkai tetap; tinggi pane dihitung ulang di browser dari tinggi baris
+        # legend yang sebenarnya (bisa lebih dari satu baris).
+        "frameHeight": total_height,
         # Semua pane menampilkan sisi sumbu yang sama supaya area gambarnya sejajar.
         "showLeft": any(ln.axis == "left" for ln in lines) or banyak_pane,
         "showRight": any(ln.axis == "right" for ln in lines) or banyak_pane,
     }
 
-    jarak = PANE_GAP * (len(daftar_pane) - 1)
     html = (TEMPLATE
             .replace("__TOOLBAR__", str(TOOLBAR_H))
             .replace("__GAP__", str(PANE_GAP))
@@ -768,7 +814,6 @@ def render(df, lines, price_line, extra_lines, height, metric_mode, price_mode, 
             .replace("__CONFIG__", json.dumps(config))
             .replace("__URLS__", json.dumps(LWC_URLS)))
 
-    total_height = TOOLBAR_H + height + jarak
     # st.iframe menggantikan components.html yang dijadwalkan dihapus Streamlit.
     embed = getattr(st, "iframe", None)
     if embed is not None:

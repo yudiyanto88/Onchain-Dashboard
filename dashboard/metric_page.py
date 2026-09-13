@@ -7,7 +7,7 @@ import base64
 
 import streamlit as st
 from . import charts, data
-from .charts import ENGINES, LIGHTWEIGHT, Line
+from .charts import Line
 from .registry import MetricFamily
 
 PRESETS = ["1M", "3M", "6M", "1Y", "4Y", "All"]
@@ -268,7 +268,6 @@ def _init_state(family, dmin, dmax):
         f"{k}_axis_btc": BTC_AXIS,
         f"{k}_extra": Z_HIDDEN,
         f"{k}_height": 720,
-        f"{k}_engine": LIGHTWEIGHT,
     }
     for key, val in defaults.items():
         st.session_state.setdefault(key, val)
@@ -424,8 +423,8 @@ def _render_controls(family, dmin, dmax):
     metric_s = st.session_state[f"{k}_scale_metric"]
     scale_txt = price_s if price_s == metric_s else "Mixed"
 
-    # Kolom dibuat banyak dan sempit; CSS membuat tiap kolom menyusut ke lebar isinya.
-    cols = st.columns(9, vertical_alignment="bottom", gap="small")
+    # Satu kolom per kotak kontrol; CSS membuat tiap kolom menyusut ke lebar isinya.
+    cols = st.columns(7, vertical_alignment="bottom", gap="small")
 
     with cols[0]:
         with st.popover(f"Range\n\n**{_range_summary(family)}**"):
@@ -472,10 +471,11 @@ def _render_controls(family, dmin, dmax):
         # Kotak ini hanya muncul kalau keluarga metriknya memang punya seri pane tambahan.
         # Pane dibangun dari sisi Python, jadi saklarnya tidak bisa ikut legend yang
         # hidup di dalam chart.
+        # Nama kotak diambil dari registry (extra_label), karena isi pane ini beda per halaman.
         if any(sr.pane == "extra" for sr in family.series):
-            with st.popover(f"Z-Score\n\n**{st.session_state[f'{k}_extra']}**"):
+            with st.popover(f"{family.extra_label}\n\n**{st.session_state[f'{k}_extra']}**"):
                 st.caption("EXTRA PANE")
-                st.segmented_control("Z-Score pane", Z_MODES, key=f"{k}_extra",
+                st.segmented_control(f"{family.extra_label} pane", Z_MODES, key=f"{k}_extra",
                                      on_change=_keep, args=(f"{k}_extra", Z_HIDDEN),
                                      label_visibility="collapsed")
                 st.caption("Own pane below the chart, always linear.")
@@ -506,15 +506,8 @@ def _render_controls(family, dmin, dmax):
                 st.caption("Only for BTC price = Overlay.")
 
     with cols[6]:
-        with st.popover(f"Chart\n\n**{st.session_state[f'{k}_engine']}**"):
-            st.segmented_control("Engine", ENGINES, key=f"{k}_engine",
-                                 on_change=_keep, args=(f"{k}_engine", LIGHTWEIGHT),
-                                 label_visibility="collapsed")
-
-    with cols[7]:
         with st.popover(f"Line style\n\n**{_style_summary(family)}**"):
             _render_line_style(family)
-
 
 
 def render_metric_page(family: MetricFamily):
@@ -546,8 +539,6 @@ def render_metric_page(family: MetricFamily):
     if df.empty:
         st.warning("No data in this date range.")
         return
-
-    sig = f"{kind}-{'_'.join(str(p) for p in periods)}"
 
     btc_mode = st.session_state[f"{k}_btc"]
     total_h = st.session_state[f"{k}_height"]
@@ -602,10 +593,5 @@ def render_metric_page(family: MetricFamily):
                          st.session_state[f"{k}_axis_btc"], width=LINE_WIDTH,
                          group="BTC Price", dim=BTC_DIM))
 
-    engine = st.session_state[f"{k}_engine"]
-    if engine == LIGHTWEIGHT:
-        charts.render_lightweight(df, plan, price_line, extra, total_h,
-                                  metric_mode, price_mode, f"dash_v2_{k}")
-    else:
-        charts.render_plotly(df, plan, price_line, extra, total_h, metric_mode, price_mode,
-                             f"chart_{k}_plotly_{btc_mode[:3]}_{sig}")
+    charts.render(df, plan, price_line, extra, total_h, metric_mode, price_mode,
+                  f"dash_v2_{k}")

@@ -42,14 +42,11 @@ class MetricFamily:
     loader: Callable
     series: list[Series]
     reference_lines: list[RefLine] = field(default_factory=list)
-    default_selection: list[str] | None = None
     metric_scale_default: str = "Auto"
     price_scale_default: str = "Log"
-
-    def default_series(self):
-        if self.default_selection is not None:
-            return self.default_selection
-        return [s.label for s in self.series]
+    # Nama kotak kontrol untuk pane tambahan paling bawah (seri pane="extra"),
+    # misalnya "Z-Score" atau nanti "Net flow". Kotaknya hanya muncul kalau ada seri itu.
+    extra_label: str = "Bottom pane"
 
 
 MARKET_VALUATION = MetricFamily(
@@ -100,6 +97,7 @@ MARKET_VALUATION = MetricFamily(
                pane="extra", group="Rolling Z-Score", hidden_default=True),
     ],
     reference_lines=[RefLine(1.0, "Neutral (1.0)")],
+    extra_label="Z-Score",
 )
 
 

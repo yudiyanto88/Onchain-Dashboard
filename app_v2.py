@@ -107,10 +107,13 @@ button[data-testid="stPopoverButton"] p strong {
 /* Kisi periode 3x3. Isi popover dirender di portal terpisah, jadi tombolnya
    tidak bisa dijangkau lewat div[data-testid="stPopover"]. Satu-satunya
    st.button di halaman ini memang tombol-tombol kisi tersebut. */
+/* Tinggi 26 px, sama dengan segmented control: Streamlit memaku tombol di 32 px, jadi
+   height harus ditimpa langsung (min-height dan padding tidak mempan). */
 div[data-testid="stButton"] button {
     background: transparent !important; border: 1px solid #232838 !important;
     color: #c9d1d9 !important; font-weight: 600 !important;   /* abu terang, sama dengan judul kecil tombol */
-    padding: 3px 6px !important; min-height: 30px !important;
+    padding: 3px 6px !important; height: 26px !important; min-height: 0 !important;
+    line-height: 1.25 !important;
     white-space: nowrap !important; border-radius: 6px !important;
     display: flex !important; align-items: center !important; justify-content: center !important;
 }
@@ -121,6 +124,7 @@ div[data-testid="stButton"] button {
    Dijadikan blok dengan tinggi baris sepadan supaya ikut ditengahkan seperti yang lain. */
 div[data-testid="stButton"] button p {
     margin: 0 !important; display: block !important; line-height: 1.25 !important;
+    font-size: 0.82rem !important; white-space: nowrap !important;
 }
 div[data-testid="stButton"] button:hover {
     background: #1e2330 !important; border-color: #2a3550 !important;
@@ -137,10 +141,6 @@ div[data-testid="stButton"] button[kind="primary"] {
     color: #ffffff !important;
 }
 [data-testid="stButtonGroup"] button[role="radio"][aria-checked="true"] * { color: #ffffff !important; }
-
-div[data-testid="stButton"] button p {
-    font-size: 0.82rem !important; margin: 0 !important; white-space: nowrap !important;
-}
 
 /* Kotak tanggal: latar abu bawaan Streamlit diganti garis tipis, senada dengan
    kontrol lain. accent-color mengatur warna kalender bawaan browser, yang sebelumnya
@@ -202,10 +202,6 @@ div[data-testid="stSlider"] div[data-focus-visible] {
     background: transparent !important; padding: 0 !important; border: 0 !important;
     color: inherit !important; font-size: 13px !important; letter-spacing: 0 !important;
 }
-div[data-testid="stButton"] button {
-    height: 26px !important; min-height: 0 !important; line-height: 1.25 !important;
-}
-div[data-testid="stButton"] button p { line-height: 1.25 !important; }
 
 /* Slider: angka ikut bergerak bersama kenop (label bawaan Streamlit), dengan satuan px
    ditambahkan lewat CSS. Batas bawah dan atas tetap ditampilkan kecil di bawah track. */
@@ -222,22 +218,6 @@ div[data-testid="stNumberInput"] input {
     height: 30px !important; font-size: 0.82rem !important; padding: 0 8px !important;
 }
 div[data-testid="stNumberInput"] button { display: none !important; }
-
-/* Legend seri: yang dimatikan dicoret dan diredupkan, seperti legend chart.
-   Streamlit 1.56 menandai tombol pills lewat atribut kind, bukan data-testid. */
-button[kind="pills"], button[kind="pillsActive"] {
-    background: transparent !important; border: none !important;
-    padding: 2px 10px !important; min-height: 26px !important;
-}
-button[kind="pills"] p {
-    text-decoration: line-through !important; opacity: 0.4 !important;
-    font-size: 0.82rem !important;
-}
-button[kind="pillsActive"] p {
-    color: #ffffff !important; font-weight: 600 !important;
-    font-size: 0.82rem !important;
-}
-button[kind="pills"]:hover p { opacity: 0.7 !important; }
 
 /* Saat browser benar-benar fullscreen, kerangka Streamlit disembunyikan
    supaya chart memakai seluruh layar tanpa perlu menekan F11. */
@@ -266,9 +246,6 @@ header[data-testid="stHeader"] { display: none !important; }
 .block-container hr { margin: 6px 0 !important; }
 div[data-testid="stVerticalBlock"] { gap: 0.35rem !important; }
 div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"]) { margin-bottom: 0 !important; }
-div[data-testid="stPill"] button {
-    font-size: 0.85rem !important; padding: 2px 12px !important; min-height: 28px !important;
-}
 </style>
 """, unsafe_allow_html=True)
 
