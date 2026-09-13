@@ -39,6 +39,39 @@ def load_mvrv():
     return df
 
 
+@st.cache_data(ttl=3600)
+def load_price_levels():
+    """Level harga on-chain dan teknikal, plus AVIV Mean/Upper dari data_aviv.csv.
+
+    AVIV dihitung ulang dari kolom mentah seperti app.py dan alerts/alert_check.py:
+    kolom price_at_aviv_* bawaan ChartInspect salah basis harga (±9–10% terlalu tinggi,
+    lihat README). AVIV Upper framework v2 = mean + 0,5 simpangan baku.
+    """
+    df = pd.read_csv("data_price_level.csv")
+    df.rename(columns={
+        'date': 'Date', 'btc_price': 'BTC Price',
+        'sth_cost_basis': 'STH RP', 'realized_price': 'RP', 'lth_cost_basis': 'LTH RP',
+        'cvdd': 'CVDD', 'MVRV 0σ': 'MVRV 0σ',
+        '200_dma': '200 DMA', '50_wma': '50 WMA', '200_wma': '200 WMA',
+    }, inplace=True)
+    df = _prepare(df)
+
+    aviv = _prepare(pd.read_csv("data_aviv.csv").rename(columns={'date': 'Date'}))
+    aviv = aviv[['Date', 'btc_price', 'aviv_ratio', 'aviv_mean', 'aviv_upper_1sd']]
+    dasar = aviv['btc_price'] / aviv['aviv_ratio']
+    aviv['AVIV Mean'] = dasar * aviv['aviv_mean']
+    aviv['AVIV Upper'] = dasar * (aviv['aviv_mean'] + 0.5 * (aviv['aviv_upper_1sd'] - aviv['aviv_mean']))
+    # Rata-rata historis AVIV baru terbentuk dari segelintir hari di awal data: 84 hari
+    # pertama (17 Jul–9 Okt 2010) AVIV Mean jatuh sampai ±300x di bawah harga dan menarik
+    # sumbu Log ke 0.0002. Hari-hari sebelum rasio AVIV Mean/harga pertama kali wajar
+    # (0,2–5) disembunyikan; level sesudahnya tidak berubah.
+    wajar = (aviv['AVIV Mean'] / aviv['btc_price']).between(0.2, 5)
+    if wajar.any():
+        awal = aviv.loc[wajar, 'Date'].iloc[0]
+        aviv.loc[aviv['Date'] < awal, ['AVIV Mean', 'AVIV Upper']] = float('nan')
+    return df.merge(aviv[['Date', 'AVIV Mean', 'AVIV Upper']], on='Date', how='left')
+
+
 def date_bounds(df):
     """Tanggal paling awal dan paling akhir yang tersedia di data."""
     return df['Date'].min().date(), df['Date'].max().date()

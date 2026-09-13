@@ -564,7 +564,8 @@ def render_metric_page(family: MetricFamily):
         axis = st.session_state[f"{k}_axis_{sr.col}"]
         plan.append(Line(sr.label, sr.col, sr.color, axis, width=LINE_WIDTH,
                          group=sr.group or sr.label, dim=sr.dim, kind=sr.kind,
-                         short=sr.short, alpha=sr.alpha, precision=sr.precision))
+                         short=sr.short, alpha=sr.alpha, precision=sr.precision,
+                         hidden_default=sr.hidden_default))
         if not sr.smoothing:
             continue
         for p in periods:

@@ -139,6 +139,14 @@ function angka(v, p) {
   if (v === null || v === undefined || !isFinite(v)) return '';
   let min = p, max = p;
   if (p === 0 && Math.abs(v) < 100) {
+    // Skala Log bisa membuat tick semu sedikit di bawah nol di dasar sumbu ("-0.0001"):
+    // tidak diberi label. Harga di bawah 0.01 (level 2010, mis. CVDD 0.0011) ditulis
+    // dengan 2 angka penting supaya tidak jadi "0.00".
+    // Hanya tick semu mendekati nol yang dikosongkan: 0 tetap "0" di sumbu linear, dan
+    // angka negatif sungguhan (mis. net flow nanti) tetap tampil.
+    if (v === 0) return '0';
+    if (v < 0 && v > -0.01) return '';
+    if (v > 0 && v < 0.01) return String(Number(v.toPrecision(2)));
     // Di bawah 1 sampai 4 desimal tapi nol di belakang dibuang: 0.60 dan 0.0495, bukan 0.6000.
     min = 2;
     max = Math.abs(v) < 1 ? 4 : 2;
@@ -580,6 +588,15 @@ loadLib(0).then(() => {
   try { window.parent.addEventListener('resize', sesuaikanTinggiLayar); } catch (e) {}
 
   function apply() {
+    // Tombol sorot hanya untuk kelompok yang punya garis menyala. Kelompok yang dimatikan
+    // seluruhnya juga dilepas dari sorotan, supaya chart tidak meredupkan semua garis
+    // demi garis yang tidak kelihatan.
+    const kelompokMenyala = new Set(legendItems
+      .filter(h => !state.hidden.includes(h.spec.name)).map(h => h.spec.group));
+    state.highlights = state.highlights.filter(g => kelompokMenyala.has(g));
+    for (const { button, group } of hlButtons) {
+      if (group !== 'none') button.hidden = !kelompokMenyala.has(group);
+    }
     for (const { button, handle } of legendButtons) {
       const hidden = state.hidden.includes(handle.spec.name);
       const faded = state.highlights.length > 0 && !state.highlights.includes(handle.spec.group);
@@ -644,10 +661,13 @@ loadLib(0).then(() => {
         baris.push({ label: group, spec: contoh,
                      nilai: utama ? angka(nilaiDi(utama.spec, i), utama.spec.precision) : '', kolom });
       }
-      // Kelompok tanpa garis utama (Rolling Z-Score 1y/2y/4y): tiap anggota satu baris.
-      for (const h of lainnya) {
-        baris.push({ label: h.spec.name, spec: h.spec,
-                     nilai: angka(nilaiDi(h.spec, i), h.spec.precision), kolom: new Map() });
+      // Kelompok tanpa garis utama (Rolling Z-Score 1y/2y/4y): satu baris mendatar, tiap
+      // anggota yang ON jadi satu kolom dengan judul kecilnya sendiri (1y · 2y · 4y).
+      if (lainnya.length > 0) {
+        baris.push({ label: group, spec: lainnya[0].spec, jendela: lainnya.map(h => ({
+          judul: (h.spec.name.split('(')[1] || h.spec.name).replace(')', ''),
+          nilai: angka(nilaiDi(h.spec, i), h.spec.precision),
+        })) });
       }
     }
     const periode = [...semuaPeriode].sort((a, b) => a - b);
@@ -657,6 +677,14 @@ loadLib(0).then(() => {
       html += '<tr><th></th><th>Value</th>' + periode.map(p => `<th>${p}d</th>`).join('') + '</tr>';
     }
     for (const b of baris) {
+      if (b.jendela) {
+        // Judul kolom sendiri tepat di atas barisnya, supaya tidak tertukar dengan judul
+        // periode smoothing (Value · 7d · 60d) di atas tabel.
+        html += '<tr><th></th>' + b.jendela.map(j => `<th>${esc(j.judul)}</th>`).join('') + '</tr>'
+          + `<tr><td>${contohWarna(b.spec)}${esc(b.label)}</td>`
+          + b.jendela.map(j => `<td class="v">${j.nilai}</td>`).join('') + '</tr>';
+        continue;
+      }
       html += `<tr><td>${contohWarna(b.spec)}${esc(b.label)}</td><td class="v">${b.nilai}</td>`
         + periode.map(p => `<td class="v">${b.kolom.get(p) || ''}</td>`).join('') + '</tr>';
     }

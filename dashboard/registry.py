@@ -103,4 +103,47 @@ MARKET_VALUATION = MetricFamily(
 )
 
 
-FAMILIES = {f.title: f for f in [MARKET_VALUATION]}
+PRICE_LEVELS = MetricFamily(
+    key="price_levels",
+    title="Price Levels",
+    subtitle="On-chain Cost Basis",
+    loader=data.load_price_levels,
+    # Semua level satuannya harga: satu sumbu (kanan) bersama BTC. Skala bawaan linear
+    # ("Auto" = linear yang menyesuaikan zoom; "Linear" di kontrol = rentang dikunci).
+    metric_scale_default="Auto",
+    price_scale_default="Auto",
+    series=[
+        # Kohort memakai warna yang sama dengan halaman MVRV: STH rust, semua holder (RP)
+        # navy, LTH teal — mata langsung mengenali kohortnya di halaman mana pun.
+        Series("STH RP", "STH RP", color="#bf5546", axis="right", dim=0.44,
+               short="STH", precision=0),
+        Series("RP", "RP", color="#0070a6", axis="right", dim=0.49, short="RP", precision=0),
+        Series("LTH RP", "LTH RP", color="#0b8e89", axis="right", dim=0.39,
+               short="LTH", precision=0),
+        # AVIV Mean dan Upper satu pasang batas zona: satu keluarga violet, dibedakan terang.
+        # Uji jarak Lab (patokan longgar handoff bagian 9): terdekat RP–AVIV Mean 16 saat
+        # buta warna; Mean–Upper sengaja mirip (17 normal). Terang dijaga setara kohort.
+        Series("AVIV Mean", "AVIV Mean", color="#7b65d2", axis="right", dim=0.42,
+               short="AVIV M", precision=0),
+        Series("AVIV Upper", "AVIV Upper", color="#a58df0", axis="right", dim=0.30,
+               short="AVIV U", precision=0),
+        # Kuning tua: terdekat BTC 43 (normal), STH RP 17 (buta warna). Magenta ditolak:
+        # saat buta warna jaraknya ke violet AVIV cuma 6.
+        Series("CVDD", "CVDD", color="#a8963f", axis="right", dim=0.32,
+               short="CVDD", precision=0),
+        # Konteks, mati sejak awal: abu-abu dibedakan terang supaya tidak bersaing dengan
+        # tujuh garis utama. MVRV 0σ menurut KB satu gugus dengan AVIV Mean.
+        Series("MVRV 0σ", "MVRV 0σ", color="#8b949e", axis="right", dim=0.32,
+               short="0σ", precision=0, hidden_default=True),
+        Series("200 DMA", "200 DMA", color="#b4b2a9", axis="right", dim=0.26,
+               short="200D", precision=0, hidden_default=True),
+        Series("50 WMA", "50 WMA", color="#6e7681", axis="right", dim=0.42,
+               short="50W", precision=0, hidden_default=True),
+        Series("200 WMA", "200 WMA", color="#d3d1c7", axis="right", dim=0.22,
+               short="200W", precision=0, hidden_default=True),
+    ],
+)
+
+
+# Urutan di sini = urutan menu sidebar.
+FAMILIES = {f.title: f for f in [MARKET_VALUATION, PRICE_LEVELS]}
