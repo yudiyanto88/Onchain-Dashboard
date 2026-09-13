@@ -237,8 +237,22 @@ div[data-testid="stNumberInput"] button { display: none !important; }
 :fullscreen div[data-testid="stElementContainer"]:has(.page-title) { display: none !important; }
 
 /* Header Streamlit melayang di atas konten. Dengan padding dipangkas, judul ikut
-   tertutup. Header hanya berisi tombol Deploy dan menu, jadi disembunyikan. */
-header[data-testid="stHeader"] { display: none !important; }
+   tertutup. Dulu seluruh header disembunyikan (display:none) — tapi tombol untuk
+   membuka sidebar lagi (stExpandSidebarButton) tinggal di dalam header, jadi setelah
+   sidebar ditutup tombolnya ikut hilang (terukur 0x0 px). Sekarang header dibiarkan
+   ada tapi transparan dan tidak menangkap klik; tombol Deploy dan menu tetap
+   disembunyikan, hanya tombol pembuka sidebar yang bisa diklik. */
+header[data-testid="stHeader"],
+header[data-testid="stHeader"] * {
+    background: transparent !important; pointer-events: none !important;
+}
+header[data-testid="stHeader"] [data-testid="stToolbarActions"],
+header[data-testid="stHeader"] [data-testid="stAppDeployButton"],
+header[data-testid="stHeader"] [data-testid="stMainMenu"] { display: none !important; }
+/* Elemen di dalam header (stToolbar) menyalakan lagi pointer-events-nya sendiri dan
+   sempat menangkap klik di atas judul halaman; karena itu aturan di atas memakai "*". */
+header[data-testid="stHeader"] [data-testid="stExpandSidebarButton"],
+header[data-testid="stHeader"] [data-testid="stExpandSidebarButton"] * { pointer-events: auto !important; }
 
 /* Ruang di atas chart dipangkas: padding, jarak antar-baris, dan garis pemisah. */
 .block-container {

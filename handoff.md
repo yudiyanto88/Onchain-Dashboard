@@ -16,7 +16,7 @@ Baca dokumen ini dan `CLAUDE.md` sebelum mulai. Bagian **3 (keputusan pending)**
   3. Struktur navigasi
   4. Tampilan
 - **Pembagian halaman:** satu halaman per keluarga metrik (sekitar 17 halaman).
-- **Pendekatan yang dipilih:** satu renderer dipakai semua halaman, konfigurasi metrik terpisah. Coba satu halaman dulu. Dashboard lama (`app.py`) tidak boleh terganggu.
+- **Pendekatan yang dipilih:** satu renderer dipakai semua halaman, konfigurasi metrik terpisah. Coba satu halaman dulu. Dashboard lama tidak boleh terganggu — sampai 13 Sep 2026, saat v2 menggantikannya (v1 diarsipkan di `archive/app_v1.py`).
 - **Posisi sekarang:** prioritas 1, 2, dan 4 sudah matang untuk **satu halaman** (Market Valuation). Prioritas 3 (navigasi seluruh halaman) belum disentuh sama sekali.
 
 ---
@@ -37,7 +37,26 @@ Baca dokumen ini dan `CLAUDE.md` sebelum mulai. Bagian **3 (keputusan pending)**
 
 ## 3. Keputusan PENDING — tanyakan dulu ke user
 
-### 3.1 Halaman metrik berikutnya — sudah diputuskan 13 Sep 2026
+### 3.1 Halaman Price Levels — SELESAI 13 Sep 2026 (menu kedua, commit `54c8158`, live)
+**Hasil:** loader `data.load_price_levels()` menggabungkan `data_price_level.csv` + AVIV dari `data_aviv.csv` (dihitung ulang dari kolom mentah). Satu sumbu kanan untuk semua garis termasuk BTC, **skala bawaan Auto** (= linear yang menyesuaikan zoom; pilihan "Linear" di kontrol justru mengunci rentang — namanya membingungkan, bisa diganti kalau user mau). Subjudul sementara "On-chain Cost Basis".
+**Palet (dipratinjau, dipasang untuk dilihat user langsung — "beda terang dulu"):**
+
+| Garis | Warna | dim (redup 1,70:1) | Catatan |
+|---|---|---|---|
+| STH RP | `#bf5546` rust | 0,44 | sama dengan STH MVRV (warna ikut kohort) |
+| RP | `#0070a6` navy | 0,49 | sama dengan MVRV (semua holder) |
+| LTH RP | `#0b8e89` teal | 0,39 | sama dengan LTH MVRV |
+| AVIV Mean | `#7b65d2` violet | 0,42 | |
+| AVIV Upper | `#a58df0` violet muda | 0,30 | satu keluarga dengan Mean, dibedakan terang (jarak 17 — sengaja mirip) |
+| CVDD | `#a8963f` kuning tua | 0,32 | terdekat: BTC 43 (normal), STH RP 17 (buta warna) |
+| MVRV 0σ / 200 DMA / 50 WMA / 200 WMA | `#8b949e` / `#b4b2a9` / `#6e7681` / `#d3d1c7` abu | 0,32 / 0,26 / 0,42 / 0,22 | mati sejak awal, dibedakan terang saja |
+
+Uji palet: patokan longgar bagian 9 (normal ≥ 30, buta warna ≥ 14), terang dijaga setara kohort (kontras 3,3–5 untuk garis utama; CVDD 6,05). Ditolak: kombinasi "paling jauh" (AVIV/CVDD 2–3× lebih terang), magenta untuk CVDD (jarak ke violet AVIV 6 saat buta warna), merah muda (dekat rust). **Belum ditanyakan lagi:** apakah AVIV Upper perlu garis putus-putus dan garis teknikal perlu pola putus-putus — user minta lihat versi beda terang di chart dulu.
+**AVIV 84 hari pertama (17 Jul–9 Okt 2010) disembunyikan** (disetujui user): rata-rata historis AVIV baru terbentuk dari segelintir hari, AVIV Mean jatuh ±300× di bawah harga dan menarik sumbu Log ke 0.0002. Aturannya berbasis data: hari sebelum rasio AVIV Mean/harga pertama kali 0,2–5 dikosongkan. Level sesudahnya tidak berubah.
+**Highlight di halaman ini tetap dipakai** (disepakati): meredupkan garis lain dan menyaring tooltip tetap berguna meski sumbu hanya satu; fungsi tarik-sumbu memang tidak berguna di sini.
+**Hasil cocok CSV:** tooltip 10 Oct 2021 — STH RP 43,376 · RP 21,731 · LTH RP 15,484 · AVIV Mean 40,932 · AVIV Upper 48,628 · CVDD 11,822 · BTC 54,695.
+
+#### Catatan keputusan awal Price Levels (13 Sep 2026)
 **Price Levels** (`data_price_level.csv`) duluan: isinya batas zona framework v2 (STH RP, RP, LTH RP, CVDD, 200DMA) dan bentuknya mirip MVRV, jadi renderer sekarang bisa dipakai hampir apa adanya.
 **Isi halaman disetujui user 13 Sep 2026** (dasar: Decision Framework v2, KB Price Level v1.4, kolom CSV):
 - **Menyala sejak awal** — BTC Price + 6 level framework v2: STH RP (`sth_cost_basis`), RP (`realized_price`), LTH RP (`lth_cost_basis`), AVIV Mean, AVIV Upper (+0,5σ), CVDD (`cvdd`). Nilai 7 Sep 2026: 78,905 · 70,965 · 53,193 · 49,349 · 89,771 · 102,301 · 50,054.
@@ -66,6 +85,7 @@ Hasil uji di halaman hidup (hover mouse sungguhan, viewport 1440): kotak di x = 
 Chart sekarang hanya menampilkan nilai hari terakhir; nilai di tanggal lampau tidak bisa dibaca. Keputusan user setelah tiga pratinjau interaktif:
 - **Bentuk: kotak tooltip** (gaya CryptoQuant). Opsi angka di dalam legend ditolak ("kurang enak bacanya").
 - **Posisi: pojok kiri atas area gambar**, di bawah baris legend, di dalam batas sumbu. Kotak **menghindar kursor**: kalau kursor mendekati kotak, kotak pindah ke pojok kanan atas. Hanya muncul saat kursor ada di chart.
+- **Rolling Z-Score satu baris mendatar** (permintaan user 13 Sep): judul kecil 1y · 2y · 4y di baris tepat di atasnya, angka di bawahnya; hanya jendela yang ON. Cocok CSV 04 Jul 2021: MVRV 1.82 · 60d 2.00 · Z 1.58 · 1y −0.90 · 2y −0.26 · BTC 35,319.
 - **Isi: satu baris per metrik, periode smoothing jadi kolom** (Value · 7d · 60d · 365d). Baris tidak bertambah saat periode ditambah; kotak hanya melebar. Baris pertama tanggal (format "07 Sep 2026").
 - **Saringan:** hanya garis yang ON di legend. Kalau Highlight aktif, hanya kelompok yang disorot. **BTC Price selalu tampil**, apa pun sorotannya (satu-satunya pengecualian, pilihan user). **Kalau kotak Z-Score = Hidden, baris MVRV Z-Score dan Rolling Z-Score tidak ditampilkan sama sekali** (ditegaskan user 13 Sep); Rolling 2y/4y hanya kalau ON.
 - **Format angka** ikut poin audit 2+9 yang sudah diterima: rasio dan Z-Score 2 desimal, harga tanpa desimal dengan pemisah ribuan (78,905). Rencananya aturan desimal/format ditaruh per seri di registry, dipakai bersama oleh sumbu, label nilai terakhir, dan tooltip.
@@ -84,7 +104,9 @@ Ide user: tombol Left/Right diganti dua kotak kecil "L" dan "R" bergaya kotak an
 ### File dan struktur
 | File | Isi |
 |---|---|
-| `app_v2.py` | Entry point v2, sidebar, seluruh CSS global (termasuk aturan `:fullscreen`). Port 8502. |
+| `app.py` | Entry point v2 (dulu `app_v2.py`, diganti nama 13 Sep saat v2 live), sidebar, seluruh CSS global (termasuk aturan `:fullscreen`). |
+| `.streamlit/config.toml` | Tema v2: `base = "dark"`, `primaryColor = "#006d77"`. Dipakai Streamlit Cloud dan `streamlit run app.py` lokal. |
+| `archive/app_v1.py` | Dashboard v1 (dulu `app.py`), diarsipkan 13 Sep beserta perbaikan `minBarSpacing`. |
 | `dashboard/registry.py` | Konfigurasi keluarga metrik (`MetricFamily`, `Series`, `RefLine`). Menambah halaman = menambah satu `MetricFamily`. |
 | `dashboard/metric_page.py` | Tata letak halaman: header, kontrol, gaya garis smoothing, rencana garis. |
 | `dashboard/charts.py` | Memilih mesin chart (Lightweight / Plotly). Dataclass `Line`. |
@@ -156,6 +178,9 @@ Periode ke-4 dan seterusnya mengulang ketiga gaya itu dengan garis 0,5 px lebih 
 - **Garis tangga adaptif**: di bawah 6 piksel per hari polanya berubah jadi putus panjang, di atas itu kembali jadi tangga penuh. Data tidak diubah.
 - **LTH otomatis pindah ke sumbu kanan** saat BTC dipisah ke pane sendiri, dan kembali ke kiri saat Overlay.
 - Legend on/off dan mode sorot bekerja di browser tanpa reload, tersimpan di `localStorage` key `dash_v2_<family.key>`.
+- **Yang bertahan dan yang kembali ke default saat halaman di-reload** (dijelaskan ke user 13 Sep): legend on/off, Highlight, dan zoom **bertahan** (localStorage). Semua kontrol Python — Range, Smoothing, Scale, BTC price, pane bawah, Display, **Line style** — **kembali ke default**, karena disimpan di sesi server Streamlit dan reload membuka sesi baru. Membuat kontrol Python ikut diingat = pekerjaan terpisah, belum diminta.
+- **Tombol Highlight hanya untuk kelompok yang punya garis menyala** (13 Sep, semua halaman). Kelompok yang dimatikan seluruhnya juga dilepas dari sorotan, supaya chart tidak meredupkan semua garis demi garis yang tidak kelihatan. Terukur: MVRV — STH MVRV dimatikan → tombol STH hilang, sorotan STH dilepas; dinyalakan lagi → kembali. Price Levels — 12 tombol → 8.
+- **Aturan format angka tambahan** (13 Sep): untuk precision 0, nilai 0 tetap "0" (sumbu linear), tick semu antara −0,01 dan 0 dikosongkan (sumbu Log sempat menulis "-0.0001"), angka positif < 0,01 ditulis dua angka penting (0.00015). Angka negatif sungguhan tetap tampil (−10,000; −50.00). Versi pertama sempat mengosongkan semua nilai ≤ 0 dan menghapus label 0 di sumbu linear — ketahuan dari screenshot, sudah diperbaiki.
 - Klik di dalam chart dan tombol Escape menutup popover yang terbuka.
 - **Pane dibangun dari daftar**, bukan dipaku dua: `price` (harga BTC bila dipisah) → `main` (metrik) → `extra` (Z-Score). Zoom, geser, dan lebar sumbu semua pane tersinkron; sumbu waktu hanya di pane paling bawah. Pembagian tinggi: tiga pane 30/45/25 %, harga+metrik 45/55 %, metrik+Z-Score 70/30 %. Pane `extra` **selalu linear** — Z-Score melewati nol, jadi Log tidak berlaku; hasilnya Log di pane metrik aman lagi dipakai.
 - **MVRV Z-Score**: histogram **navy `#0070a6`** (ikut warna induknya, MVRV), **pekat 80 %**. **Rolling Z-Score 1y/2y/4y**: histogram hijau `#97c459`, transparan 55 %, dihitung di `data.py` dari MVRV Ratio terhadap rata-rata dan simpangan 365/730/1460 hari (data 2y mulai 2013, 4y mulai 2014). Keduanya **tanpa smoothing** (`smoothing=False`). Dikonfirmasi user 13 Sep 2026 (lihat bagian 5).
@@ -165,7 +190,7 @@ Periode ke-4 dan seterusnya mengulang ketiga gaya itu dengan garis 0,5 px lebih 
 ### Teknis
 - Streamlit di laptop user: **1.63.0**, dikunci `streamlit==1.63.0` di `requirements.txt`.
 - Dashboard v2 **wajib dijalankan dengan tema teal gelap** (lihat bagian 11). Tanpa itu, warna aksen kembali merah dan latar popover jadi putih.
-- `app.py` lama diuji di 1.63.0: 12 halaman tanpa error. Diubah sekali atas permintaan user (wrapper `renderLightweightCharts` + `minBarSpacing`).
+- Dashboard v1 (sekarang `archive/app_v1.py`) diuji di 1.63.0: 12 halaman tanpa error. Diubah sekali atas permintaan user (wrapper `renderLightweightCharts` + `minBarSpacing`).
 - `components.html` sudah diganti `st.iframe` (dengan fallback).
 - **Format angka per seri** (13 Sep): field `precision` di `Series` (registry) dan `Line` (charts), bawaan 2; harga BTC `BTC_PRECISION = 0` di `metric_page.py`, garis smoothing mewarisi precision induknya. Di `lw_chart.py`, `formatSeri(spec)` memasang `priceFormat: {type: 'custom'}` pada tiap seri, jadi sumbu, label nilai terakhir, label garis silang, dan tooltip memakai fungsi yang sama, `angka(v, p)`: pemisah ribuan en-US; untuk precision 0, harga < 100 tetap 2 desimal dan harga < 1 sampai 4 desimal tanpa nol di belakang (0.60, 0.0495) supaya harga BTC 2010 tidak terbaca "0". Terukur: 0.60 · 0.15 · 0.0495 · 8.09 · 100 · 78,905 · 1,600,000.
 - **Tooltip membaca periode smoothing dari nama seri** "<metrik> <SMA|EMA>(<periode>)" (dibuat di `metric_page.py`). Kelompok tanpa garis utama (Rolling Z-Score) → tiap anggota satu baris. Nilai diambil dari `D.cols` lewat indeks tanggal, bukan dari `param.seriesData`, supaya pane mana pun yang disentuh kursor menghasilkan isi yang sama. Hanya pane yang sedang memegang tooltip boleh menyembunyikannya (saat pindah pane, pane lama melapor kosong sesudah pane baru mengisi).
@@ -223,16 +248,17 @@ Periode ke-4 dan seterusnya mengulang ketiga gaya itu dengan garis 0,5 px lebih 
 - **Range All tidak selalu memuat seluruh sejarah — tidak terulang di chart yang sudah tergambar, kemungkinan artefak panel** (diusut 13 Sep). Rentang direkam tiap 100 ms sambil mengganti Range 1y → All: tampilan "±160 bar terakhir" hanya ada **sebelum chart pertama kali tergambar** (lebar sumbu masih 0, area gambar = lebar penuh bingkai). Begitu frame tergambar (dipicu screenshot), rentangnya langsung penuh (bar 0–5896) dan tidak mundur. Cocok dengan panel browser Claude yang membekukan frame. Kode tidak diubah. Kalau user melihatnya di browsernya sendiri, usut dari situ.
 - **Riwayat masalah tombol layar penuh (selesai, lalu seluruh mekanismenya diganti tombol di dalam chart — disimpan sebagai catatan).** Cara kerja lama:
   1. Kotak **Screen** (Normal | Full) hanya mengubah `st.session_state[f"{k}_screen"]`. Saat "Full", `render_metric_page()` menyuntikkan CSS yang menyembunyikan sidebar, header, dan toolbar Streamlit sehingga chart memenuhi jendela.
-  2. Layar penuh browser **tidak bisa dipanggil dari Python**, karena `requestFullscreen()` wajib dipanggil di dalam gestur klik. Jadi `app_v2.py` menyisipkan `_FULLSCREEN_SCRIPT` lewat `st.iframe`; skrip itu berjalan di dalam iframe, mengambil `window.parent.document`, mencari kelompok tombol yang berisi "Full" dan "Normal", lalu memasang pendengar klik fase-capture pada keduanya (`attach()` + `MutationObserver`, penanda `dataset.fsBound`).
+  2. Layar penuh browser **tidak bisa dipanggil dari Python**, karena `requestFullscreen()` wajib dipanggil di dalam gestur klik. Jadi `app_v2.py` menyisipkan `_FULLSCREEN_SCRIPT` lewat `st.iframe`; skrip itu berjalan di dalam iframe, mengambil `window.parent.document`, mencari kelompok tombol yang berisi "Full" dan "Normal", lalu memasang pendengar klik fase-capture pada keduanya (`attach()` + `MutationObserver`, penanda `dataset.fsBound`). (Nama file waktu itu `app_v2.py`; sekarang `app.py`.)
   3. "Full" memanggil `doc.documentElement.requestFullscreen()`, "Normal" memanggil `doc.exitFullscreen()`.
   - **Sebab yang terbukti:** klik Full/Normal itu sendiri membuat Streamlit membangun ulang iframe skrip (mode Full menambah satu blok CSS, jadi urutan elemen bergeser). Konteks JavaScript lama mati bersama iframe-nya, tapi tombolnya tetap elemen DOM yang sama dan penanda `fsBound = '1'` ikut menempel — skrip baru mengira sudah terpasang lalu melewatinya. Sesudah rerun pertama tidak ada lagi pendengar yang hidup: Full (klik pertama) bekerja, Normal tidak pernah. Penanda `fsBound = 1` justru bukti pendengar mati, bukan bukti terpasang.
   - **Perbaikannya:** penanda diberi nomor unik per muatan skrip (`const ID = 'fs' + Math.random()...`), jadi konteks yang sedang hidup selalu memasang pendengarnya sendiri. Pendengar mati dari iframe lama tetap menempel tapi tidak pernah berbunyi.
   - **Catatan uji:** layar penuh sungguhan tidak bisa diuji dari panel browser Claude — panel itu memblokir Fullscreen API (`TypeError: Permissions check failed`, bahkan dari halaman utama). Yang bisa diuji dari sana cuma pemasangan ulang pendengarnya. User yang mengonfirmasi hasil akhirnya di browser sendiri.
-  - **Akhir cerita:** atas usul user, tombolnya dipindah ke dalam chart. Kotak Screen, `_FULLSCREEN_SCRIPT` (58 baris), state `{k}_screen`, dan blok CSS penyembunyi kerangka dibuang semua; yang tersisa hanya aturan `:fullscreen` di `app_v2.py`.
+  - **Akhir cerita:** atas usul user, tombolnya dipindah ke dalam chart. Kotak Screen, `_FULLSCREEN_SCRIPT` (58 baris), state `{k}_screen`, dan blok CSS penyembunyi kerangka dibuang semua; yang tersisa hanya aturan `:fullscreen` di `app.py` (dulu `app_v2.py`).
 - ~~Mesin Plotly ketinggalan~~ — mesin Plotly dibuang 13 Sep (bagian 4).
 - **Slider rentang di bawah chart** — lihat 3.2.
 - **Memindahkan Line style ke dalam chart** — lihat 3.3. Sebabnya: semua kontrol hidup di Python, dan setiap klik membuat Streamlit menggambar ulang komponen chart (iframe baru). Legend dan sorot tidak memuat ulang karena sudah hidup di dalam chart. Range dan Smoothing tidak bisa dipindah kecuali rata-rata bergerak dihitung di browser.
-- **Sudah commit dua kali (13 Sep), belum push, belum deploy.** Commit pertama (`d0623dd`) berisi `app_v2.py`, `dashboard/`, `.claude/launch.json`, `handoff.md`, dan `requirements.txt`; commit kedua berisi pane Z-Score, tombol layar penuh di dalam chart, dan perapian kontrol. `.claude/settings.local.json` sengaja tidak ikut (pengaturan lokal). Perubahan repo lain yang belum di-commit (CLAUDE.md, `auto_update.py`, `references/`, puluhan file `research/`) **tidak disentuh** — itu pekerjaan user sendiri. Streamlit Cloud masih menjalankan `app.py`. Deploy v2 masuk akal setelah halaman-halamannya lengkap, dan itu keputusan user. Catatan: di Streamlit Cloud, tema teal gelap harus dipasang lewat `.streamlit/config.toml` — dan file itu dipakai bersama `app.py`, jadi tampilan dashboard lama ikut berubah. Tanyakan dulu.
+- **v2 SUDAH LIVE sejak 13 Sep 2026** (push `07164da..db1260d`, disetujui user). Langkah yang dijalankan: `app.py` (v1, termasuk perubahan 15 baris `minBarSpacing` yang belum di-commit) → `archive/app_v1.py`; `app_v2.py` → `app.py` supaya pengaturan Streamlit Cloud tidak perlu diubah; `.streamlit/config.toml` ditambahkan (tema teal gelap — dulu ditahan karena bentrok dengan v1); tulisan sidebar "Experimental build…" dihapus; README, `.claude/launch.json`, dan komentar `alerts/alert_check.py` disesuaikan. 12 commit data dari GitHub di-merge dulu (hanya CSV + `alerts/logs`, bersih), kedua halaman diuji dengan data terbaru (13 Sep) sebelum push. `.claude/settings.local.json` dan perubahan repo milik user (`CLAUDE.md`, `auto_update.py`, `references/`, `research/`) **tidak disentuh dan tidak di-push**. Alamat Streamlit Cloud belum diketahui sesi ini — minta ke user kalau perlu mengecek versi online.
+- **Alur kerja yang disepakati (13 Sep):** trial and error di **localhost** dulu; baru setelah valid di-commit, lalu push ke GitHub (Streamlit Cloud deploy otomatis). Sebelum push, **selalu merge dulu dari GitHub** — GitHub Actions meng-commit data setiap hari, jadi repo lokal hampir selalu tertinggal.
 - ~~Bersih-bersih kode~~ — selesai 13 Sep: CSS `button[kind="pills"]` dan `stPill` dibuang, aturan tombol `stButton` yang menumpuk disatukan, `default_selection` / `default_series()` dibuang. Diukur sebelum-sesudah dengan keadaan sama (smoothing 7/60/365): tombol kisi periode tetap 48,3 × 26 px, huruf 13,12 px, jarak dalam 3px 6px.
 - **Ide untuk nanti:** memantau LTV intraday memakai harga 10 menit dari ChartInspect (bagian 10). Harga terendah intraday lebih relevan untuk risiko likuidasi daripada harga penutupan harian.
 
@@ -290,7 +316,7 @@ Bukan untuk halaman: `data_master_all_metrics.csv` (file hasil generate) dan `da
 ## 10. Jebakan teknis yang sudah ditemukan
 
 ### Streamlit
-- **Setelah mengubah file di `dashboard/`, restart server v2.** Streamlit membaca ulang `app_v2.py` setiap render, tapi modul di `dashboard/` yang sudah dimuat tidak dibaca ulang.
+- **Setelah mengubah file di `dashboard/`, restart server v2.** Streamlit membaca ulang `app.py` setiap render, tapi modul di `dashboard/` yang sudah dimuat tidak dibaca ulang.
 - **`st.rerun()` memotong satu putaran.** Widget yang belum sempat digambar (misalnya isi popover Line style) **nilainya dibuang Streamlit**. Karena itu gaya garis disimpan di gudang terpisah `st.session_state[f"{k}_lstyles"]` (dict biasa), sedangkan widget hanya cerminan yang disemai ulang tiap render.
 - **Tombol tidak boleh mengubah nilai widget di badan `if st.button(...)`** — Streamlit menolak dengan `StreamlitWidgetAlreadyInstantiatedError`. Pakai `on_click=` callback, yang berjalan sebelum halaman digambar ulang.
 - **`st.rerun()` membuang nilai widget yang belum sempat digambar.** Bukan cuma isi popover yang sedang terbuka: *semua* kontrol yang letaknya sesudah titik rerun ikut hilang nilainya. Gejalanya di sini: menekan tombol periode Smoothing membuat kotak Screen balik sendiri ke "Normal" padahal browser masih layar penuh (kotak Screen digambar paling ujung). Obatnya bukan menambal satu per satu — hapus `st.rerun()`-nya, pakai `on_click=`. Sesudah itu Display, Chart, dan Line style ikut aman.
@@ -341,25 +367,26 @@ Bukan untuk halaman: `data_master_all_metrics.csv` (file hasil generate) dan `da
 - **Heredoc di Bash merusak backslash dan kutip** pada skrip Python yang panjang (pola `\n`, backtick JS). Untuk patch yang rumit, tulis skrip ke file dulu lalu jalankan.
 - **Windows MAX_PATH:** membuat venv di path temp yang panjang membuat `pip install streamlit` gagal di tengah jalan. Pakai path pendek.
 - **GitHub Actions tidak membaca `requirements.txt`** (workflow memasang `requests pandas numpy` sendiri), jadi mengunci versi Streamlit tidak mengganggu update data harian.
+- **Sebelum push, merge dulu dari GitHub.** GitHub Actions meng-commit CSV dan `alerts/logs` setiap hari, jadi repo lokal hampir selalu tertinggal. Cek dulu `git diff --name-only HEAD...origin/main`: kalau isinya hanya `data_*.csv` dan `alerts/logs/`, merge aman walau ada perubahan user yang belum di-commit. Kalau menyentuh file yang sedang diubah user, berhenti dan tanya.
 - **Git:** repo punya banyak perubahan lain yang belum di-commit dari pekerjaan user sebelumnya (`CLAUDE.md`, `auto_update.py`, `references/`, puluhan file di `research/`). **Jangan commit semuanya sekaligus** — hanya file dashboard yang relevan, dan hanya kalau user minta.
 
 ---
 
 ## 11. Cara menjalankan
 
-Dashboard lama:
+Dashboard v2 (versi live). Tema teal gelap dibaca otomatis dari `.streamlit/config.toml`:
 
 ```bash
-streamlit run app.py --server.port 8501
+streamlit run app.py
 ```
 
-Dashboard v2 (wajib dengan tema teal gelap):
+Dashboard v1 (arsip):
 
 ```bash
-streamlit run app_v2.py --server.port 8502 --theme.base dark --theme.primaryColor "#006d77"
+streamlit run archive/app_v1.py --server.port 8501
 ```
 
-Konfigurasi yang sama ada di `.claude/launch.json`: `dashboard-lama` (8501), `dashboard-v2` (8502), `dashboard-v2-uji` (8503, dipakai sesi Claude Code supaya tidak bentrok dengan server milik user).
+Konfigurasi di `.claude/launch.json`: `dashboard-lama` (8501, `archive/app_v1.py`), `dashboard-v2` (8502, `app.py`), `dashboard-v2-uji` (8503, `app.py`, dipakai sesi Claude Code supaya tidak bentrok dengan server milik user). Kedua konfigurasi v2 masih memberi opsi `--theme.*`; itu tidak bentrok dengan `config.toml` (nilainya sama). Ingat: opsi `--theme.*` apa pun wajib disertai `--theme.base dark`.
 
 ---
 
@@ -367,7 +394,7 @@ Konfigurasi yang sama ada di `.claude/launch.json`: `dashboard-lama` (8501), `da
 
 1. Baca `CLAUDE.md` dan dokumen ini.
 2. Jalankan `dashboard-v2-uji`, buka halaman Market Valuation, dan lihat sendiri keadaannya sebelum mengubah apa pun.
-3. Lanjutkan ke **Price Levels** (bagian 3.1). Judul halaman dan warna Z-Score sudah beres; pakai gaya judul B2 dan aturan teal di bagian 4–5 untuk halaman baru.
+3. Market Valuation dan Price Levels sudah live. Halaman berikutnya belum dipilih, dan **pengelompokan navigasi 17 halaman belum dibahas** — tanyakan. Untuk halaman baru pakai gaya judul B2, aturan teal (bagian 4–5), `precision` per seri, dan uji palet bagian 9. Kerjakan di localhost dulu; push hanya setelah user menyatakan valid.
 4. Untuk urusan tampilan apa pun, buat widget pratinjau dengan data asli lebih dulu, lalu tunggu pilihan user. Untuk warna garis baru, jalankan uji palet di bagian 9 sebelum menunjukkan pratinjau.
 5. Sesudah mengubah apa pun di `dashboard/`, **restart server** — modul yang sudah dimuat tidak dibaca ulang.
 6. Kalau ada keluhan tampilan yang terdengar kecil ("kurang rata", "kebesaran"), **ukur dulu di halaman hidup** lewat `getBoundingClientRect` dan `getComputedStyle`, jangan menebak dari kode. Semua perbaikan tata letak 13 Sep ketemu dengan cara itu, dan dua tebakan pertama meleset.

@@ -45,7 +45,8 @@ BTC_AXIS = "right"
 
 BTC_COLOR = "#F7931A"
 BTC_DIM = 0.28      # opasitas BTC saat seri lain disorot (kontras 1.70:1, sama dengan metrik)
-LINE_WIDTH = 1.5    # semua garis utama, termasuk BTC
+LINE_WIDTH = 2.0    # semua garis utama, termasuk BTC (uji 13 Sep: 1,5 px tampak tipis di
+                    # layar rasio 1 karena library tidak membulatkan tebal garis data)
 BTC_PRECISION = 0   # harga BTC tanpa desimal
 
 # Bentuk garis yang bisa dipilih untuk tiap garis smoothing.
