@@ -1,7 +1,7 @@
 # Handoff — Upgrade Dashboard Streamlit (v2)
 
-Ditulis ulang: 13 September 2026 (pembaruan ketiga: judul B2, teal warna utama, warna Z-Score). Untuk dilanjutkan di sesi Claude Code berikutnya.
-(Versi sebelumnya ditulis 11 dan 12 September 2026; isinya sudah dilebur ke sini.)
+Ditulis ulang: 14 September 2026 (pembaruan kelima: halaman SOPR, kotak Tooltip, menu berkelompok `st.navigation`, commit `073a997` live). Untuk dilanjutkan di sesi Claude Code berikutnya.
+(Pembaruan keempat 13 Sep: v2 live, Price Levels, tooltip, garis 2 px. Versi 11 dan 12 Sep sudah dilebur ke sini.)
 
 Baca dokumen ini dan `CLAUDE.md` sebelum mulai. Bagian **3 (keputusan pending)** harus ditanyakan ke user dulu — jangan langsung diterapkan.
 
@@ -17,7 +17,7 @@ Baca dokumen ini dan `CLAUDE.md` sebelum mulai. Bagian **3 (keputusan pending)**
   4. Tampilan
 - **Pembagian halaman:** satu halaman per keluarga metrik (sekitar 17 halaman).
 - **Pendekatan yang dipilih:** satu renderer dipakai semua halaman, konfigurasi metrik terpisah. Coba satu halaman dulu. Dashboard lama tidak boleh terganggu — sampai 13 Sep 2026, saat v2 menggantikannya (v1 diarsipkan di `archive/app_v1.py`).
-- **Posisi sekarang:** prioritas 1, 2, dan 4 sudah matang untuk **satu halaman** (Market Valuation). Prioritas 3 (navigasi seluruh halaman) belum disentuh sama sekali.
+- **Posisi sekarang (14 Sep 2026):** tiga halaman live — MVRV, Price Levels, SOPR. Prioritas 3 (navigasi) sudah berjalan: menu `st.navigation` berkelompok jenis metrik dengan alamat per halaman (bagian 3.11). Halaman berikutnya tinggal menambah `MetricFamily` dengan `group` dan `url_path`.
 
 ---
 
@@ -51,7 +51,7 @@ Baca dokumen ini dan `CLAUDE.md` sebelum mulai. Bagian **3 (keputusan pending)**
 | CVDD | `#a8963f` kuning tua | 0,32 | terdekat: BTC 43 (normal), STH RP 17 (buta warna) |
 | MVRV 0σ / 200 DMA / 50 WMA / 200 WMA | `#8b949e` / `#b4b2a9` / `#6e7681` / `#d3d1c7` abu | 0,32 / 0,26 / 0,42 / 0,22 | mati sejak awal, dibedakan terang saja |
 
-Uji palet: patokan longgar bagian 9 (normal ≥ 30, buta warna ≥ 14), terang dijaga setara kohort (kontras 3,3–5 untuk garis utama; CVDD 6,05). Ditolak: kombinasi "paling jauh" (AVIV/CVDD 2–3× lebih terang), magenta untuk CVDD (jarak ke violet AVIV 6 saat buta warna), merah muda (dekat rust). **Belum ditanyakan lagi:** apakah AVIV Upper perlu garis putus-putus dan garis teknikal perlu pola putus-putus — user minta lihat versi beda terang di chart dulu.
+Uji palet: patokan longgar bagian 9 (normal ≥ 30, buta warna ≥ 14), terang dijaga setara kohort (kontras 3,3–5 untuk garis utama; CVDD 6,05). Ditolak: kombinasi "paling jauh" (AVIV/CVDD 2–3× lebih terang), magenta untuk CVDD (jarak ke violet AVIV 6 saat buta warna), merah muda (dekat rust). **Palet disetujui user apa adanya (13 Sep):** AVIV Upper tetap garis penuh violet muda, garis teknikal tetap abu-abu dibedakan terang. Pertanyaan garis putus-putus ditutup.
 **AVIV 84 hari pertama (17 Jul–9 Okt 2010) disembunyikan** (disetujui user): rata-rata historis AVIV baru terbentuk dari segelintir hari, AVIV Mean jatuh ±300× di bawah harga dan menarik sumbu Log ke 0.0002. Aturannya berbasis data: hari sebelum rasio AVIV Mean/harga pertama kali 0,2–5 dikosongkan. Level sesudahnya tidak berubah.
 **Highlight di halaman ini tetap dipakai** (disepakati): meredupkan garis lain dan menyaring tooltip tetap berguna meski sumbu hanya satu; fungsi tarik-sumbu memang tidak berguna di sini.
 **Hasil cocok CSV:** tooltip 10 Oct 2021 — STH RP 43,376 · RP 21,731 · LTH RP 15,484 · AVIV Mean 40,932 · AVIV Upper 48,628 · CVDD 11,822 · BTC 54,695.
@@ -65,7 +65,7 @@ Uji palet: patokan longgar bagian 9 (normal ≥ 30, buta warna ≥ 14), terang d
 - Usulan yang belum diputuskan: satu sumbu Log untuk semua garis termasuk BTC; pane bawah dikosongkan di versi pertama (kandidat nanti: Price/CVDD, STH RP/LTH RP); penanda zona Z1–Z5 **tidak** dibuat (keputusan framework, bagian 5).
 - ⚠️ `references/data_dictionary.md` masih menyuruh memakai kolom `price_at_aviv_*`, bertentangan dengan README dan `app.py` (kolom itu salah basis ±9–10%). Dashboard mengikuti README/`app.py`. Dokumen referensi milik user — sudah dilaporkan, belum dikoreksi.
 
-**Dibahas saat mulai mengerjakan Price Levels (ditunda user 13 Sep):** framework v2 juga memakai **AVIV Mean dan AVIV Upper** sebagai batas zona, dan keduanya ada di `data_aviv.csv`, bukan `data_price_level.csv`. Kalau halaman ini mau memuat semua batas zona, loader perlu menggabungkan dua file, dan level AVIV harus dihitung ulang dari `btc_price / aviv_ratio × aviv_mean` (kolom `price_at_aviv_*` salah basis). Baca `references/Decision_Framework v2.md` dulu sebelum mengusulkan isi halaman. **Pengelompokan navigasi 17 halaman masih belum dibahas** — tanyakan saat halaman kedua selesai.
+**Dibahas saat mulai mengerjakan Price Levels (ditunda user 13 Sep):** framework v2 juga memakai **AVIV Mean dan AVIV Upper** sebagai batas zona, dan keduanya ada di `data_aviv.csv`, bukan `data_price_level.csv`. Kalau halaman ini mau memuat semua batas zona, loader perlu menggabungkan dua file, dan level AVIV harus dihitung ulang dari `btc_price / aviv_ratio × aviv_mean` (kolom `price_at_aviv_*` salah basis). Baca `references/Decision_Framework v2.md` dulu sebelum mengusulkan isi halaman. ~~Pengelompokan navigasi 17 halaman masih belum dibahas~~ — diputuskan 14 Sep 2026 (bagian 3.11).
 
 ### 3.2 Slider rentang di bawah chart — ditunda (dikonfirmasi lagi 13 Sep 2026)
 Gaya navigator TradingView: chart mini berisi seluruh sejarah, dengan kotak geser yang bisa ditarik dan diubah lebarnya, tersinkron dua arah dengan chart utama. Tidak ada bawaannya di lightweight-charts 4.2.3, jadi harus digambar sendiri di dalam chart. Karena hidup di dalam chart, tidak memicu reload Streamlit. Pekerjaan sedang-berat. Alasan ditunda: 16 halaman lain belum ada.
@@ -94,6 +94,38 @@ Chart sekarang hanya menampilkan nilai hari terakhir; nilai di tanggal lampau ti
 ### 3.8 Tombol Range di celah kanan baris kontrol — ditahan user 13 Sep 2026
 Ide: pindahkan Range ke celah kosong di kanan baris kontrol, gaya CryptoQuant (preset 1m·3m·6m·1y·4y·All + ikon kalender yang membuka panel From/To dengan kalender dua bulan dan Latest/Reset/Apply). Sudah dipratinjau. Catatan teknis: kotak tanggal Streamlit 1.63 hanya kolom ketik (react-aria), jadi kalender dua bulan harus dibuat sendiri sebagai komponen kecil; alternatif sederhana = kolom tanggal Streamlit + `st.form` (chart hanya dimuat ulang saat Apply). Tombol "now" versi CryptoQuant sebaiknya jadi "Latest" (tanggal data terakhir, bukan hari ini). Ide lain yang sempat dibahas untuk celah itu: tombol simpan gambar chart (untuk ditempel ke Claude.ai). Memindahkan tombol Highlight ke sana ditolak — butuh menempelkan tombol dari iframe ke halaman induk, rawan rusak. User: "belum perlu, kosongkan dulu".
 
+### 3.9 Halaman ketiga: SOPR — SELESAI 14 Sep 2026 (commit `073a997`, live)
+Dipilih user dari tiga pratinjau tata letak dengan data asli (A: semua SOPR di sumbu kiri + BTC digabung; **B: BTC di pane sendiri + LTH-SOPR sumbu kanan + Log**; C: seperti MVRV, LTH mati di awal).
+- **Data:** `data.load_sopr()` dari `data_momentum.csv` (`asopr`, `sth_sopr`, `lth_sopr`, sejak 17 Jul 2010). NUPL di file yang sama sengaja tidak dimuat — halaman sendiri nanti.
+- **Tata letak B:** `btc_mode_default="Separate pane"`, skala metrik dan harga Log, LTH-SOPR `separate_axis="right"` (ganti ke Overlay → LTH ke kiri; balik ke Separate pane → LTH ke kanan). Alasan: **LTH-SOPR harian masih melonjak di atas 20 sampai 2024 (29,7) dan 2025 (24,4)**, dulu 385 (2011) dan 294 (2013). Berbagi sumbu dengan aSOPR/STH-SOPR (0,9–1,2) membuat keduanya rata, bahkan di Range 1y.
+- **Garis acuan Break-even 1.0 di setiap sumbu yang memuat metrik** (`RefLine.all_axes=True`): dua garis saat Separate pane, satu saat Overlay. Definisi SOPR, bukan ambang framework.
+- **Warna ikut kohort:** aSOPR navy `#0070a6` (dim 0,49), STH-SOPR rust `#bf5546` (0,44), LTH-SOPR teal `#0b8e89` (0,39). Tombol sorot: aSOPR · STH · LTH · Gap.
+- **Pane bawah "SOPR Gap"**: histogram rust alpha 0,80, dim 0,41 (redup 1,44:1, setara Z-Score). **Mati sejak awal** (keputusan user, apa pun mode harga BTC).
+- **Rumus gap = KB SOPR v1.4 §12: SMA90(STH-SOPR) − SMA60 dari SMA90 itu.** Diuji tiga tafsiran terhadap angka KB; hanya ini yang cocok persis: +0.02447 (10 Jan 2021), +0.01313 (21 Okt 2021), +0.00770 (17 Jul 2025), cross turun 28 Mar 2021 · 30 Nov 2021 · 3 Feb 2025 · 18 Agt 2025. User menyetujui rumus ini untuk dashboard.
+- **Desimal:** SOPR 3; gap 5 (KB menulis +0.00096; dengan 4 jadi "0.0010"); **LTH-SOPR ≥ 100 tanpa desimal** (`Series.whole_from=100`: sumbu menulis 1,200 · 500 · 180, di bawah 100 tetap 1.318).
+- **Terukur:** tooltip 06 Feb 2021 cocok CSV (BTC 39,221 · aSOPR 1.073 · STH-SOPR 1.050 · LTH-SOPR 4.664 · Gap 0.01021); 11 May 2011 (5.50 · 1.449 · 1.327 · 47.338).
+- Garis ambang framework (0,97 · 0,95 · 0,93 · 0,50) sengaja tidak dipasang — keputusan framework (bagian 5). Smoothing Off sejak awal (KB: LTH-SOPR harian terlalu berisik, minimal rata-rata 14 hari — user tinggal menyalakan).
+- ⚠️ **Belum diputuskan (user cek di Claude.ai):** `alerts/alert_check.py` `_sth_sopr_ma_gap` menghitung **SMA60 − SMA90**, bukan rumus KB. Angka dan tanggal cross-nya berbeda (10 Jan 2021 = +0.01141; cross 2021 di 4 Mar, 15 Apr, 18 Okt, 10 Des). Dipakai trigger K1 dan sinyal 2 alarm bear di alert harian. Teks framework v2 "gap MA90−MA60" ambigu. **Jangan dibetulkan diam-diam.**
+
+### 3.10 Kotak Tooltip — SELESAI 14 Sep 2026 (commit `073a997`)
+Kotak kedelapan di ujung baris kontrol, pilihan **Fixed / Cursor / Off**, **bawaan Cursor**.
+- **Fixed:** perilaku lama (kiri atas area gambar, pindah ke kanan atas kalau kursor mendekat).
+- **Cursor:** gaya ChartInspect — kotak 16 px di kiri garis kursor, tengahnya sejajar kursor, dibatasi di dalam area pane. Kalau di kiri tidak cukup tempat, pindah ke kanan kursor. Terukur: jarak ke kursor 15,9 px, selisih tengah 0,2 px; di tepi kiri kotak mulai di kursor + 16.
+- **Off:** tidak ada kotak; garis silang dan label sumbu tetap. Saran Claude untuk screenshot bersih ke Claude.ai.
+- **Satu pilihan untuk semua halaman** (permintaan user). Disimpan di key biasa `tooltip_pref`; widget `tooltip_mode` hanya cerminan, karena `st.navigation` membuang nilai widget saat pindah halaman (bagian 10).
+- **Latar tetap 94 %** (`rgba(28,34,48,0.94)`). Dipratinjau 100/94/80/65 %; user: lebih tembus membuat garis dan angka sama-sama tidak terbaca.
+
+### 3.11 Menu berkelompok (`st.navigation`) — SELESAI 14 Sep 2026 (commit `073a997`)
+Dipratinjau dua cara: A (radio lama + judul kelompok) dan **B (navigasi bawaan Streamlit)**, plus tiga pengelompokan (tanpa kelompok / **jenis metrik** / peran di framework). User memilih **B + jenis metrik**.
+- **Alamat per halaman:** `localhost:8503/` (MVRV, halaman pertama = bawaan), `/price-levels`, `/sopr`. Reload tetap di halaman yang sama; bisa di-bookmark. Terukur.
+- **Nama menu pendek** (`MetricFamily.title`: MVRV, Price Levels, SOPR); **nama kelompok** (`MetricFamily.group`) jadi judul kelompok di menu **dan** lencana teal di atas judul halaman (VALUATION, PROFITABILITY). `MetricFamily.key` tidak diubah (key localStorage tetap `dash_v2_market_valuation`).
+- **Usulan kelompok lengkap (19 halaman dari daftar CSV, belum semua dibuat):** Valuation (MVRV · Price Levels · AVIV · RHODL) · Profitability (SOPR · NUPL · Realized P/L · Supply in Profit) · Holder Behavior (HODL Waves · Realized Cap · CDD/VDD · LTH Flow) · Flows & Demand (Exchange · Apparent Demand) · Derivatives (Funding & OI · Futures Basis) · Sentiment & Macro (Fear & Greed · Search Trends · Treasury 2Y). Menu hanya menampilkan halaman yang sudah ada.
+- **Judul kelompok teal terang `#2aa6b0`** 11 px tebal 600 huruf kapital (pilihan 2 dari empat pratinjau). Alasan: warna abu `#8b90a0` (5,5:1) tebal kapital terlihat seterang menu tidak aktif `#c9d1d9` (11,4:1). Teal membedakan lewat warna dan senada dengan lencana kategori. Ditolak: abu, abu + garis, abu redup `#6e7681` (3,8:1, mirip "Highlight" redup yang dulu ditolak).
+- **Menu:** 15 px `#c9d1d9`; aktif latar `#102e39` + garis kiri 3 px `#006d77`, tulisan putih 600; hover `#1e2330`. Huruf pertama judul kelompok dan nama menu sama-sama di x=33 (sebelum diluruskan 20 vs 33).
+- **Tulisan merek tetap di atas menu** lewat CSS flex `order` (bawaan Streamlit menaruh menu paling atas). Garis pemisah bawaan disembunyikan. Jarak merek → judul kelompok 17 px.
+- `expanded=True`: tanpa ini Streamlit menyembunyikan halaman ke-11 dst. di balik "View more".
+- Judul kelompok bisa diklik untuk melipat kelompok (panah muncul saat hover) — fitur bawaan, dibiarkan.
+
 ### 3.5 Kotak L / R untuk pilihan sumbu — ditahan
 Ide user: tombol Left/Right diganti dua kotak kecil "L" dan "R" bergaya kotak angka periode di legend. Hasil ukur: **tidak menghemat lebar sama sekali** (lebar popover ditentukan baris CHART HEIGHT, bukan baris axis), hanya menghemat tinggi ±14 px per baris. Ditahan sampai ada halaman dengan garis banyak — bukan khusus HODL Waves, metrik lain juga bisa. Kalau dipakai, pakai untuk semua halaman sekaligus.
 
@@ -104,7 +136,7 @@ Ide user: tombol Left/Right diganti dua kotak kecil "L" dan "R" bergaya kotak an
 ### File dan struktur
 | File | Isi |
 |---|---|
-| `app.py` | Entry point v2 (dulu `app_v2.py`, diganti nama 13 Sep saat v2 live), sidebar, seluruh CSS global (termasuk aturan `:fullscreen`). |
+| `app.py` | Entry point v2 (dulu `app_v2.py`, diganti nama 13 Sep saat v2 live), menu `st.navigation` berkelompok (14 Sep), sidebar, seluruh CSS global (termasuk aturan `:fullscreen`). |
 | `.streamlit/config.toml` | Tema v2: `base = "dark"`, `primaryColor = "#006d77"`. Dipakai Streamlit Cloud dan `streamlit run app.py` lokal. |
 | `archive/app_v1.py` | Dashboard v1 (dulu `app.py`), diarsipkan 13 Sep beserta perbaikan `minBarSpacing`. |
 | `dashboard/registry.py` | Konfigurasi keluarga metrik (`MetricFamily`, `Series`, `RefLine`). Menambah halaman = menambah satu `MetricFamily`. |
@@ -113,9 +145,9 @@ Ide user: tombol Left/Right diganti dua kotak kecil "L" dan "R" bergaya kotak an
 | `dashboard/lw_chart.py` | Chart lightweight-charts yang digambar langsung di browser via `st.iframe`. Pane dibangun dari daftar (harga / metrik / tambahan), legend, sorot, geser sumbu, zoom tersimpan, tangga adaptif, tombol layar penuh. |
 | `dashboard/data.py` | Loader CSV, SMA/EMA, filter tanggal, Z-Score rolling 1Y/2Y/4Y. |
 
-Hanya **Market Valuation** yang sudah dibuat (`data_mvrv.csv`: MVRV, STH MVRV, LTH MVRV + garis acuan Neutral 1,0, plus MVRV Z-Score dan Rolling Z-Score di pane tambahan).
+Halaman yang sudah dibuat: **MVRV** (`data_mvrv.csv`: MVRV, STH MVRV, LTH MVRV + garis acuan Neutral 1,0, plus MVRV Z-Score dan Rolling Z-Score di pane tambahan), **Price Levels** (bagian 3.1), **SOPR** (bagian 3.9).
 
-### Kontrol di halaman (7 kotak, semuanya bergaya sama)
+### Kontrol di halaman (8 kotak, semuanya bergaya sama; Tooltip ditambah 14 Sep, bagian 3.10)
 - **Range** — preset **1m / 3m / 6m / 1y / 4y / All** (huruf kecil sejak 13 Sep supaya seragam dengan "7d" dan "1y"; nilai di baliknya tetap "1M" dst.) plus tanggal From/To yang disejajarkan satu baris. Default **All**.
 - **Smoothing** — tab SMA/EMA, kisi 3×3 (Off, 7d, 14d, 30d, 60d, 90d, 200d, 365d, 730d), input periode sendiri + tombol Add. Multi-periode.
 - **Scale** — Auto/Linear/Log terpisah untuk metrik (kiri) dan BTC (kanan).
@@ -138,10 +170,11 @@ Gaya diberikan menurut urutan periode dan **menempel pada periodenya** — memat
 Periode ke-4 dan seterusnya mengulang ketiga gaya itu dengan garis 0,5 px lebih tebal. Warna selalu mengikuti metrik induknya.
 
 ### Tampilan
-- Warna garis: MVRV navy `#0070a6`, STH rust `#bf5546`, LTH teal `#0b8e89`, BTC oranye `#F7931A`. Semua garis utama 1,5 px.
+- Warna garis: MVRV navy `#0070a6`, STH rust `#bf5546`, LTH teal `#0b8e89`, BTC oranye `#F7931A`. Semua garis utama **2 px** (sejak 13 Sep; sebelumnya 1,5 px — lihat bagian 5).
+- **Header Streamlit transparan, tombol pembuka sidebar kembali** (13 Sep, laporan user: setelah sidebar ditutup tombolnya tidak muncul). Dulu `stHeader` di-`display:none`, padahal `stExpandSidebarButton` tinggal di dalamnya (terukur 0×0 px). Sekarang header dan semua anaknya `background: transparent; pointer-events: none`, Deploy/menu/`stToolbarActions` tetap `display:none`, hanya tombol pembuka sidebar `pointer-events: auto`. Terukur (1440): tombol 28×28 px, klik mengenai tombol, sidebar terbuka lagi; judul halaman dan tombol Range tidak tertutup; aturan `:fullscreen` tetap menyembunyikan header.
 - **Teal gelap `#006d77` warna utama dashboard** (keputusan user 13 Sep 2026). Aksen kontrol: latar teal 40% + garis tepi + teks putih.
   - `#006d77` **tidak dipakai sebagai warna huruf**: kontrasnya 3,1:1 di latar halaman `#0e1117` dan 2,9:1 di sidebar `#151924`. Pakai sebagai isian, garis tepi, lencana, atau garis aksen; tulisan di atasnya putih (6,1:1). Kalau tulisan memang harus berwarna teal, pakai teal terang `#2aa6b0` (hue sama, 6,0:1 di sidebar).
-  - **Sidebar ikut teal** (13 Sep): menu aktif bergaris kiri `#006d77` dengan latar `#102e39` (teal 25% di atas sidebar); tulisan "ON-CHAIN DASHBOARD v2" `#2aa6b0`. Ungu `#a855f7` sudah tidak dipakai di v2.
+  - **Sidebar ikut teal** (13 Sep): menu aktif bergaris kiri `#006d77` dengan latar `#102e39` (teal 25% di atas sidebar); tulisan "ON-CHAIN DASHBOARD v2" `#2aa6b0`. Ungu `#a855f7` sudah tidak dipakai di v2. Sejak 14 Sep menu memakai `st.navigation` dengan judul kelompok teal terang (bagian 3.11); CSS radio lama dibuang.
 - **Judul halaman (gaya B2, 13 Sep):** kategori (`family.title`, sama dengan nama menu sidebar) jadi lencana kecil — 11 px, huruf besar, renggang 0,12em, tebal 600, putih di atas `#006d77`, sudut 4 px. Di bawahnya nama metrik (`family.subtitle`) jadi judul **1,15rem (18,4 px) tebal 600 putih**, sama dengan menu sidebar, dengan "Latest data: <tanggal>" sebaris di kanan (0,72rem `#8b90a0`, rata garis dasar). Dibangun dari `div`, bukan `h3`, supaya Streamlit tidak menambah ikon tautan. Terukur: tepi kiri lencana, judul, tombol, dan chart sama-sama di x=380 (viewport 1440); jarak judul ke tombol 14,6 px (sama dengan judul lama).
 - Popover ringkas: jarak tepi 12–14 px, judul kecil 11 px, tombol 12 px / tinggi minimal 26 px.
 - Kotak tanggal tanpa latar abu, isinya rata tengah, kalender bawaan browser diwarnai lewat `accent-color`.
@@ -196,6 +229,13 @@ Periode ke-4 dan seterusnya mengulang ketiga gaya itu dengan garis 0,5 px lebih 
 - **Tooltip membaca periode smoothing dari nama seri** "<metrik> <SMA|EMA>(<periode>)" (dibuat di `metric_page.py`). Kelompok tanpa garis utama (Rolling Z-Score) → tiap anggota satu baris. Nilai diambil dari `D.cols` lewat indeks tanggal, bukan dari `param.seriesData`, supaya pane mana pun yang disentuh kursor menghasilkan isi yang sama. Hanya pane yang sedang memegang tooltip boleh menyembunyikannya (saat pindah pane, pane lama melapor kosong sesudah pane baru mengisi).
 - **Field baru `MetricFamily.extra_label`** (13 Sep): nama kotak kontrol pane bawah. `default_selection` / `default_series()` dibuang (tidak terpakai). `charts.py` sekarang hanya berisi `Line` dan `render()` yang meneruskan ke `lw_chart`.
 - **Field baru `Series` di registry** (13 Sep): `kind` ("line"/"histogram"), `smoothing`, `short`, `alpha`, `group`, `hidden_default`, `pane` ("main"/"extra"). `Line` di `charts.py` ikut membawa `kind`, `short`, `hidden_default`. `lw_chart.render()` sekarang menerima `extra_lines`.
+- **Field baru 14 Sep:**
+  - `MetricFamily.group` (kelompok menu + lencana judul), `MetricFamily.url_path` (alamat halaman), `MetricFamily.btc_mode_default` (keadaan awal kotak BTC price; SOPR "Separate pane" — `_init_state` langsung memakai `separate_axis` kalau bawaannya Separate pane).
+  - `Series.whole_from` / `Line.whole_from`: angka sebesar ini ke atas ditulis tanpa desimal (`angka(v, p, bulatDari)` dan `angkaSeri(spec, v)` di `lw_chart.py`).
+  - `RefLine.all_axes`: satu garis acuan di setiap sumbu yang memuat metrik.
+  - `lw_chart.render(..., tooltip=)` dan `C.tooltip` di browser (`posisikanTooltip`).
+- **Garis acuan mewarisi `precision` dan `whole_from` metrik di sumbunya** (14 Sep) — lihat bagian 10 kenapa.
+- **Desimal data yang dikirim ke chart ikut precision seri** (14 Sep): `_num(v, digits)` dengan `digits = max(4, precision + 1)` untuk nilai < 1000. Sebelumnya dipaku 4 desimal, sehingga gap 5 desimal tampil dari angka yang sudah terpotong.
 
 ---
 
@@ -214,7 +254,7 @@ Periode ke-4 dan seterusnya mengulang ketiga gaya itu dengan garis 0,5 px lebih 
 - **Gaya smoothing:** titik-titik → tangga → pita, seperti tabel di bagian 4. Gaya menempel pada periodenya.
 - **Simbol/marker untuk membedakan garis smoothing ditolak user** (terlalu ramai).
 - **Legend berkelompok per metrik** (bukan satu label per garis).
-- **Tebal garis 1,5 px** untuk semua garis utama termasuk BTC.
+- **Tebal garis 2 px** untuk semua garis utama termasuk BTC (`LINE_WIDTH` di `metric_page.py`, diputuskan user 13 Sep setelah membandingkan di localhost; menggantikan 1,5 px). Alasan: library tidak membulatkan tebal garis data, jadi 1,5 px di layar rasio piksel 1 tampak seperti 1 px tajam + tepi samar. Garis smoothing tidak diubah (titik-titik 2 px kini setebal garis utama, dibedakan polanya; pita 3 px).
 - **Popover Scale memakai nama metrik** (misalnya "MVRV OSCILLATORS"), bukan kata "Metric".
 - **Tata letak panel bertumpuk tidak dipakai** untuk halaman MVRV.
 - **Tingkat terang legend, angka periode, dan mode sorot sengaja berbeda** (kontras 14,5 / 10,0 / 5,8 : 1). Itu hierarki: isi chart → anak isi → alat. Menyamakannya juga memperkecil beda antara tombol sorot aktif (putih, 17,9:1) dan yang tidak aktif. Dibahas 13 Sep, diputuskan tetap.
@@ -226,6 +266,9 @@ Periode ke-4 dan seterusnya mengulang ketiga gaya itu dengan garis 0,5 px lebih 
 - **Z-Score full-history untuk aturan, rolling untuk mata.** Jendela rolling bisa dipilih (1y/2y/4y), tapi mengganti jendela tidak membuatnya jadi sinyal — kesimpulan KB berlaku untuk metodenya, bukan untuk angka 365 hari.
 - **Tombol layar penuh satu saja, di dalam chart**, keluar lewat Esc. Kotak Screen di baris kontrol dihapus.
 - **Line style tanpa nama, lambang saja** (nama di tooltip). Step = pilihan B (satu anak tangga naik).
+- **Halaman SOPR tata letak B** (BTC Separate pane, LTH-SOPR sumbu kanan, Log), **rumus gap KB §12**, desimal SOPR 3 / gap 5, LTH-SOPR ≥ 100 tanpa desimal, pane Gap mati sejak awal (14 Sep, bagian 3.9).
+- **Tooltip: Fixed / Cursor / Off, bawaan Cursor, satu pilihan untuk semua halaman, latar 94 %** (14 Sep, bagian 3.10). Latar lebih tembus ditolak.
+- **Menu: `st.navigation` (cara B), kelompok jenis metrik, nama menu pendek, judul kelompok teal terang `#2aa6b0`** (14 Sep, bagian 3.11). Pengelompokan "peran di framework" ditolak: menu ikut dirombak setiap framework berganti versi.
 
 ---
 
@@ -239,13 +282,16 @@ Periode ke-4 dan seterusnya mengulang ketiga gaya itu dengan garis 0,5 px lebih 
 
 ## 7. Belum dikerjakan
 
-- **Halaman metrik lainnya** dan **navigasi seluruh halaman** (prioritas 3).
+- **Halaman metrik lainnya** (16 dari usulan 19 di bagian 3.11). ~~Navigasi seluruh halaman~~ — selesai 14 Sep.
+- **Semua kontrol Python diingat per halaman — diminta user 14 Sep, lalu DIPENDING.** Sekarang Range, Smoothing, Scale, BTC price, pane bawah, Display, dan Line style kembali ke bawaan setiap pindah halaman (terukur: Range 1y di SOPR → All setelah ke MVRV dan balik), karena `st.navigation` membuang nilai widget halaman lain. Pola solusinya sudah ada: gudang key biasa + widget sebagai cerminan (`TIP_STORE` untuk Tooltip, `{key}_lstyles` untuk Line style). Belum diputuskan: cukup selama sesi browser, atau juga setelah reload (butuh URL query atau localStorage).
+- **Rumus gap STH-SOPR di `alerts/alert_check.py` berbeda dari KB §12** — menunggu keputusan user di Claude.ai (bagian 3.9). Jangan diubah tanpa diminta.
 - ~~Desain judul halaman~~ dan ~~warna histogram Z-Score~~ — selesai 13 Sep 2026 (bagian 3.6, 4, 5).
 - **Lambang Step dan Band (gambar SVG) duduk 1,2 px berbeda secara vertikal** dari tiga lambang teks di sebelahnya. Di screenshot tidak terlihat dan user belum mengeluh; kalau dilaporkan, geser gambar 1 px ke atas.
 - **Gradasi warna histogram Z-Score** — ditunda user, bagian 5.
+- **Label nilai terakhir di sumbu bertumpuk** (terlihat 13 Sep, belum dibahas dengan user). Dengan smoothing 3 periode menyala, halaman MVRV punya 12 label nilai terakhir berderet di sumbu kiri (MVRV/STH/LTH × garis utama + 3 smoothing) dan saling menimpa. Sudah ada sebelum pekerjaan 13 Sep. Kandidat solusi (belum dipilih): label nilai terakhir hanya untuk garis utama (`lastValueVisible` false untuk garis smoothing — nilainya tetap terbaca di tooltip), atau hanya untuk garis yang disorot. Tanyakan dulu dengan pratinjau.
 - ~~Legend padat di layar sempit~~ — selesai 13 Sep (tinggi baris legend ikut isinya, bagian 4).
 - ~~Celah kosong di kiri chart saat chart melebar dengan zoom All~~ — selesai 13 Sep (bagian 4).
-- **Range All tidak selalu memuat seluruh sejarah — tidak terulang di chart yang sudah tergambar, kemungkinan artefak panel** (diusut 13 Sep). Rentang direkam tiap 100 ms sambil mengganti Range 1y → All: tampilan "±160 bar terakhir" hanya ada **sebelum chart pertama kali tergambar** (lebar sumbu masih 0, area gambar = lebar penuh bingkai). Begitu frame tergambar (dipicu screenshot), rentangnya langsung penuh (bar 0–5896) dan tidak mundur. Cocok dengan panel browser Claude yang membekukan frame. Kode tidak diubah. Kalau user melihatnya di browsernya sendiri, usut dari situ.
+- **Range All tidak selalu memuat seluruh sejarah — tidak terulang di chart yang sudah tergambar, kemungkinan artefak panel** (diusut 13 Sep). Terlihat lagi 14 Sep di panel Claude (SOPR All mulai ±2012); di browser user SOPR mulai 2010 — artefak panel, bukan bug. Rentang direkam tiap 100 ms sambil mengganti Range 1y → All: tampilan "±160 bar terakhir" hanya ada **sebelum chart pertama kali tergambar** (lebar sumbu masih 0, area gambar = lebar penuh bingkai). Begitu frame tergambar (dipicu screenshot), rentangnya langsung penuh (bar 0–5896) dan tidak mundur. Cocok dengan panel browser Claude yang membekukan frame. Kode tidak diubah. Kalau user melihatnya di browsernya sendiri, usut dari situ.
 - **Riwayat masalah tombol layar penuh (selesai, lalu seluruh mekanismenya diganti tombol di dalam chart — disimpan sebagai catatan).** Cara kerja lama:
   1. Kotak **Screen** (Normal | Full) hanya mengubah `st.session_state[f"{k}_screen"]`. Saat "Full", `render_metric_page()` menyuntikkan CSS yang menyembunyikan sidebar, header, dan toolbar Streamlit sehingga chart memenuhi jendela.
   2. Layar penuh browser **tidak bisa dipanggil dari Python**, karena `requestFullscreen()` wajib dipanggil di dalam gestur klik. Jadi `app_v2.py` menyisipkan `_FULLSCREEN_SCRIPT` lewat `st.iframe`; skrip itu berjalan di dalam iframe, mengambil `window.parent.document`, mencari kelompok tombol yang berisi "Full" dan "Normal", lalu memasang pendengar klik fase-capture pada keduanya (`attach()` + `MutationObserver`, penanda `dataset.fsBound`). (Nama file waktu itu `app_v2.py`; sekarang `app.py`.)
@@ -321,6 +367,7 @@ Bukan untuk halaman: `data_master_all_metrics.csv` (file hasil generate) dan `da
 - **Tombol tidak boleh mengubah nilai widget di badan `if st.button(...)`** — Streamlit menolak dengan `StreamlitWidgetAlreadyInstantiatedError`. Pakai `on_click=` callback, yang berjalan sebelum halaman digambar ulang.
 - **`st.rerun()` membuang nilai widget yang belum sempat digambar.** Bukan cuma isi popover yang sedang terbuka: *semua* kontrol yang letaknya sesudah titik rerun ikut hilang nilainya. Gejalanya di sini: menekan tombol periode Smoothing membuat kotak Screen balik sendiri ke "Normal" padahal browser masih layar penuh (kotak Screen digambar paling ujung). Obatnya bukan menambal satu per satu — hapus `st.rerun()`-nya, pakai `on_click=`. Sesudah itu Display, Chart, dan Line style ikut aman.
 - **Iframe komponen dibangun ulang kalau urutan elemen di atasnya berubah**, walau isinya sama persis. Penanda tetap yang ditulis ke DOM halaman induk (mis. `dataset.xxx = '1'`) akan bertahan padahal konteks yang menulisnya sudah mati — pakai nomor unik per muatan, jangan nilai tetap.
+- **Jangan sembunyikan `header[data-testid="stHeader"]` dengan `display:none`** — tombol pembuka sidebar (`stExpandSidebarButton`) ada di dalamnya. Dan `pointer-events: none` pada header saja tidak cukup: `stToolbar` di dalamnya menyalakan lagi penangkap kliknya sendiri dan menutupi klik di atas judul halaman. Terapkan ke `header ... *`, lalu nyalakan kembali hanya untuk tombol pembuka sidebar.
 - **Wadah teks (`stMarkdownContainer`) punya `margin-bottom: -16px`.** Tinggi tata letaknya jadi 16 px lebih pendek daripada kotak yang terlihat. Kalau dipakai bersama `st.columns(vertical_alignment="center")`, isinya jatuh 8 px di bawah garis tengah. Batalkan dengan `margin-bottom: 16px` pada div sendiri.
 - **Tinggi tombol dipaku 32 px oleh Streamlit.** `min-height` dan `padding` tidak bisa mengecilkannya; `height` harus ditimpa langsung.
 - **Teks `st.button` dipasang sebagai baris *inline*** di kotak baris yang lebih tinggi daripada hurufnya, jadi duduk di garis dasar (2,3 px di bawah tengah) sementara `st.segmented_control` duduk 0,5 px di atas tengah. Perbaikannya `display:block` + `line-height` pada `p` di dalam tombol.
@@ -334,9 +381,14 @@ Bukan untuk halaman: `data_master_all_metrics.csv` (file hasil generate) dan `da
 - **Kalender tanggal adalah milik browser** (input `type=date`), muncul di luar halaman dan tidak bisa di-CSS. Warnanya diatur lewat `accent-color` pada input.
 - **Nama atribut berubah di 1.63:** opsi radio terpilih memakai `data-selected` (dulu `data-checked`), dan bulatan radio bukan lagi anak pertama label. CSS sidebar lama diam-diam berhenti bekerja karena ini.
 - Elemen yang sedang difokus memakai bayangan merah bawaan; ditimpa dengan bayangan teal (`:focus-visible` dan `[data-focus-visible]`).
+- **Pindah halaman lewat `st.navigation` membuang nilai widget, walau key dan widget-nya sama persis di tiap halaman** (terukur 14 Sep: Tooltip Fixed di SOPR jadi Cursor lagi di MVRV; dengan `st.radio` lama tidak terjadi untuk widget yang sama). Nilai yang harus bertahan disimpan di key biasa `st.session_state` (bukan key widget), lalu widget disemai dari situ dan `on_change` menulis balik.
+- **`st.navigation` menaruh menu di paling atas sidebar**, di atas isi `with st.sidebar`. Urutannya dibalik lewat `[data-testid="stSidebarContent"] { display:flex; flex-direction:column }` + `order` pada `stSidebarHeader` (0), `stSidebarUserContent` (1), `stSidebarNav` (2). Test id lain: `stNavSectionHeader` (judul kelompok, ada panah lipat tersembunyi), `stSidebarNavLink` (aktif = `aria-current="page"`), `stSidebarNavSeparator`.
+- **`st.Page` dengan fungsi:** identitas halaman dihitung dari `url_path` (`calc_hash`), nama bawaan dari `__name__`. Halaman dibuat lewat pabrik `_halaman(family)` dengan `__name__` unik + `url_path` eksplisit. Halaman `default=True` beralamat root (`/`).
+- **Sesaat setelah sidebar dibuka, lebarnya terbaca 0 dan teks merek pecah per huruf** — itu animasi pembuka, bukan bug. Ukur ulang sesudah ±1 detik (terukur 300 px).
 
 ### lightweight-charts 4.2.3
 - **`minBarSpacing` kecil (0.005)** supaya `fitContent()` sanggup menampilkan ~5.900 titik harian.
+- **Tebal garis data tidak dibulatkan** (dicek di kode 4.2.3): garis seri digambar `lineWidth × pixelRatio` apa adanya; hanya garis kisi dan garis silang yang `Math.floor`. Tebal pecahan (1,5) di layar rasio 1 jatuh di antara piksel dan tampak tipis. Bilangan bulat (2) tajam.
 - **`fitContent()` tidak bekerja selama lebar chart 0.** Hasilnya chart berhenti di lebar bar bawaan (±160 hari terakhir), dan kalau ikut disimpan, chart selalu terbuka di rentang itu. Tampilan awal karena itu diulang lewat poller sampai lebar > 0.
 - **Kesiapan harus diukur dari pane utama.** Pane harga (Separate pane) punya skala waktu tersembunyi, jadi `timeScale().width()`-nya selalu 0.
 - **`chart.resize(w, h, true)` mengubah rentang yang tampil** kalau ukurannya beda. Jangan dipakai sebagai "paksa gambar ulang" saat mengukur — ini sempat membuat hasil pengukuran palsu di sesi ini.
@@ -346,6 +398,7 @@ Bukan untuk halaman: `data_master_all_metrics.csv` (file hasil generate) dan `da
 - **`lineType`**: Simple / WithSteps / Curved. Tangga hanya terlihat kalau satu bar memakan beberapa piksel.
 - **`priceScale().width()` bernilai 0 sampai chart benar-benar menggambar.** Perataan baris legend ke area gambar karena itu diulang tiap 150 ms selama 4 detik pertama. Di panel browser Claude yang sering membeku nilainya bisa tetap 0 sampai ada gerakan mouse — itu artefak panel, bukan bug.
 - **Lebar area gambar baru mengendap 1–2 detik sesudah chart tampil**, karena lebar sumbu harga menyesuaikan panjang label ("300000.00" vs "1.50") dan kedua pane disamakan. Chart mempertahankan **lebar bar**, bukan rentangnya, jadi area yang menyusut menggeser tepi kiri. Inilah sebab zoom mengecil sedikit demi sedikit tiap kali berganti Overlay ↔ Separate pane (2931 → 3104 → 3268 → 3422 dalam tiga kali ganti). Memeriksa sekali sesudah memasang zoom **tidak cukup** — geserannya datang belakangan, saat pemeriksaan sudah selesai.
+- **Format angka sumbu diambil dari seri pertama di sumbu itu.** Garis acuan disisipkan paling depan (`plan.insert(0, …)`), jadi precision bawaannya (2) sempat membuat sumbu SOPR menulis 1.25 dan bukan 1.250 (14 Sep). Garis acuan kini mewarisi `precision` dan `whole_from` metrik di sumbunya.
 - **Tidak ada perintah mengatur rentang sumbu harga di v4.** Rentang dikunci lewat `autoscaleInfoProvider` pada semua garis di sumbu itu. v5 (5.2.1) punya `IPriceScaleApi.setVisibleRange`, tapi upgrade mengubah hampir seluruh kode chart.
 - **Menarik angka sumbu = mengubah skala** (`handleScale`), bukan menggeser. Menarik area gambar hanya menggeser sumbu "utama" pane, dan hanya kalau autoscale-nya mati.
 - **Fullscreen API pernah ditolak** (`TypeError: Permissions check failed`) — lihat bagian 7.
@@ -394,7 +447,7 @@ Konfigurasi di `.claude/launch.json`: `dashboard-lama` (8501, `archive/app_v1.py
 
 1. Baca `CLAUDE.md` dan dokumen ini.
 2. Jalankan `dashboard-v2-uji`, buka halaman Market Valuation, dan lihat sendiri keadaannya sebelum mengubah apa pun.
-3. Market Valuation dan Price Levels sudah live. Halaman berikutnya belum dipilih, dan **pengelompokan navigasi 17 halaman belum dibahas** — tanyakan. Untuk halaman baru pakai gaya judul B2, aturan teal (bagian 4–5), `precision` per seri, dan uji palet bagian 9. Kerjakan di localhost dulu; push hanya setelah user menyatakan valid.
+3. MVRV, Price Levels, dan SOPR sudah live dengan menu berkelompok (commit terakhir `073a997`). **Halaman berikutnya belum dipilih** — tanyakan; daftar usulan dan kelompoknya di bagian 3.11. Halaman baru = satu `MetricFamily` dengan `group` dan `url_path`. Pakai gaya judul B2, aturan teal (bagian 4–5), `precision`/`whole_from` per seri, dan uji palet bagian 9. Pending yang bisa ditanyakan: kontrol diingat per halaman (bagian 7), rumus gap `alert_check.py` (bagian 3.9). Kerjakan di localhost dulu; push hanya setelah user menyatakan valid.
 4. Untuk urusan tampilan apa pun, buat widget pratinjau dengan data asli lebih dulu, lalu tunggu pilihan user. Untuk warna garis baru, jalankan uji palet di bagian 9 sebelum menunjukkan pratinjau.
 5. Sesudah mengubah apa pun di `dashboard/`, **restart server** — modul yang sudah dimuat tidak dibaca ulang.
 6. Kalau ada keluhan tampilan yang terdengar kecil ("kurang rata", "kebesaran"), **ukur dulu di halaman hidup** lewat `getBoundingClientRect` dan `getComputedStyle`, jangan menebak dari kode. Semua perbaikan tata letak 13 Sep ketemu dengan cara itu, dan dua tebakan pertama meleset.
