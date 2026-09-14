@@ -15,6 +15,8 @@ LWC_URLS = [
 ]
 TOOLBAR_H = 40
 PANE_GAP = 6
+NAV_H = 52          # slider rentang di bawah chart; diambil dari tinggi pane, bukan ditambahkan
+NAV_COL = "BTC Price"
 
 TEMPLATE = """
 <style>
@@ -55,6 +57,9 @@ TEMPLATE = """
   .fsbtn { display: inline-flex; align-items: center; gap: 6px; }
   .fsbtn svg { width: 12px; height: 12px; }
   #panes > div + div { margin-top: __GAP__px; }
+  /* Slider rentang (navigator): paling bawah, di bawah sumbu tanggal. */
+  #nav { margin-top: __GAP__px; }
+  #nav canvas { display: block; touch-action: none; }
   /* Tooltip: angka di tanggal bawah kursor. Posisinya dipilih lewat kotak Tooltip
      (Fixed / Cursor / Off, lihat posisikanTooltip). Satu baris per metrik; periode
      smoothing jadi kolom. */
@@ -80,6 +85,7 @@ TEMPLATE = """
   <div id="hl"><span class="hllabel">Highlight</span></div>
 </div>
 <div id="panes"></div>
+<div id="nav"></div>
 <div id="tip"></div>
 <div id="err"></div>
 <script>
@@ -217,6 +223,215 @@ loadLib(0).then(() => {
     anchor.setData(D.t.map(t => ({ time: t, value: 0 })));
   }
 
+  // ---------------------------------------------------------------- slider rentang
+  // Gaya navigator TradingView (disetujui user 14 Sep 2026): seluruh data chart digambar
+  // mini (BTC Price, skala Log) dengan jendela teal yang bisa digeser dan diubah lebarnya.
+  // Digambar di kanvas biasa, bukan chart kedua: letak horizontalnya diambil langsung dari
+  // area gambar chart (lebar sumbu kiri + lebar skala waktu), jadi selalu selebar chart
+  // tanpa perlu ikut sinkron lebar sumbu. Rentang logis 0 .. N-1 = seluruh lebar slider, sama
+  // dengan hasil fitContent() di chart (Range All = jendela penuh).
+  // Hidup di dalam chart: menggeser slider tidak memicu rerun Streamlit.
+  let gambarNav = () => {};
+  if (C.nav && D.t.length > 1) {
+    const navEl = document.getElementById('nav');
+    const kanvas = document.createElement('canvas');
+    navEl.appendChild(kanvas);
+    const ctx = kanvas.getContext('2d');
+    const N = D.t.length;
+    const TINGGI_NAV = C.navHeight;
+    const MIN_BAR = 8;                        // jendela tersempit
+    const PEGANGAN_W = 9, PEGANGAN_H = 26;    // pegangan kiri/kanan
+    const JANGKAU_PEGANGAN = 7;               // jarak kursor ke tepi jendela yang masih menangkap pegangan
+    const chartBawah = charts[charts.length - 1];   // skala waktunya yang terlihat
+
+    let lmin = Infinity, lmax = -Infinity;
+    const logNilai = D.cols[C.nav].map(v => {
+      if (v === null || !(v > 0)) return null;
+      const l = Math.log10(v);
+      if (l < lmin) lmin = l;
+      if (l > lmax) lmax = l;
+      return l;
+    });
+    if (!(lmax > lmin)) { lmin -= 1; lmax += 1; }
+
+    function geometri() {
+      const kiriScale = chartBawah.priceScale('left');
+      const kanan = chartBawah.priceScale('right');
+      const kiri = kiriScale.options().visible ? kiriScale.width() : 0;
+      let lebar = chartBawah.timeScale().width();
+      if (!(lebar > 0)) {
+        lebar = document.body.clientWidth - kiri - (kanan.options().visible ? kanan.width() : 0);
+      }
+      return { kiri, lebar };
+    }
+    const xDari = (g, logis) => g.kiri + logis * g.lebar / (N - 1);
+    const logisDari = (g, x) => (x - g.kiri) * (N - 1) / g.lebar;
+    // Jendela dijaga di dalam data; lebarnya tidak berubah saat digeser mentok ke tepi.
+    function batasi(from, to) {
+      const w = to - from;
+      if (w >= N - 1) return { from: 0, to: N - 1 };
+      if (from < 0) return { from: 0, to: w };
+      if (to > N - 1) return { from: N - 1 - w, to: N - 1 };
+      return { from, to };
+    }
+
+    function lukis() {
+      const lebarCss = document.body.clientWidth;
+      const dpr = window.devicePixelRatio || 1;
+      if (kanvas.width !== Math.round(lebarCss * dpr) || kanvas.height !== Math.round(TINGGI_NAV * dpr)) {
+        kanvas.width = Math.round(lebarCss * dpr);
+        kanvas.height = Math.round(TINGGI_NAV * dpr);
+        kanvas.style.width = lebarCss + 'px';
+        kanvas.style.height = TINGGI_NAV + 'px';
+      }
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, lebarCss, TINGGI_NAV);
+      const g = geometri();
+      if (!(g.lebar > 0)) return;
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(g.kiri, 0, g.lebar, TINGGI_NAV);
+      ctx.clip();
+      ctx.fillStyle = '#161b26';
+      ctx.fillRect(g.kiri, 0, g.lebar, TINGGI_NAV);
+
+      // Area harga BTC (Log): ruang 6 px di atas, 2 px di bawah.
+      const atas = 6, bawah = TINGGI_NAV - 2;
+      const yDari = l => atas + (1 - (l - lmin) / (lmax - lmin)) * (bawah - atas);
+      const garis = new Path2D();
+      let xAwal = null, xAkhir = null;
+      for (let i = 0; i < N; i++) {
+        if (logNilai[i] === null) continue;
+        const x = xDari(g, i), y = yDari(logNilai[i]);
+        if (xAwal === null) { garis.moveTo(x, y); xAwal = x; } else garis.lineTo(x, y);
+        xAkhir = x;
+      }
+      if (xAwal !== null) {
+        const area = new Path2D(garis);
+        area.lineTo(xAkhir, TINGGI_NAV);
+        area.lineTo(xAwal, TINGGI_NAV);
+        area.closePath();
+        ctx.fillStyle = 'rgba(91,107,128,0.35)';
+        ctx.fill(area);
+        ctx.strokeStyle = '#5b6b80';
+        ctx.lineWidth = 1;
+        ctx.stroke(garis);
+      }
+
+      const r = panes.main.timeScale().getVisibleLogicalRange();
+      if (!r) { ctx.restore(); return; }
+      const b = batasi(Math.max(0, r.from), Math.min(N - 1, r.to));
+      const x1 = xDari(g, b.from), x2 = xDari(g, b.to);
+      // Selubung gelap di luar jendela, isian teal tipis di dalamnya.
+      ctx.fillStyle = 'rgba(10,12,18,0.62)';
+      ctx.fillRect(g.kiri, 0, x1 - g.kiri, TINGGI_NAV);
+      ctx.fillRect(x2, 0, g.kiri + g.lebar - x2, TINGGI_NAV);
+      ctx.fillStyle = 'rgba(0,109,119,0.10)';
+      ctx.fillRect(x1, 0, x2 - x1, TINGGI_NAV);
+      ctx.strokeStyle = '#006d77';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(Math.round(x1) + 0.5, 0.5, Math.max(0, Math.round(x2) - Math.round(x1) - 1), TINGGI_NAV - 1);
+      ctx.restore();
+
+      // Pegangan tidak dipotong batas area: di tepi data separuhnya menjorok ke sumbu.
+      const yPeg = Math.round((TINGGI_NAV - PEGANGAN_H) / 2);
+      for (const x of [x1, x2]) {
+        const kiriPeg = Math.round(x - PEGANGAN_W / 2);
+        ctx.fillStyle = '#006d77';
+        ctx.beginPath();
+        if (ctx.roundRect) ctx.roundRect(kiriPeg, yPeg, PEGANGAN_W, PEGANGAN_H, 3);
+        else ctx.rect(kiriPeg, yPeg, PEGANGAN_W, PEGANGAN_H);
+        ctx.fill();
+        ctx.fillStyle = '#9fd4d8';
+        ctx.fillRect(kiriPeg + 3, yPeg + 8, 1, PEGANGAN_H - 16);
+        ctx.fillRect(kiriPeg + 5, yPeg + 8, 1, PEGANGAN_H - 16);
+      }
+    }
+    gambarNav = lukis;
+
+    function pasangRentang(from, to) {
+      for (const chart of charts) {
+        try { chart.timeScale().setVisibleLogicalRange({ from, to }); } catch (e) {}
+      }
+      lukis();
+    }
+
+    // Bagian slider di bawah kursor: pegangan kiri/kanan, jendela, atau area gelap.
+    function bagianDi(x) {
+      const g = geometri();
+      const r = panes.main.timeScale().getVisibleLogicalRange();
+      if (!r || !(g.lebar > 0)) return null;
+      const b = batasi(Math.max(0, r.from), Math.min(N - 1, r.to));
+      const x1 = xDari(g, b.from), x2 = xDari(g, b.to);
+      // Pegangan menangkap sampai JANGKAU_PEGANGAN di luar jendela, tapi ke dalam paling
+      // banyak sepertiga lebar jendela: jendela sempit tetap punya bagian tengah untuk digeser.
+      const dalam = Math.min(JANGKAU_PEGANGAN, (x2 - x1) / 3);
+      let jenis = 'lompat';
+      if (x >= x1 - JANGKAU_PEGANGAN && x <= x1 + dalam) jenis = 'kiri';
+      else if (x >= x2 - dalam && x <= x2 + JANGKAU_PEGANGAN) jenis = 'kanan';
+      else if (x > x1 && x < x2) jenis = 'geser';
+      return { jenis, g, from: b.from, to: b.to };
+    }
+    const KURSOR = { kiri: 'ew-resize', kanan: 'ew-resize', geser: 'grab', lompat: 'pointer' };
+    const xKanvas = event => event.clientX - kanvas.getBoundingClientRect().left;
+
+    let tarik = null;
+    kanvas.addEventListener('pointerdown', event => {
+      if (event.button !== 0) return;
+      const x = xKanvas(event);
+      const bagian = bagianDi(x);
+      if (!bagian) return;
+      let { jenis, from, to } = bagian;
+      // Klik di area gelap: jendela dipindah berpusat di klik, lalu bisa langsung digeser.
+      if (jenis === 'lompat') {
+        const tengah = logisDari(bagian.g, x);
+        const w = to - from;
+        ({ from, to } = batasi(tengah - w / 2, tengah + w / 2));
+        pasangRentang(from, to);
+        jenis = 'geser';
+      }
+      tarik = { jenis, x, from, to };
+      kanvas.style.cursor = jenis === 'geser' ? 'grabbing' : KURSOR[jenis];
+      // Tarikan tidak putus walau kursor keluar dari slider.
+      try { kanvas.setPointerCapture(event.pointerId); } catch (e) {}
+      event.preventDefault();
+    });
+    kanvas.addEventListener('pointermove', event => {
+      const x = xKanvas(event);
+      if (!tarik) {
+        const bagian = bagianDi(x);
+        kanvas.style.cursor = bagian ? KURSOR[bagian.jenis] : 'default';
+        return;
+      }
+      const g = geometri();
+      if (!(g.lebar > 0)) return;
+      const d = (x - tarik.x) * (N - 1) / g.lebar;   // piksel -> bar
+      let from = tarik.from, to = tarik.to;
+      if (tarik.jenis === 'geser') {
+        ({ from, to } = batasi(from + d, to + d));
+      } else if (tarik.jenis === 'kiri') {
+        from = Math.max(0, Math.min(from + d, to - MIN_BAR));
+      } else {
+        to = Math.min(N - 1, Math.max(to + d, from + MIN_BAR));
+      }
+      pasangRentang(from, to);
+    });
+    const lepas = event => {
+      if (!tarik) return;
+      tarik = null;
+      try { kanvas.releasePointerCapture(event.pointerId); } catch (e) {}
+      const bagian = bagianDi(xKanvas(event));
+      kanvas.style.cursor = bagian ? KURSOR[bagian.jenis] : 'default';
+    };
+    kanvas.addEventListener('pointerup', lepas);
+    kanvas.addEventListener('pointercancel', lepas);
+
+    // Zoom/geser di chart (mouse, tombol Range, pemulihan zoom) menggerakkan slider.
+    panes.main.timeScale().subscribeVisibleLogicalRangeChange(() => lukis());
+    lukis();
+  }
+
   // Rentang tetap untuk garis metrik di pane utama (C.metricRange, mis. 0–100 untuk persen
   // supply): 50% selalu di tengah, apa pun Range-nya. Harga BTC tidak ikut. Kalau harga
   // dipindah ke sumbu yang sama, rentang sumbu itu jadi gabungan keduanya (bawaan library).
@@ -294,9 +509,24 @@ loadLib(0).then(() => {
   // Karena itu tampilan awal diulang sampai chart benar-benar punya lebar.
   // Posisi bar (logical range) dipakai, bukan tanggal: memulihkan tanggal membuat
   // tepi kiri bergeser sedikit tiap kali karena dibulatkan ke bar terdekat.
-  const dataSig = D.t.length + ':' + D.t[0] + ':' + D.t[D.t.length - 1];
+  // Chart menerima seluruh sejarah; kotak Range (C.view, tanggal) hanya menentukan rentang
+  // yang tampil. Rentang Range ikut sidik data, jadi menekan Range tetap menang atas zoom
+  // tersimpan, sedangkan rerun lain (smoothing, skala) memulihkan zoom terakhir.
+  let rentangRange = null;
+  if (C.view) {
+    let dari = D.t.findIndex(t => t >= C.view[0]);
+    let sampai = -1;
+    for (let i = D.t.length - 1; i >= 0; i--) { if (D.t[i] <= C.view[1]) { sampai = i; break; } }
+    if (dari < 0) dari = 0;
+    if (sampai < dari) sampai = D.t.length - 1;
+    rentangRange = { from: dari, to: sampai };
+  }
+  const dataSig = D.t.length + ':' + D.t[0] + ':' + D.t[D.t.length - 1]
+    + (C.view ? ':' + C.view.join(':') : '');
   const simpanan = readState();
-  const pulihkanZoom = simpanan.bars && simpanan.sig === dataSig ? simpanan.bars : null;
+  const zoomSimpanan = simpanan.bars && simpanan.sig === dataSig ? simpanan.bars : null;
+  // Target tampilan awal: zoom tersimpan, kalau tidak ada rentang dari kotak Range.
+  const pulihkanZoom = zoomSimpanan || rentangRange;
   let tampilanAwalSelesai = false;
   // Selama fase pemulihan, zoom simpanan boleh ditarik kembali kalau ada yang menggesernya.
   // Lebar sumbu harga baru mengendap sekitar satu-dua detik setelah chart tampil (label
@@ -371,6 +601,8 @@ loadLib(0).then(() => {
     const bar = document.getElementById('bar');
     bar.style.paddingLeft = sisi(panes.main.priceScale('left')) + 'px';
     bar.style.paddingRight = sisi(panes.main.priceScale('right')) + 'px';
+    // Lebar sumbu menentukan letak area gambar, jadi slider digambar ulang di sini juga.
+    gambarNav();
     // Jarak kiri-kanan bisa membuat legend membungkus ke baris baru. ResizeObserver
     // pada baris ini seharusnya menangkapnya, tapi tidak berbunyi kalau frame sedang
     // tidak digambar; pemeriksaan di sini (ikut timer rapikanBar) jadi cadangannya.
@@ -674,7 +906,9 @@ loadLib(0).then(() => {
     }
     // Sinkron sumbu hanya kalau tinggi benar-benar berubah: rapikanBar memanggil fungsi
     // ini, dan sinkron sumbu memanggil rapikanBar — tanpa syarat ini keduanya berputar.
-    if (terapkanTinggi(tinggiBingkai - barEl.offsetHeight - __GAP__ * (C.panes.length - 1))) {
+    // Slider rentang (bila ada) juga diambil dari tinggi pane, bukan dari bingkai.
+    const tinggiNav = C.nav ? C.navHeight + __GAP__ : 0;
+    if (terapkanTinggi(tinggiBingkai - barEl.offsetHeight - __GAP__ * (C.panes.length - 1) - tinggiNav)) {
       scheduleScaleSync();
     }
   }
@@ -1116,8 +1350,11 @@ def _scale(mode):
 
 
 def render(df, lines, price_line, extra_lines, height, metric_mode, price_mode, store_key,
-           tooltip="Cursor", metric_range=None, complement=None):
+           tooltip="Cursor", metric_range=None, complement=None, view=None):
     """Gambar chart.
+
+    view: (tanggal awal, tanggal akhir) yang tampil saat chart dibuka — dari kotak Range.
+    df selalu berisi seluruh sejarah; di luar view tetap bisa digeser/zoom dan tampil di slider.
 
     price_line: garis harga BTC bila dipisah ke pane sendiri (pane paling atas).
     extra_lines: garis untuk pane tambahan paling bawah (mis. Z-Score), atau kosong.
@@ -1132,6 +1369,12 @@ def render(df, lines, price_line, extra_lines, height, metric_mode, price_mode, 
     digits = {}
     for spec in specs:
         digits[spec["col"]] = max(digits.get(spec["col"], 4), spec.get("precision", 2) + 1)
+    # Slider rentang selalu berisi harga BTC, juga saat garis harganya Hidden. Halaman tanpa
+    # kolom harga tidak mendapat slider.
+    nav = NAV_COL in df.columns
+    if nav:
+        digits.setdefault(NAV_COL, 4)
+    nav_h = NAV_H + PANE_GAP if nav else 0
     payload = {
         "t": df["Date"].dt.strftime("%Y-%m-%d").tolist(),
         "cols": {col: [_num(v, n) for v in df[col]] for col, n in digits.items()},
@@ -1147,15 +1390,17 @@ def render(df, lines, price_line, extra_lines, height, metric_mode, price_mode, 
 
     # Pembagian tinggi: pane harga dan pane tambahan mengambil porsi tetap, sisanya
     # untuk pane metrik yang tetap jadi yang terbesar.
+    # Tinggi total chart tetap; slider rentang mengambil tempatnya dari pane.
+    tinggi_pane = height - nav_h
     porsi_harga = 0.30 if price_line is not None and extra_lines else 0.45
-    tinggi_harga = int(height * porsi_harga) if price_line is not None else 0
-    tinggi_extra = int(height * (0.25 if price_line is not None else 0.30)) if extra_lines else 0
+    tinggi_harga = int(tinggi_pane * porsi_harga) if price_line is not None else 0
+    tinggi_extra = int(tinggi_pane * (0.25 if price_line is not None else 0.30)) if extra_lines else 0
 
     daftar_pane = []
     if price_line is not None:
         daftar_pane.append({"id": "price", "height": tinggi_harga,
                             "left": _scale(price_mode), "right": _scale(price_mode)})
-    daftar_pane.append({"id": "main", "height": height - tinggi_harga - tinggi_extra,
+    daftar_pane.append({"id": "main", "height": tinggi_pane - tinggi_harga - tinggi_extra,
                         "left": _scale(_mode_sumbu("left")), "right": _scale(_mode_sumbu("right"))})
     if extra_lines:
         # Pane Z-Score selalu linear: angkanya melewati nol, jadi skala log tidak berlaku.
@@ -1171,6 +1416,9 @@ def render(df, lines, price_line, extra_lines, height, metric_mode, price_mode, 
         "tooltip": tooltip,   # "Fixed" / "Cursor" / "Off"
         "metricRange": list(metric_range) if metric_range else None,  # sumbu metrik tetap
         "complement": list(complement) if complement else None,       # kolom Profit | Loss
+        "nav": NAV_COL if nav else None,   # kolom isi slider rentang
+        "navHeight": NAV_H,
+        "view": list(view) if view else None,   # rentang tampil awal (kotak Range)
         # Tinggi bingkai tetap; tinggi pane dihitung ulang di browser dari tinggi baris
         # legend yang sebenarnya (bisa lebih dari satu baris).
         "frameHeight": total_height,

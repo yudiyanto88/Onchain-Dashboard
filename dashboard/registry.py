@@ -224,6 +224,8 @@ SUPPLY_IN_PROFIT = MetricFamily(
     # melainkan kolom tooltip. Keduanya dipilih user 14 Sep 2026 dari pratinjau.
     metric_range=(0, 100),
     complement=("Profit", "Loss"),
+    # Harga BTC di pane sendiri sejak awal (permintaan user 14 Sep 2026).
+    btc_mode_default="Separate pane",
     series=[
         # Warna ikut kohort: semua holder navy, STH rust, LTH teal. Satu desimal seperti KB.
         # Nama legend tanpa kata "Supply" (sudah ada di judul halaman): versi panjang membuat

@@ -564,12 +564,16 @@ def render_metric_page(family: MetricFamily):
     kind = st.session_state[f"{k}_smooth_kind"]
     periods = sorted(st.session_state[f"{k}_periods"])
 
+    # Chart selalu menerima seluruh sejarah; kotak Range hanya menentukan rentang yang tampil
+    # (pilihan B, 14 Sep 2026), supaya slider rentang di bawah chart berisi semua data dan
+    # tombol Range cukup memindahkan jendelanya.
+    date_from, date_to = st.session_state[f"{k}_from"], st.session_state[f"{k}_to"]
     df = data.apply_filters(
-        df_raw, kind, periods,
-        st.session_state[f"{k}_from"], st.session_state[f"{k}_to"],
+        df_raw, kind, periods, dmin, dmax,
         [s.col for s in family.series if s.smoothing],
     )
-    if df.empty:
+    view = df["Date_str"].between(f"{date_from:%Y-%m-%d}", f"{date_to:%Y-%m-%d}")
+    if df.empty or not view.any():
         st.warning("No data in this date range.")
         return
 
@@ -647,4 +651,5 @@ def render_metric_page(family: MetricFamily):
 
     charts.render(df, plan, price_line, extra, total_h, metric_mode, price_mode,
                   f"dash_v2_{k}", tooltip=st.session_state[TIP_STORE],
-                  metric_range=family.metric_range, complement=family.complement)
+                  metric_range=family.metric_range, complement=family.complement,
+                  view=(f"{date_from:%Y-%m-%d}", f"{date_to:%Y-%m-%d}"))

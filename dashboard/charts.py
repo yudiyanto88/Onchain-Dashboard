@@ -31,7 +31,7 @@ class Line:
 
 
 def render(df, lines, price_line, extra_lines, height, metric_mode, price_mode, key,
-           tooltip="Cursor", metric_range=None, complement=None):
+           tooltip="Cursor", metric_range=None, complement=None, view=None):
     """Legend dan sorot diproses di browser; key dipakai untuk menyimpan pilihan."""
     lw_chart.render(df, lines, price_line, extra_lines, height,
-                    metric_mode, price_mode, key, tooltip, metric_range, complement)
+                    metric_mode, price_mode, key, tooltip, metric_range, complement, view)
