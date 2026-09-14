@@ -27,10 +27,11 @@ class Line:
     short: str | None = None   # nama pendek di tombol sorot
     precision: int = 2         # desimal di sumbu, label nilai terakhir, dan tooltip
     whole_from: float | None = None  # angka sebesar ini ke atas ditulis tanpa desimal
+    complement_color: str | None = None  # warna garis pasangan (Loss) saat keduanya menyala
 
 
 def render(df, lines, price_line, extra_lines, height, metric_mode, price_mode, key,
-           tooltip="Cursor"):
+           tooltip="Cursor", metric_range=None, complement=None):
     """Legend dan sorot diproses di browser; key dipakai untuk menyimpan pilihan."""
     lw_chart.render(df, lines, price_line, extra_lines, height,
-                    metric_mode, price_mode, key, tooltip)
+                    metric_mode, price_mode, key, tooltip, metric_range, complement)

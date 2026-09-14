@@ -598,7 +598,8 @@ def render_metric_page(family: MetricFamily):
         plan.append(Line(sr.label, sr.col, sr.color, axis, width=LINE_WIDTH,
                          group=sr.group or sr.label, dim=sr.dim, kind=sr.kind,
                          short=sr.short, alpha=sr.alpha, precision=sr.precision,
-                         hidden_default=sr.hidden_default, whole_from=sr.whole_from))
+                         hidden_default=sr.hidden_default, whole_from=sr.whole_from,
+                         complement_color=sr.complement_color))
         if not sr.smoothing:
             continue
         for p in periods:
@@ -607,7 +608,8 @@ def render_metric_page(family: MetricFamily):
                 # Nama "<metrik> <SMA|EMA>(<periode>)" dibaca tooltip untuk kolom periodenya.
                 plan.append(Line(f"{sr.label} {kind}({p})", col, sr.color, axis,
                                  group=sr.label, dim=sr.dim, precision=sr.precision,
-                                 whole_from=sr.whole_from, **_smooth_style(family, p)))
+                                 whole_from=sr.whole_from, complement_color=sr.complement_color,
+                                 **_smooth_style(family, p)))
 
     # Garis acuan mengikuti sumbu yang dipakai metrik, bukan dipaku ke satu sisi.
     used_axes = {ln.axis for ln in plan}
@@ -644,4 +646,5 @@ def render_metric_page(family: MetricFamily):
                          group="BTC Price", dim=BTC_DIM, precision=BTC_PRECISION))
 
     charts.render(df, plan, price_line, extra, total_h, metric_mode, price_mode,
-                  f"dash_v2_{k}", tooltip=st.session_state[TIP_STORE])
+                  f"dash_v2_{k}", tooltip=st.session_state[TIP_STORE],
+                  metric_range=family.metric_range, complement=family.complement)

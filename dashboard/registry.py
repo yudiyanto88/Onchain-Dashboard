@@ -29,6 +29,8 @@ class Series:
                                       # (harga 0; rasio 2; nanti funding rate bisa 5)
     whole_from: float | None = None   # angka sebesar ini ke atas ditulis tanpa desimal
                                       # (LTH-SOPR: 1.318 tapi 384, bukan 384.000)
+    complement_color: str | None = None  # warna garis pasangan (Loss) saat Profit dan
+                                         # Loss sama-sama menyala (MetricFamily.complement)
 
 
 @dataclass
@@ -63,6 +65,10 @@ class MetricFamily:
     # Keadaan awal kotak BTC price ("Overlay" / "Separate pane" / "Hidden").
     # Nilainya sama dengan pilihan di metric_page.
     btc_mode_default: str = "Overlay"
+    # Rentang tetap sumbu metrik, mis. (0, 100) untuk persen supply. None = ikut data.
+    metric_range: tuple[float, float] | None = None
+    # Kolom tooltip untuk metrik yang punya pasangan 100 − nilai, mis. ("Profit", "Loss").
+    complement: tuple[str, str] | None = None
 
 
 MARKET_VALUATION = MetricFamily(
@@ -122,7 +128,7 @@ MARKET_VALUATION = MetricFamily(
 PRICE_LEVELS = MetricFamily(
     key="price_levels",
     title="Price Levels",
-    subtitle="On-chain Cost Basis",
+    subtitle="Price Levels",
     group="Valuation",
     url_path="price-levels",
     loader=data.load_price_levels,
@@ -135,7 +141,10 @@ PRICE_LEVELS = MetricFamily(
         # navy, LTH teal — mata langsung mengenali kohortnya di halaman mana pun.
         Series("STH RP", "STH RP", color="#bf5546", axis="right", dim=0.44,
                short="STH", precision=0),
-        Series("RP", "RP", color="#0070a6", axis="right", dim=0.49, short="RP", precision=0),
+        # Ditulis lengkap di legend: singkatan "RP" belum tentu dikenal pembaca. STH RP dan
+        # LTH RP tetap singkat (keputusan user 14 Sep 2026); tombol sorot tetap "RP".
+        Series("Realized Price", "RP", color="#0070a6", axis="right", dim=0.49, short="RP",
+               precision=0),
         Series("LTH RP", "LTH RP", color="#0b8e89", axis="right", dim=0.39,
                short="LTH", precision=0),
         # AVIV Mean dan Upper satu pasang batas zona: satu keluarga violet, dibedakan terang.
@@ -202,6 +211,38 @@ SOPR = MetricFamily(
 )
 
 
+SUPPLY_IN_PROFIT = MetricFamily(
+    key="supply_in_profit",
+    title="Supply in Profit",
+    subtitle="Supply in Profit",
+    group="Profitability",
+    url_path="supply-in-profit",
+    loader=data.load_supply,
+    # Persen supply dibaca sebagai level ("sudah di bawah 50%?"), jadi sumbunya tetap 0–100:
+    # di Range 1y dengan Auto sumbu bisa cuma 55–70 dan turun 3 poin terlihat seperti jatuh.
+    # Loss = 100 − Profit persis di data (selisih maks 0,0014), jadi bukan garis sendiri
+    # melainkan kolom tooltip. Keduanya dipilih user 14 Sep 2026 dari pratinjau.
+    metric_range=(0, 100),
+    complement=("Profit", "Loss"),
+    series=[
+        # Warna ikut kohort: semua holder navy, STH rust, LTH teal. Satu desimal seperti KB.
+        # Nama legend tanpa kata "Supply" (sudah ada di judul halaman): versi panjang membuat
+        # legend pecah dua baris di layar 1440 (keputusan user 14 Sep 2026).
+        # Warna Loss saat Profit dan Loss sama-sama menyala (set B, dipilih user 14 Sep 2026):
+        # sekeluarga tapi lebih terang — navy -> lavender, rust -> merah muda, teal -> aqua.
+        # Uji jarak Lab: antar-Loss 28 normal / 28 buta warna (campur putih 50% cuma 18 / 14);
+        # terlemah LTH vs STH Loss saat buta warna 13 (normal 64). Kalau hanya Loss yang
+        # menyala, garis Loss memakai warna kohort asli.
+        Series("Total in Profit", "Total Supply in Profit", color="#0070a6",
+               axis="left", dim=0.49, short="Total", precision=1, complement_color="#839df0"),
+        Series("STH in Profit", "STH Supply in Profit", color="#bf5546",
+               axis="left", dim=0.44, short="STH", precision=1, complement_color="#dc9390"),
+        Series("LTH in Profit", "LTH Supply in Profit", color="#0b8e89",
+               axis="left", dim=0.39, short="LTH", precision=1, complement_color="#38d1b4"),
+    ],
+)
+
+
 # Urutan di sini = urutan menu sidebar; kelompok muncul menurut halaman pertamanya.
 # Halaman pertama jadi halaman bawaan (alamat localhost:8503/).
-FAMILIES = {f.title: f for f in [MARKET_VALUATION, PRICE_LEVELS, SOPR]}
+FAMILIES = {f.title: f for f in [MARKET_VALUATION, PRICE_LEVELS, SOPR, SUPPLY_IN_PROFIT]}

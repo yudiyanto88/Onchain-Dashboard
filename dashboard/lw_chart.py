@@ -67,6 +67,8 @@ TEMPLATE = """
   #tip td:first-child, #tip th:first-child { padding-left: 0; text-align: left; }
   #tip th { font-weight: 400; color: #8b949e; font-size: 11px; }
   #tip .v { color: #fff; font-weight: 600; }
+  /* Kolom pelengkap (Loss = 100 − Profit) sedikit diredupkan: turunan dari angka di kirinya. */
+  #tip .v.sisa { color: #aeb6c2; }
   #tip .tsw { display: inline-block; width: 14px; height: 0; border-top: 2px solid; vertical-align: 4px; margin-right: 6px; }
   #tip .tbox { display: inline-block; width: 11px; height: 9px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
   #err { color: #DA3633; padding: 16px; }
@@ -215,6 +217,21 @@ loadLib(0).then(() => {
     anchor.setData(D.t.map(t => ({ time: t, value: 0 })));
   }
 
+  // Rentang tetap untuk garis metrik di pane utama (C.metricRange, mis. 0–100 untuk persen
+  // supply): 50% selalu di tengah, apa pun Range-nya. Harga BTC tidak ikut. Kalau harga
+  // dipindah ke sumbu yang sama, rentang sumbu itu jadi gabungan keduanya (bawaan library).
+  const rentangTetap = spec => C.metricRange && spec.pane === 'main' && spec.group !== 'BTC Price'
+    ? () => ({ priceRange: { minValue: C.metricRange[0], maxValue: C.metricRange[1] } })
+    : null;
+
+  // Pasangan nilai (C.complement, mis. Profit | Loss): tiap garis metrik di pane utama punya
+  // kembaran 100 − nilai. Garis smoothing ikut tepat, karena rata-rata dari 100 − x =
+  // 100 − rata-rata x (SMA maupun EMA). Harga BTC dan garis acuan tidak ikut.
+  const [judulNilai, judulSisa] = C.complement || [null, null];
+  const bisaDibalik = spec => !!C.complement && spec.pane === 'main'
+    && !!spec.group && spec.group !== 'BTC Price';
+  const namaSisa = teks => judulNilai ? teks.split(judulNilai).join(judulSisa) : teks;
+
   const handles = [];
   for (const spec of S) {
     const values = D.cols[spec.col];
@@ -230,6 +247,16 @@ loadLib(0).then(() => {
       lastValueVisible: !!spec.group,
       priceFormat: formatSeri(spec),
     };
+    if (rentangTetap(spec)) {
+      umum.autoscaleInfoProvider = rentangTetap(spec);
+      // Angka di luar rentang (ruang tepi sumbu: 110, 120, -10) tidak ditulis — persen supply
+      // tidak pernah di sana, jadi label itu hanya membingungkan.
+      const [bawah, atas] = C.metricRange;
+      const tulis = umum.priceFormat.formatter;
+      umum.priceFormat = Object.assign({}, umum.priceFormat, {
+        formatter: v => (v < bawah - 1e-9 || v > atas + 1e-9) ? '' : tulis(v),
+      });
+    }
     // Batang digambar dari garis nol, jadi nilai negatif turun ke bawah sendiri.
     const line = spec.kind === 'histogram'
       ? panes[spec.pane].addHistogramSeries(Object.assign({ base: 0 }, umum))
@@ -240,7 +267,24 @@ loadLib(0).then(() => {
           crosshairMarkerVisible: !!spec.group,
         }, umum));
     line.setData(points);
-    handles.push({ spec, line });
+    const handle = { spec, line };
+    // Kembaran Loss: bentuk garis sama, lahir tersembunyi; nyala/warnanya diatur apply().
+    if (bisaDibalik(spec)) {
+      handle.kembar = panes[spec.pane].addLineSeries(Object.assign({
+        lineWidth: spec.width,
+        lineStyle: spec.style,
+        lineType: spec.steps ? 1 : 0,
+        crosshairMarkerVisible: true,
+      }, umum, { title: namaSisa(spec.name), visible: false }));
+      handle.kembar.setData(points.map(p => ({ time: p.time, value: 100 - p.value })));
+    }
+    handles.push(handle);
+  }
+  // Sumbu berentang tetap: ruang tepi bawaan (atas 20 %, bawah 10 %) dipersempit supaya
+  // 0–100 memakai hampir seluruh tinggi pane dan tidak menyisakan pita kosong di atas 100.
+  if (C.metricRange) {
+    new Set(handles.filter(h => rentangTetap(h.spec)).map(h => h.spec.axis)).forEach(side =>
+      panes.main.priceScale(side).applyOptions({ scaleMargins: { top: 0.06, bottom: 0.04 } }));
   }
   // Tampilan awal: pulihkan zoom terakhir, atau tampilkan seluruh data.
   // Sidik data ikut disimpan, jadi kalau rentang tanggalnya memang berubah
@@ -395,7 +439,10 @@ loadLib(0).then(() => {
   }).observe(document.body);
 
   const legendItems = handles.filter(h => h.spec.group);
-  const groups = [...new Set(legendItems.map(h => h.spec.group))];
+  // BTC Price selalu kelompok terakhir di legend, tombol sorot, dan tooltip. Saat Separate
+  // pane seri harga disisipkan paling depan (pane atas), dan sebelum ini ikut tampil pertama.
+  const groups = [...new Set(legendItems.map(h => h.spec.group))]
+    .sort((a, b) => (a === 'BTC Price') - (b === 'BTC Price'));
   // Beberapa garis bisa disorot sekaligus. Penyimpanan lama berisi satu nama
   // (highlight: 'MVRV' atau 'none'), jadi diubah ke daftar bila masih format lama.
   const saved = readState();
@@ -418,6 +465,29 @@ loadLib(0).then(() => {
     seen: [...new Set(dikenal.concat(legendItems.map(h => h.spec.name)))],
   });
   delete state.highlight;   // sisa format lama, sudah digantikan highlights
+
+  // Saklar Profit dan Loss (C.complement): dua-duanya bebas nyala/mati, termasuk mati
+  // bersamaan (keputusan user 14 Sep 2026). Hidup di browser, tersimpan di localStorage.
+  // Format lama (satu pilihan, state.inverse) dipindahkan sekali ke dua saklar ini.
+  if (C.complement && typeof state.showProfit !== 'boolean') {
+    state.showProfit = state.inverse !== true;
+    state.showLoss = state.inverse === true;
+  }
+  delete state.inverse;
+  // Garis smoothing Loss saat Profit dan Loss sama-sama menyala: mati di awal, dinyalakan
+  // lewat kotak angka kedua di legend. Daftar berisi nama seri Profit induknya.
+  state.lossShown = Array.isArray(state.lossShown) ? state.lossShown : [];
+  const tampilProfit = () => !C.complement || state.showProfit;
+  const tampilLoss = () => !!C.complement && state.showLoss;
+  const hanyaLoss = () => tampilLoss() && !tampilProfit();
+  const keduanyaMati = () => !!C.complement && !state.showProfit && !state.showLoss;
+  const labelKelompok = [];
+  const titikLoss = [];
+
+  // Garis stroke contoh warna di legend, dengan warna tertentu.
+  const garisContoh = (spec, warna) => `${spec.alpha < 1 ? 3 : 2}px `
+    + `${spec.style === 1 ? 'dotted' : spec.style ? 'dashed' : 'solid'} `
+    + `${spec.alpha < 1 ? dimmed(warna, spec.alpha) : warna}`;
 
   // Legend dikelompokkan per metrik: satu label untuk garis utama, lalu titik kecil
   // berisi angka periode untuk tiap garis smoothing-nya. Tanpa ini, satu metrik dengan
@@ -458,7 +528,17 @@ loadLib(0).then(() => {
         + `${contoh.spec.style === 1 ? 'dotted' : contoh.spec.style ? 'dashed' : 'solid'} `
         + `${baseColor(contoh.spec)}`;
     }
-    button.append(swatch, document.createTextNode(group));
+    const teksKelompok = document.createTextNode(group);
+    button.append(swatch);
+    // Kelompok berpasangan: contoh warna kedua untuk Loss, tampil saat keduanya menyala.
+    if (utama && utama.kembar) {
+      const swatchSisa = document.createElement('span');
+      swatchSisa.className = 'sw';
+      swatchSisa.style.borderTop = garisContoh(utama.spec, utama.spec.complement_color || utama.spec.color);
+      button.append(swatchSisa);
+      labelKelompok.push({ node: teksKelompok, group, spec: utama.spec, swatch, swatchSisa });
+    }
+    button.append(teksKelompok);
     if (utama) {
       button.onclick = () => toggleHidden(utama.spec.name);
       legendButtons.push({ button, handle: utama });
@@ -476,6 +556,23 @@ loadLib(0).then(() => {
       titik.onclick = () => toggleHidden(handle.spec.name);
       wadah.appendChild(titik);
       legendButtons.push({ button: titik, handle });
+      // Kotak kedua untuk smoothing Loss, bertepi warna Loss; hanya tampil saat Profit dan
+      // Loss sama-sama menyala (kalau hanya Loss, kotak pertama yang mengaturnya).
+      if (handle.kembar) {
+        const kotak = document.createElement('button');
+        kotak.className = 'lgdot';
+        kotak.textContent = titik.textContent;
+        kotak.title = namaSisa(handle.spec.name);
+        kotak.style.borderColor = handle.spec.complement_color || handle.spec.color;
+        kotak.onclick = () => {
+          const nama = handle.spec.name;
+          state.lossShown = state.lossShown.includes(nama)
+            ? state.lossShown.filter(x => x !== nama) : state.lossShown.concat(nama);
+          apply();
+        };
+        wadah.appendChild(kotak);
+        titikLoss.push({ button: kotak, handle });
+      }
     }
 
     legendEl.appendChild(wadah);
@@ -503,6 +600,25 @@ loadLib(0).then(() => {
     hlEl.appendChild(button);
     return { button, group };
   });
+
+  // Saklar Profit dan Loss di awal kelompok Highlight (letak B, dipilih user 14 Sep 2026),
+  // dipisah garis tipis. Hanya ada di halaman yang punya pasangan nilai (C.complement).
+  const saklar = [];
+  if (C.complement) {
+    const labelHighlight = hlEl.querySelector('.hllabel');
+    for (const [judul, kunci] of [[judulNilai, 'showProfit'], [judulSisa, 'showLoss']]) {
+      const button = document.createElement('button');
+      button.className = 'hl';
+      button.textContent = judul;
+      button.title = `Show ${judul.toLowerCase()} lines (${judulNilai} + ${judulSisa} = 100)`;
+      button.onclick = () => { state[kunci] = !state[kunci]; apply(); };
+      hlEl.insertBefore(button, labelHighlight);
+      saklar.push({ button, kunci });
+    }
+    const pemisah = document.createElement('span');
+    pemisah.className = 'fssep';
+    hlEl.insertBefore(pemisah, labelHighlight);
+  }
 
   // Tombol layar penuh hidup di dalam chart, bukan di baris kontrol Streamlit.
   // Kliknya sudah merupakan gestur pengguna, jadi requestFullscreen() boleh dipanggil
@@ -599,21 +715,50 @@ loadLib(0).then(() => {
     // seluruhnya juga dilepas dari sorotan, supaya chart tidak meredupkan semua garis
     // demi garis yang tidak kelihatan.
     const kelompokMenyala = new Set(legendItems
-      .filter(h => !state.hidden.includes(h.spec.name)).map(h => h.spec.group));
+      .filter(h => !state.hidden.includes(h.spec.name) && !(bisaDibalik(h.spec) && keduanyaMati()))
+      .map(h => h.spec.group));
     state.highlights = state.highlights.filter(g => kelompokMenyala.has(g));
     for (const { button, group } of hlButtons) {
       if (group !== 'none') button.hidden = !kelompokMenyala.has(group);
     }
+    const keduanya = tampilProfit() && tampilLoss();
     for (const { button, handle } of legendButtons) {
-      const hidden = state.hidden.includes(handle.spec.name);
-      const faded = state.highlights.length > 0 && !state.highlights.includes(handle.spec.group);
-      const fadedAlpha = handle.spec.dim * (handle.spec.alpha < 1 ? handle.spec.alpha : 1);
+      const spec = handle.spec;
+      const hidden = state.hidden.includes(spec.name);
+      const faded = state.highlights.length > 0 && !state.highlights.includes(spec.group);
+      const fadedAlpha = spec.dim * (spec.alpha < 1 ? spec.alpha : 1);
+      const warna = hex => faded ? dimmed(hex, fadedAlpha)
+        : (spec.alpha < 1 ? dimmed(hex, spec.alpha) : hex);
       handle.line.applyOptions({
-        visible: !hidden,
-        color: faded ? dimmed(handle.spec.color, fadedAlpha) : baseColor(handle.spec),
+        visible: !hidden && (!handle.kembar || tampilProfit()),
+        color: warna(spec.color),
       });
+      if (handle.kembar) {
+        // Garis utama Loss ikut saklar legend induknya. Smoothing Loss: saat keduanya
+        // menyala diatur kotak kedua (mati di awal); saat hanya Loss, ikut kotak pertama.
+        const utama = spec.name === spec.group;
+        const nyala = tampilLoss() && (utama || !keduanya ? !hidden
+          : state.lossShown.includes(spec.name));
+        handle.kembar.applyOptions({
+          visible: nyala,
+          // Warna Loss set B hanya saat keduanya menyala; kalau hanya Loss, warna kohort asli.
+          color: warna(keduanya && spec.complement_color ? spec.complement_color : spec.color),
+        });
+      }
       button.classList.toggle('off', hidden);
     }
+    for (const { button, handle } of titikLoss) {
+      button.style.display = keduanya ? '' : 'none';
+      button.classList.toggle('off', !state.lossShown.includes(handle.spec.name));
+    }
+    // Nama kelompok: keduanya -> nama pendek (Total) + dua contoh warna; hanya Loss ->
+    // "Total in Loss"; selain itu nama asli ("Total in Profit").
+    for (const { node, group, spec, swatch, swatchSisa } of labelKelompok) {
+      node.textContent = keduanya ? (spec.short || group) : hanyaLoss() ? namaSisa(group) : group;
+      swatchSisa.style.display = keduanya ? '' : 'none';
+      swatch.style.display = '';
+    }
+    for (const { button, kunci } of saklar) button.classList.toggle('on', !!state[kunci]);
     for (const { button, group } of hlButtons) {
       button.classList.toggle('on', group === 'none'
         ? state.highlights.length === 0
@@ -638,7 +783,11 @@ loadLib(0).then(() => {
   const periodeDari = nama => { const m = /[(]([0-9]+)[)]$/.exec(nama); return m ? +m[1] : null; };
   const teksWaktu = t => typeof t === 'string' ? t
     : `${t.year}-${String(t.month).padStart(2, '0')}-${String(t.day).padStart(2, '0')}`;
-  const nilaiDi = (spec, i) => { const v = D.cols[spec.col][i]; return v === null ? null : v; };
+  const nilaiDi = (spec, i) => {
+    const v = D.cols[spec.col][i];
+    if (v === null) return null;
+    return hanyaLoss() && bisaDibalik(spec) ? 100 - v : v;   // hanya Loss: kolom utama = Loss
+  };
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
   function contohWarna(spec) {
@@ -652,7 +801,9 @@ loadLib(0).then(() => {
     const semuaPeriode = new Set();
     for (const group of groups) {
       if (state.highlights.length > 0 && group !== HARGA && !state.highlights.includes(group)) continue;
-      const anggota = legendItems.filter(h => h.spec.group === group && !state.hidden.includes(h.spec.name));
+      // Saklar Profit dan Loss sama-sama mati: garis metrik tidak tampil, jadi barisnya juga tidak.
+      const anggota = legendItems.filter(h => h.spec.group === group && !state.hidden.includes(h.spec.name)
+        && !(bisaDibalik(h.spec) && keduanyaMati()));
       if (anggota.length === 0) continue;
       const utama = anggota.find(h => h.spec.name === group);
       const smoothing = anggota.filter(h => h !== utama && periodeDari(h.spec.name) !== null);
@@ -665,8 +816,14 @@ loadLib(0).then(() => {
           kolom.set(p, angkaSeri(h.spec, nilaiDi(h.spec, i)));
         }
         const contoh = (utama || smoothing[0]).spec;
-        baris.push({ label: group, spec: contoh,
-                     nilai: utama ? angkaSeri(utama.spec, nilaiDi(utama.spec, i)) : '', kolom });
+        const v = utama ? nilaiDi(utama.spec, i) : null;
+        // Kolom pelengkap (C.complement, mis. Profit | Loss): Loss = 100 − Profit, hanya untuk
+        // nilai utama metrik. Nama baris memakai nama pendek (Total · STH · LTH) supaya kotak
+        // yang bertambah satu kolom tidak ikut melebar karena nama panjang.
+        const lengkap = C.complement && group !== HARGA;
+        baris.push({ label: lengkap && contoh.short ? contoh.short : group, spec: contoh,
+                     nilai: utama ? angkaSeri(utama.spec, v) : '', kolom,
+                     sisa: lengkap && v !== null ? angkaSeri(utama.spec, 100 - v) : '' });
       }
       // Kelompok tanpa garis utama (Rolling Z-Score 1y/2y/4y): satu baris mendatar, tiap
       // anggota yang ON jadi satu kolom dengan judul kecilnya sendiri (1y · 2y · 4y).
@@ -680,8 +837,14 @@ loadLib(0).then(() => {
     const periode = [...semuaPeriode].sort((a, b) => a - b);
     const [y, m, d] = D.t[i].split('-');
     let html = `<div class="tgl">${d} ${BULAN[+m - 1]} ${y}</div><table>`;
-    if (periode.length > 0) {
-      html += '<tr><th></th><th>Value</th>' + periode.map(p => `<th>${p}d</th>`).join('') + '</tr>';
+    // Judul kolom Profit | Loss hanya kalau ada baris metrik (saklar keduanya mati = tinggal BTC).
+    if (periode.length > 0 || (C.complement && baris.some(b => b.label !== HARGA))) {
+      // Hanya Loss yang menyala: urutan kolom dibalik jadi Loss | Profit.
+      const [kolomNilai, kolomSisa] = !C.complement ? ['Value', null]
+        : hanyaLoss() ? [judulSisa, judulNilai] : [judulNilai, judulSisa];
+      html += `<tr><th></th><th>${esc(kolomNilai)}</th>`
+        + (kolomSisa ? `<th>${esc(kolomSisa)}</th>` : '')
+        + periode.map(p => `<th>${p}d</th>`).join('') + '</tr>';
     }
     for (const b of baris) {
       if (b.jendela) {
@@ -693,6 +856,7 @@ loadLib(0).then(() => {
         continue;
       }
       html += `<tr><td>${contohWarna(b.spec)}${esc(b.label)}</td><td class="v">${b.nilai}</td>`
+        + (C.complement ? `<td class="v sisa">${b.sisa}</td>` : '')
         + periode.map(p => `<td class="v">${b.kolom.get(p) || ''}</td>`).join('') + '</tr>';
     }
     tipEl.innerHTML = html + '</table>';
@@ -792,7 +956,10 @@ loadLib(0).then(() => {
     const pola = perBar >= PIKSEL_PER_BAR_TANGGA ? 0 : 3;   // 0 = penuh, 3 = putus panjang
     if (pola === polaTanggaSekarang) return;
     polaTanggaSekarang = pola;
-    for (const handle of garisTangga) handle.line.applyOptions({ lineStyle: pola });
+    for (const handle of garisTangga) {
+      handle.line.applyOptions({ lineStyle: pola });
+      if (handle.kembar) handle.kembar.applyOptions({ lineStyle: pola });
+    }
   }
 
   sesuaikanTangga();
@@ -805,8 +972,11 @@ loadLib(0).then(() => {
   // dikunci lewat autoscaleInfoProvider pada semua garis di sumbu tersebut.
   // Klik dua kali di chart mengembalikan semua sumbu ke Auto.
   const sideOf = spec => spec.pane === 'price' ? 'right' : spec.axis;
+  // Kembaran Loss ikut dikunci: kalau tidak, rentangnya (0–100) bergabung dengan rentang
+  // yang dikunci dan sumbu tidak bisa digeser.
   const seriesOn = (pane, side) =>
-    handles.filter(h => h.spec.pane === pane && sideOf(h.spec) === side).map(h => h.line);
+    handles.filter(h => h.spec.pane === pane && sideOf(h.spec) === side)
+      .flatMap(h => h.kembar ? [h.line, h.kembar] : [h.line]);
   const locked = new Map();
 
   function paneHeight(pane) {
@@ -836,7 +1006,12 @@ loadLib(0).then(() => {
 
   function resetScales() {
     locked.clear();
-    for (const { line } of handles) line.applyOptions({ autoscaleInfoProvider: original => original() });
+    // Garis berentang tetap kembali ke rentang tetapnya, bukan ke Auto.
+    for (const { spec, line, kembar } of handles) {
+      const provider = rentangTetap(spec) || (original => original());
+      line.applyOptions({ autoscaleInfoProvider: provider });
+      if (kembar) kembar.applyOptions({ autoscaleInfoProvider: provider });
+    }
     charts.forEach(chart => ['left', 'right'].forEach(side =>
       chart.priceScale(side).applyOptions({ autoScale: true })));
   }
@@ -941,7 +1116,7 @@ def _scale(mode):
 
 
 def render(df, lines, price_line, extra_lines, height, metric_mode, price_mode, store_key,
-           tooltip="Cursor"):
+           tooltip="Cursor", metric_range=None, complement=None):
     """Gambar chart.
 
     price_line: garis harga BTC bila dipisah ke pane sendiri (pane paling atas).
@@ -994,6 +1169,8 @@ def render(df, lines, price_line, extra_lines, height, metric_mode, price_mode, 
         "store": store_key,
         "panes": daftar_pane,
         "tooltip": tooltip,   # "Fixed" / "Cursor" / "Off"
+        "metricRange": list(metric_range) if metric_range else None,  # sumbu metrik tetap
+        "complement": list(complement) if complement else None,       # kolom Profit | Loss
         # Tinggi bingkai tetap; tinggi pane dihitung ulang di browser dari tinggi baris
         # legend yang sebenarnya (bisa lebih dari satu baris).
         "frameHeight": total_height,

@@ -93,6 +93,23 @@ def load_sopr():
     return df
 
 
+@st.cache_data(ttl=3600)
+def load_supply():
+    """Persen supply dalam untung: semua holder, STH, LTH (data_supply.csv).
+
+    Kolom *_in_loss tidak dimuat: di data selalu 100 − in_profit, dan tooltip menghitungnya
+    sendiri. Jumlah supply LTH/STH (BTC) belum dipakai halaman ini.
+    """
+    df = pd.read_csv("data_supply.csv")
+    df.rename(columns={
+        'date': 'Date', 'btc_price': 'BTC Price',
+        'percent_btc_in_profit': 'Total Supply in Profit',
+        'pct_sth_in_profit': 'STH Supply in Profit',
+        'pct_lth_in_profit': 'LTH Supply in Profit',
+    }, inplace=True)
+    return _prepare(df)
+
+
 def date_bounds(df):
     """Tanggal paling awal dan paling akhir yang tersedia di data."""
     return df['Date'].min().date(), df['Date'].max().date()
