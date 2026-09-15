@@ -80,7 +80,7 @@ def load_sopr():
     (double-smoothed). Rumus ini yang mereproduksi angka KB persis (+0.02447 10 Jan 2021,
     cross turun 28 Mar 2021 dan 30 Nov 2021). Catatan: alerts/alert_check.py menghitung
     SMA60 − SMA90, hasilnya berbeda — dilaporkan ke user 13 Sep 2026, belum diputuskan.
-    NUPL di file yang sama sengaja tidak dimuat: halaman sendiri.
+    NUPL di file yang sama dimuat terpisah oleh load_nupl (halaman sendiri).
     """
     df = pd.read_csv("data_momentum.csv")
     df.rename(columns={
@@ -90,6 +90,23 @@ def load_sopr():
     df = _prepare(df)
     ma90 = df['STH-SOPR'].rolling(90).mean()
     df['STH-SOPR Gap'] = ma90 - ma90.rolling(60).mean()
+    return df
+
+
+@st.cache_data(ttl=3600)
+def load_nupl():
+    """NUPL, STH-NUPL, LTH-NUPL dari data_momentum.csv, plus gap LTH − STH.
+
+    Gap = LTH-NUPL − STH-NUPL (KB NUPL v1.4 §8.1), tanpa smoothing. Ratio LTH/STH (§8.2)
+    sengaja tidak dimuat: melompat tanpa makna saat STH mendekati nol (+73 ke −561 sehari).
+    """
+    df = pd.read_csv("data_momentum.csv")
+    df.rename(columns={
+        'date': 'Date', 'btc_price': 'BTC Price',
+        'nupl': 'NUPL', 'sth_nupl': 'STH-NUPL', 'lth_nupl': 'LTH-NUPL',
+    }, inplace=True)
+    df = _prepare(df)
+    df['NUPL Gap'] = df['LTH-NUPL'] - df['STH-NUPL']
     return df
 
 

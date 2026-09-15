@@ -218,6 +218,45 @@ SOPR = MetricFamily(
 )
 
 
+NUPL = MetricFamily(
+    key="nupl",
+    title="NUPL",
+    subtitle="Net Unrealized Profit/Loss",
+    group="Profitability",
+    url_path="nupl",
+    loader=data.load_nupl,
+    # Disetujui user 15 Sep 2026 dari pratinjau data mingguan. BTC di pane sendiri seperti
+    # MVRV/SOPR/Supply. Skala metrik linear (Auto): NUPL punya nilai negatif, jadi Log tidak
+    # berlaku. Sumbu tidak dipaku −1..1 walau 2011 menarik sumbu sampai −3.6 di Range All:
+    # sumbu tetap akan memotong lembah 2011 dan tidak menyesuaikan zoom.
+    # Garis ambang KB (0.55, 0.50, −0.20, ...) sengaja tidak dipasang: KB sendiri menyebut
+    # ambang tetap tidak andal lintas siklus, dan framework v2 tidak memakai NUPL.
+    # Pane Gap mati sejak awal (permintaan user).
+    btc_mode_default="Separate pane",
+    metric_scale_default="Auto",
+    price_scale_default="Log",
+    series=[
+        # Warna ikut kohort: semua holder navy, STH rust, LTH teal. 3 desimal seperti KB.
+        # Ketiganya berskala sama, jadi saat BTC di pane sendiri semuanya pindah ke sumbu
+        # kanan (separate_axis, permintaan user 15 Sep 2026); saat Overlay kembali ke kiri
+        # supaya tidak berbagi sumbu dengan harga.
+        Series("NUPL", "NUPL", color="#0070a6", axis="left", separate_axis="right", dim=0.49,
+               short="NUPL", precision=3),
+        Series("STH-NUPL", "STH-NUPL", color="#bf5546", axis="left", separate_axis="right", dim=0.44,
+               short="STH", precision=3),
+        Series("LTH-NUPL", "LTH-NUPL", color="#0b8e89", axis="left", separate_axis="right", dim=0.39,
+               short="LTH", precision=3),
+        # Gap LTH − STH (KB NUPL §8.1): batang rust, dim sama dengan SOPR Gap (redup 1.44:1).
+        Series("Gap (LTH − STH)", "NUPL Gap", color="#bf5546", axis="left", dim=0.41,
+               kind="histogram", smoothing=False, short="Gap", alpha=0.80,
+               pane="extra", precision=3),
+    ],
+    # Batas untung/rugi agregat (definisi NUPL, bukan ambang framework).
+    reference_lines=[RefLine(0.0, "Break-even (0)")],
+    extra_label="NUPL Gap",
+)
+
+
 SUPPLY_IN_PROFIT = MetricFamily(
     key="supply_in_profit",
     title="Supply in Profit",
@@ -235,6 +274,7 @@ SUPPLY_IN_PROFIT = MetricFamily(
     btc_mode_default="Separate pane",
     series=[
         # Warna ikut kohort: semua holder navy, STH rust, LTH teal. Satu desimal seperti KB.
+        # Sumbu kanan saat BTC di pane sendiri, kiri saat Overlay (sama seperti NUPL, 15 Sep 2026).
         # Nama legend tanpa kata "Supply" (sudah ada di judul halaman): versi panjang membuat
         # legend pecah dua baris di layar 1440 (keputusan user 14 Sep 2026).
         # Warna Loss saat Profit dan Loss sama-sama menyala (set B, dipilih user 14 Sep 2026):
@@ -243,15 +283,18 @@ SUPPLY_IN_PROFIT = MetricFamily(
         # terlemah LTH vs STH Loss saat buta warna 13 (normal 64). Kalau hanya Loss yang
         # menyala, garis Loss memakai warna kohort asli.
         Series("Total in Profit", "Total Supply in Profit", color="#0070a6",
-               axis="left", dim=0.49, short="Total", precision=1, complement_color="#839df0"),
+               axis="left", separate_axis="right", dim=0.49, short="Total", precision=1,
+               complement_color="#839df0"),
         Series("STH in Profit", "STH Supply in Profit", color="#bf5546",
-               axis="left", dim=0.44, short="STH", precision=1, complement_color="#dc9390"),
+               axis="left", separate_axis="right", dim=0.44, short="STH", precision=1,
+               complement_color="#dc9390"),
         Series("LTH in Profit", "LTH Supply in Profit", color="#0b8e89",
-               axis="left", dim=0.39, short="LTH", precision=1, complement_color="#38d1b4"),
+               axis="left", separate_axis="right", dim=0.39, short="LTH", precision=1,
+               complement_color="#38d1b4"),
     ],
 )
 
 
 # Urutan di sini = urutan menu sidebar; kelompok muncul menurut halaman pertamanya.
 # Halaman pertama jadi halaman bawaan (alamat localhost:8503/).
-FAMILIES = {f.title: f for f in [MARKET_VALUATION, PRICE_LEVELS, SOPR, SUPPLY_IN_PROFIT]}
+FAMILIES = {f.title: f for f in [MARKET_VALUATION, PRICE_LEVELS, SOPR, NUPL, SUPPLY_IN_PROFIT]}
