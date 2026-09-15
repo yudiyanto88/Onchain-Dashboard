@@ -78,6 +78,13 @@ MARKET_VALUATION = MetricFamily(
     group="Valuation",
     url_path="mvrv",
     loader=data.load_mvrv,
+    # Bawaan (permintaan user 15 Sep 2026): BTC Separate pane, sumbu MVRV Log. LTH MVRV bisa
+    # puluhan di puncak siklus; dengan Log, MVRV dan STH di sekitar 1 tidak ikut rata, dan
+    # saat Separate pane LTH pindah ke sumbu kanan (separate_axis).
+    # Pane Z-Score tetap linear (lw_chart.render), jadi nilai negatifnya aman.
+    btc_mode_default="Separate pane",
+    metric_scale_default="Log",
+    price_scale_default="Log",
     series=[
         # Navy/rust/teal dibuat setara terangnya supaya tidak ada garis yang mendominasi.
         # Teal LTH lolos uji buta warna terhadap rust, tapi cukup mirip navy saat garis

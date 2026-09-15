@@ -59,7 +59,8 @@ TEMPLATE = """
   #panes > div + div { margin-top: __GAP__px; }
   /* Slider rentang (navigator): paling bawah, di bawah sumbu tanggal. */
   #nav { margin-top: __GAP__px; }
-  #nav canvas { display: block; touch-action: none; }
+  /* pan-y: geser jari atas-bawah di slider tetap menggulir halaman; kiri-kanan untuk slider. */
+  #nav canvas { display: block; touch-action: pan-y; }
   /* Tooltip: angka di tanggal bawah kursor. Posisinya dipilih lewat kotak Tooltip
      (Fixed / Cursor / Off, lihat posisikanTooltip). Satu baris per metrik; periode
      smoothing jadi kolom. */
@@ -185,6 +186,10 @@ function chartOptions(height, left, right, showLeft, showRight, timeVisible) {
     layout: { background: { type: 'solid', color: '#131722' }, textColor: '#d1d4dc', fontSize: 11 },
     grid: { vertLines: { color: 'rgba(42,46,57,0.3)' }, horzLines: { color: 'rgba(42,46,57,0.3)' } },
     crosshair: { mode: 0 },
+    // Geser jari atas-bawah di chart menggulir halaman, bukan chart (15 Sep 2026): di HP chart
+    // menutupi hampir seluruh layar, jadi halaman nyaris tidak bisa digulir. Geser kiri-kanan
+    // dan cubit dua jari tetap untuk chart. Mouse dan roda gulir tidak terpengaruh.
+    handleScroll: { vertTouchDrag: false },
     leftPriceScale: Object.assign({ visible: showLeft, borderVisible: false }, left),
     rightPriceScale: Object.assign({ visible: showRight, borderVisible: false }, right),
     // minBarSpacing kecil supaya fitContent() sanggup menampilkan seluruh sejarah harian.

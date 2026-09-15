@@ -12,7 +12,9 @@ from dashboard.registry import FAMILIES
 st.set_page_config(
     page_title="On-Chain Dashboard v2",
     layout="wide",
-    initial_sidebar_state="expanded",
+    # "auto": terbuka di layar lebar, tertutup di HP. Dulu "expanded", dan di HP sidebar
+    # langsung menutupi seluruh halaman setiap kali dibuka (15 Sep 2026).
+    initial_sidebar_state="auto",
 )
 
 st.markdown("""
@@ -270,6 +272,11 @@ header[data-testid="stHeader"] [data-testid="stExpandSidebarButton"] * { pointer
 /* Ruang di atas chart dipangkas: padding, jarak antar-baris, dan garis pemisah. */
 .block-container {
     padding-top: 0.6rem !important; padding-bottom: 0.3rem !important; max-width: 100%;
+}
+/* Layar sempit (HP): jarak kiri halaman cuma 16 px, jadi tombol pembuka sidebar (28 px di
+   y=16) menimpa lencana kategori. Judul diturunkan sampai di bawah tombol itu. */
+@media (max-width: 768px) {
+    .block-container { padding-top: 3.25rem !important; }
 }
 .block-container hr { margin: 6px 0 !important; }
 div[data-testid="stVerticalBlock"] { gap: 0.35rem !important; }
