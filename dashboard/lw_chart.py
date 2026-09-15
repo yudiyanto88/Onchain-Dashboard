@@ -865,7 +865,19 @@ loadLib(0).then(() => {
   const IKON_PENUH = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>';
   const IKON_KELUAR = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></svg>';
   const docInduk = () => { try { return window.parent.document; } catch (e) { return null; } };
-  const sedangPenuh = () => { const d = docInduk(); return !!(d && d.fullscreenElement); };
+  // Layar penuh semu (15 Sep 2026): Safari dan Chrome di iPhone tidak menyediakan Fullscreen
+  // API untuk halaman, jadi tombol Full di sana hanya memasang kelas penuh-semu di halaman
+  // induk. app.py memberi kelas itu aturan yang sama dengan :fullscreen, dan chart mengisi
+  // sisa tinggi jendela seperti layar penuh biasa. Browser yang punya Fullscreen API
+  // (laptop, Android) tidak pernah masuk jalur ini.
+  const adaFullscreenApi = () => {
+    const d = docInduk();
+    return !!(d && d.documentElement.requestFullscreen && d.fullscreenEnabled);
+  };
+  const KELAS_SEMU = 'penuh-semu';
+  // Kelas menempel di halaman induk, jadi tetap terbaca sesudah Streamlit membangun ulang chart.
+  const sedangSemu = () => { const d = docInduk(); return !!(d && d.documentElement.classList.contains(KELAS_SEMU)); };
+  const sedangPenuh = () => { const d = docInduk(); return !!(d && d.fullscreenElement) || sedangSemu(); };
 
   // Saat layar penuh, chart ikut memanjang mengisi sisa tinggi jendela. Tinggi iframe
   // ditetapkan Streamlit lewat gaya inline pada iframe dan wadahnya, jadi keduanya
@@ -929,19 +941,58 @@ loadLib(0).then(() => {
   function perbaruiFs() {
     const penuh = sedangPenuh();
     fsBtn.innerHTML = (penuh ? IKON_KELUAR : IKON_PENUH) + (penuh ? 'Exit' : 'Full');
-    fsBtn.title = penuh ? 'Leave full screen (Esc)' : 'Full screen';
+    fsBtn.title = penuh ? (sedangSemu() ? 'Leave full screen' : 'Leave full screen (Esc)') : 'Full screen';
     sesuaikanTinggiLayar();
   }
   fsBtn.onclick = () => {
     const d = docInduk();
     if (!d) return;
+    if (sedangSemu() || !adaFullscreenApi()) {
+      const masuk = !sedangSemu();
+      d.documentElement.classList.toggle(KELAS_SEMU, masuk);
+      // Halaman digulir ke atas supaya chart mulai tepat di bawah baris kontrol.
+      if (masuk) {
+        const utama = d.querySelector('[data-testid="stMain"]');
+        if (utama) utama.scrollTop = 0;
+        try { window.parent.scrollTo(0, 0); } catch (e) {}
+      }
+      perbaruiFs();
+      // Tinggi dihitung ulang sesudah judul dan jarak halaman benar-benar berubah.
+      setTimeout(perbaruiFs, 60);
+      setTimeout(perbaruiFs, 300);
+      return;
+    }
     // Janji dari kedua perintah ini bisa ditolak browser; ditangkap supaya tidak
     // muncul sebagai error yang tidak tertangani di console.
     const janji = d.fullscreenElement ? d.exitFullscreen() : d.documentElement.requestFullscreen();
     if (janji && janji.catch) janji.catch(() => {});
   };
   perbaruiFs();
-  hlEl.append(fsSep, fsBtn);
+  hlEl.append(fsSep);
+
+  // Saklar Scale, khusus perangkat sentuh (15 Sep 2026, ikon "geser vertikal" pilihan user).
+  // Bawaannya geser jari atas-bawah menggulir halaman (vertTouchDrag mati, lihat
+  // chartOptions). Saat saklar menyala, geser jari atas-bawah kembali menggeser skala chart.
+  // Tidak disimpan: setiap chart dibuka saklar mati, supaya halaman tidak "terkunci" diam-diam.
+  // Perangkat dengan mouse sebagai penunjuk utama (laptop) tidak mendapat tombol ini.
+  const sentuh = (() => { try { return window.matchMedia('(pointer: coarse)').matches; } catch (e) { return false; } })();
+  if (sentuh) {
+    const IKON_SKALA = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l3 3l3-3M12 15v6M15 6l-3-3l-3 3M12 3v6"/></svg>';
+    const skalaBtn = document.createElement('button');
+    skalaBtn.className = 'hl fsbtn';
+    skalaBtn.innerHTML = IKON_SKALA + 'Scale';
+    let geserSkala = false;
+    const perbaruiSkala = () => {
+      skalaBtn.classList.toggle('on', geserSkala);
+      skalaBtn.title = geserSkala ? 'Vertical drag moves the scale (tap to scroll the page instead)'
+        : 'Vertical drag scrolls the page (tap to move the scale instead)';
+      charts.forEach(chart => chart.applyOptions({ handleScroll: { vertTouchDrag: geserSkala } }));
+    };
+    skalaBtn.onclick = () => { geserSkala = !geserSkala; perbaruiSkala(); };
+    perbaruiSkala();
+    hlEl.append(skalaBtn);
+  }
+  hlEl.append(fsBtn);
   // Esc keluar dari layar penuh tanpa melewati tombol ini, jadi tampilannya
   // disesuaikan dari peristiwa dokumen induk, bukan dari klik. Ukuran jendela juga
   // diikuti supaya chart tetap pas saat layar penuh dipindah ke monitor lain.

@@ -236,20 +236,28 @@ div[data-testid="stNumberInput"] input {
 div[data-testid="stNumberInput"] button { display: none !important; }
 
 /* Saat browser benar-benar fullscreen, kerangka Streamlit disembunyikan
-   supaya chart memakai seluruh layar tanpa perlu menekan F11. */
+   supaya chart memakai seluruh layar tanpa perlu menekan F11.
+   html.penuh-semu = layar penuh semu untuk browser tanpa Fullscreen API (Safari/Chrome di
+   iPhone, 15 Sep 2026): kelas dipasang tombol Full di chart, aturannya sama persis. */
 :fullscreen header[data-testid="stHeader"],
 :fullscreen div[data-testid="stToolbar"],
-:fullscreen div[data-testid="stDecoration"] { display: none !important; }
-:fullscreen section[data-testid="stSidebar"] { display: none !important; }
+:fullscreen div[data-testid="stDecoration"],
+html.penuh-semu header[data-testid="stHeader"],
+html.penuh-semu div[data-testid="stToolbar"],
+html.penuh-semu div[data-testid="stDecoration"] { display: none !important; }
+:fullscreen section[data-testid="stSidebar"],
+html.penuh-semu section[data-testid="stSidebar"] { display: none !important; }
 /* Layar penuh: jarak kiri-kanan bawaan Streamlit (5rem = 80 px per sisi) dipangkas
    jadi 1rem, dan judul halaman disembunyikan supaya baris tombol naik ke atas dan
    chart mendapat ruang lebih. Isi dan desain chart tidak berubah. */
-:fullscreen .block-container {
+:fullscreen .block-container,
+html.penuh-semu .block-container {
     padding-top: 0.6rem !important; padding-bottom: 0.3rem !important;
     padding-left: 1rem !important; padding-right: 1rem !important;
     max-width: 100% !important;
 }
-:fullscreen div[data-testid="stElementContainer"]:has(.page-title) { display: none !important; }
+:fullscreen div[data-testid="stElementContainer"]:has(.page-title),
+html.penuh-semu div[data-testid="stElementContainer"]:has(.page-title) { display: none !important; }
 
 /* Header Streamlit melayang di atas konten. Dengan padding dipangkas, judul ikut
    tertutup. Dulu seluruh header disembunyikan (display:none) — tapi tombol untuk
