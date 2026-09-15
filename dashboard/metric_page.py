@@ -596,14 +596,17 @@ def render_metric_page(family: MetricFamily):
                               group=sr.group or sr.label, dim=sr.dim, kind=sr.kind,
                               short=sr.short, alpha=sr.alpha,
                               hidden_default=sr.hidden_default, precision=sr.precision,
-                              whole_from=sr.whole_from))
+                              whole_from=sr.whole_from, negative_color=sr.negative_color,
+                              unit=sr.unit, compact=sr.compact))
             continue
         axis = st.session_state[f"{k}_axis_{sr.col}"]
         plan.append(Line(sr.label, sr.col, sr.color, axis, width=LINE_WIDTH,
                          group=sr.group or sr.label, dim=sr.dim, kind=sr.kind,
                          short=sr.short, alpha=sr.alpha, precision=sr.precision,
                          hidden_default=sr.hidden_default, whole_from=sr.whole_from,
-                         complement_color=sr.complement_color))
+                         complement_color=sr.complement_color,
+                         negative_color=sr.negative_color,
+                         unit=sr.unit, pair=sr.pair, compact=sr.compact))
         if not sr.smoothing:
             continue
         for p in periods:
@@ -613,6 +616,7 @@ def render_metric_page(family: MetricFamily):
                 plan.append(Line(f"{sr.label} {kind}({p})", col, sr.color, axis,
                                  group=sr.label, dim=sr.dim, precision=sr.precision,
                                  whole_from=sr.whole_from, complement_color=sr.complement_color,
+                                 unit=sr.unit, compact=sr.compact,
                                  **_smooth_style(family, p)))
 
     # Garis acuan mengikuti sumbu yang dipakai metrik, bukan dipaku ke satu sisi.
@@ -624,6 +628,9 @@ def render_metric_page(family: MetricFamily):
         # all_axes: satu garis di setiap sumbu yang memuat metrik (SOPR: LTH-SOPR di kanan).
         # Kiri didahulukan supaya urutannya tetap sama tiap render.
         axes = sorted(used_axes) if ref.all_axes and used_axes else [ref_axis]
+        # follow: satu garis di sumbu seri tertentu (garis nol funding, bukan sumbu OI).
+        if ref.follow:
+            axes = [st.session_state.get(f"{k}_axis_{ref.follow}", ref_axis)]
         for axis in axes:
             # Garis acuan jadi seri pertama di sumbunya, dan lightweight-charts mengambil
             # format angka sumbu dari seri pertama itu. Precision-nya disamakan dengan metrik
@@ -652,4 +659,5 @@ def render_metric_page(family: MetricFamily):
     charts.render(df, plan, price_line, extra, total_h, metric_mode, price_mode,
                   f"dash_v2_{k}", tooltip=st.session_state[TIP_STORE],
                   metric_range=family.metric_range, complement=family.complement,
-                  view=(f"{date_from:%Y-%m-%d}", f"{date_to:%Y-%m-%d}"))
+                  view=(f"{date_from:%Y-%m-%d}", f"{date_to:%Y-%m-%d}"),
+                  unit_switch=family.unit_switch, unit_label=family.unit_label)

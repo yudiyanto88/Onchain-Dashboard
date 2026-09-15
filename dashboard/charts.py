@@ -28,10 +28,16 @@ class Line:
     precision: int = 2         # desimal di sumbu, label nilai terakhir, dan tooltip
     whole_from: float | None = None  # angka sebesar ini ke atas ditulis tanpa desimal
     complement_color: str | None = None  # warna garis pasangan (Loss) saat keduanya menyala
+    negative_color: str | None = None    # histogram: warna batang negatif (positif = color)
+    unit: str | None = None              # satuan untuk saklar satuan di chart
+    pair: str | None = None              # kolom seri pasangan satuan (pindah sisi sumbu)
+    compact: bool = False                # angka ringkas K/M/B
 
 
 def render(df, lines, price_line, extra_lines, height, metric_mode, price_mode, key,
-           tooltip="Cursor", metric_range=None, complement=None, view=None):
+           tooltip="Cursor", metric_range=None, complement=None, view=None,
+           unit_switch=None, unit_label=""):
     """Legend dan sorot diproses di browser; key dipakai untuk menyimpan pilihan."""
     lw_chart.render(df, lines, price_line, extra_lines, height,
-                    metric_mode, price_mode, key, tooltip, metric_range, complement, view)
+                    metric_mode, price_mode, key, tooltip, metric_range, complement, view,
+                    unit_switch, unit_label)

@@ -100,11 +100,16 @@ if not df_master_mom.empty:
 # 3. PIPELINE: DERIVATIVES
 # ==========================================
 print("\n[3/15] Menarik data Derivatives...")
+# Kolom OI per bursa dari API futures-open-interest (satuan BTC). Disimpan supaya
+# perubahan OI bisa dihitung tanpa lompatan saat bursa baru masuk cakupan.
+OI_EXCHANGES = ['cme', 'binance', 'bybit', 'hyperliquid', 'bitget', 'okx', 'deribit',
+                'coinbase', 'bitmex', 'kraken', 'bitfinex', 'mexc', 'huobi']
+
 df_funding = fetch_data("https://chartinspect.com/api/charts/derivatives/futures-funding-rates?timeframe=all", ['date', 'btc_price', 'funding_rate'])
-df_oi = fetch_data("https://chartinspect.com/api/charts/derivatives/futures-open-interest?timeframe=all", ['date', 'total_oi'])
+df_oi = fetch_data("https://chartinspect.com/api/charts/derivatives/futures-open-interest?timeframe=all", ['date', 'total_oi'] + OI_EXCHANGES)
 
 if not df_funding.empty and not df_oi.empty:
-    df_oi_clean = df_oi[['date', 'total_oi']]
+    df_oi_clean = df_oi.rename(columns={ex: f'oi_{ex}' for ex in OI_EXCHANGES})
     df_master_deriv = pd.merge(df_funding, df_oi_clean, on='date', how='outer')
     df_master_deriv['date'] = pd.to_datetime(df_master_deriv['date']).dt.strftime('%Y-%m-%d')
     df_master_deriv = df_master_deriv.sort_values('date').reset_index(drop=True)

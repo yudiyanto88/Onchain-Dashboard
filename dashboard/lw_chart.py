@@ -167,12 +167,22 @@ function angka(v, p, bulatDari) {
   }
   return v.toLocaleString('en-US', { minimumFractionDigits: min, maximumFractionDigits: max });
 }
+// Format ringkas K/M/B (spec.compact, dipakai open interest USD): 40.81B, bukan 40,812,345,678.
+function angkaRingkas(v) {
+  if (v === null || v === undefined || !isFinite(v)) return '';
+  const a = Math.abs(v);
+  const [bagi, akhir] = a >= 1e9 ? [1e9, 'B'] : a >= 1e6 ? [1e6, 'M'] : a >= 1e3 ? [1e3, 'K'] : [1, ''];
+  return Number((v / bagi).toFixed(2)).toLocaleString('en-US') + akhir;
+}
 function formatSeri(spec) {
   const p = Number.isInteger(spec.precision) ? spec.precision : 2;
+  if (spec.compact) return { type: 'custom', minMove: 1, formatter: angkaRingkas };
   return { type: 'custom', minMove: p === 0 ? 0.0001 : Math.pow(10, -p),
            formatter: v => angka(v, p, spec.whole_from) };
 }
-function angkaSeri(spec, v) { return angka(v, spec.precision, spec.whole_from); }
+function angkaSeri(spec, v) {
+  return spec.compact ? angkaRingkas(v) : angka(v, spec.precision, spec.whole_from);
+}
 
 // Pita smoothing digambar tembus pandang, jadi warna dasarnya sudah mengandung alpha.
 function baseColor(spec) {
@@ -452,6 +462,17 @@ loadLib(0).then(() => {
     && !!spec.group && spec.group !== 'BTC Price';
   const namaSisa = teks => judulNilai ? teks.split(judulNilai).join(judulSisa) : teks;
 
+  // Histogram dua warna (funding rate, perubahan OI; 16 Sep 2026): batang positif memakai
+  // spec.color, negatif spec.negative_color. Warna per titik mengalahkan warna seri, jadi
+  // saat seri diredupkan (Highlight) titiknya diwarnai ulang lewat warnaiTitik(..., true).
+  const duaWarna = spec => spec.kind === 'histogram' && !!spec.negative_color;
+  function warnaiTitik(spec, points, redup) {
+    const alpha = redup ? spec.dim * (spec.alpha < 1 ? spec.alpha : 1) : (spec.alpha < 1 ? spec.alpha : 1);
+    const plus = dimmed(spec.color, alpha), minus = dimmed(spec.negative_color, alpha);
+    for (const p of points) p.color = p.value < 0 ? minus : plus;
+    return points;
+  }
+
   const handles = [];
   for (const spec of S) {
     const values = D.cols[spec.col];
@@ -459,6 +480,8 @@ loadLib(0).then(() => {
     for (let i = 0; i < D.t.length; i++) {
       if (values[i] !== null) points.push({ time: D.t[i], value: values[i] });
     }
+    // Histogram dua warna (negative_color): tiap batang membawa warnanya sendiri.
+    if (duaWarna(spec)) warnaiTitik(spec, points, false);
     const umum = {
       color: baseColor(spec),
       priceScaleId: spec.pane === 'price' ? 'right' : spec.axis,
@@ -488,6 +511,7 @@ loadLib(0).then(() => {
         }, umum));
     line.setData(points);
     const handle = { spec, line };
+    if (duaWarna(spec)) { handle.titik = points; handle.redup = false; }
     // Kembaran Loss: bentuk garis sama, lahir tersembunyi; nyala/warnanya diatur apply().
     if (bisaDibalik(spec)) {
       handle.kembar = panes[spec.pane].addLineSeries(Object.assign({
@@ -721,6 +745,22 @@ loadLib(0).then(() => {
   const labelKelompok = [];
   const titikLoss = [];
 
+  // Saklar satuan (C.unitSwitch, mis. BTC | USD untuk open interest; 16 Sep 2026): seri
+  // bertanda spec.unit hanya tampil kalau saklar satuannya menyala. Dua-duanya boleh menyala
+  // atau mati. Seri pane bawah (ΔOI) cuma satu yang digambar: satuan pertama yang menyala;
+  // tooltip tetap menampilkan semua satuan yang menyala. Tersimpan di localStorage.
+  const SATUAN = C.unitSwitch || [];
+  const nyalaAwal = Object.fromEntries(SATUAN.map((u, i) => [u, i === 0]));
+  state.unitOn = Object.assign({}, nyalaAwal,
+    state.unitOn && typeof state.unitOn === 'object' ? state.unitOn : {});
+  const satuanPertama = () => SATUAN.find(u => state.unitOn[u]) || null;
+  // Seri digambar menurut saklar satuan (pane bawah: hanya satuan pertama yang menyala).
+  const satuanTampil = spec => !spec.unit
+    || (spec.pane === 'extra' ? spec.unit === satuanPertama() : !!state.unitOn[spec.unit]);
+  // Baris tooltip menurut saklar satuan (pane bawah: semua satuan yang menyala).
+  const satuanTooltip = spec => !spec.unit || !!state.unitOn[spec.unit];
+  const wadahKelompok = new Map();
+
   // Garis stroke contoh warna di legend, dengan warna tertentu.
   const garisContoh = (spec, warna) => `${spec.alpha < 1 ? 3 : 2}px `
     + `${spec.style === 1 ? 'dotted' : spec.style ? 'dashed' : 'solid'} `
@@ -759,7 +799,10 @@ loadLib(0).then(() => {
       swatch.style.height = '9px';
       swatch.style.width = '11px';
       swatch.style.borderRadius = '2px';
-      swatch.style.background = baseColor(contoh.spec);
+      // Dua warna: separuh kiri warna positif, separuh kanan warna negatif.
+      swatch.style.background = duaWarna(contoh.spec)
+        ? `linear-gradient(90deg, ${baseColor(contoh.spec)} 50%, ${baseColor(Object.assign({}, contoh.spec, { color: contoh.spec.negative_color }))} 50%)`
+        : baseColor(contoh.spec);
     } else {
       swatch.style.borderTop = `${contoh.spec.alpha < 1 ? 3 : 2}px `
         + `${contoh.spec.style === 1 ? 'dotted' : contoh.spec.style ? 'dashed' : 'solid'} `
@@ -813,6 +856,7 @@ loadLib(0).then(() => {
     }
 
     legendEl.appendChild(wadah);
+    wadahKelompok.set(group, { wadah, anggota });
   }
 
   const hlEl = document.getElementById('hl');
@@ -851,6 +895,30 @@ loadLib(0).then(() => {
       button.onclick = () => { state[kunci] = !state[kunci]; apply(); };
       hlEl.insertBefore(button, labelHighlight);
       saklar.push({ button, kunci });
+    }
+    const pemisah = document.createElement('span');
+    pemisah.className = 'fssep';
+    hlEl.insertBefore(pemisah, labelHighlight);
+  }
+  // Saklar satuan di awal kelompok Highlight, dengan keterangan kecil (C.unitLabel, mis. "OI")
+  // supaya "BTC" di saklar tidak tertukar dengan tombol sorot "BTC" (harga).
+  const saklarSatuan = [];
+  if (SATUAN.length) {
+    const labelHighlight = hlEl.querySelector('.hllabel');
+    if (C.unitLabel) {
+      const ket = document.createElement('span');
+      ket.className = 'hllabel';
+      ket.textContent = C.unitLabel;
+      hlEl.insertBefore(ket, labelHighlight);
+    }
+    for (const u of SATUAN) {
+      const button = document.createElement('button');
+      button.className = 'hl';
+      button.textContent = u;
+      button.title = `Show ${C.unitLabel ? C.unitLabel + ' ' : ''}in ${u}`;
+      button.onclick = () => { state.unitOn[u] = !state.unitOn[u]; apply(); };
+      hlEl.insertBefore(button, labelHighlight);
+      saklarSatuan.push({ button, u });
     }
     const pemisah = document.createElement('span');
     pemisah.className = 'fssep';
@@ -1005,7 +1073,8 @@ loadLib(0).then(() => {
     // seluruhnya juga dilepas dari sorotan, supaya chart tidak meredupkan semua garis
     // demi garis yang tidak kelihatan.
     const kelompokMenyala = new Set(legendItems
-      .filter(h => !state.hidden.includes(h.spec.name) && !(bisaDibalik(h.spec) && keduanyaMati()))
+      .filter(h => !state.hidden.includes(h.spec.name) && !(bisaDibalik(h.spec) && keduanyaMati())
+        && satuanTampil(h.spec))
       .map(h => h.spec.group));
     state.highlights = state.highlights.filter(g => kelompokMenyala.has(g));
     for (const { button, group } of hlButtons) {
@@ -1020,9 +1089,15 @@ loadLib(0).then(() => {
       const warna = hex => faded ? dimmed(hex, fadedAlpha)
         : (spec.alpha < 1 ? dimmed(hex, spec.alpha) : hex);
       handle.line.applyOptions({
-        visible: !hidden && (!handle.kembar || tampilProfit()),
+        visible: !hidden && (!handle.kembar || tampilProfit()) && satuanTampil(spec),
         color: warna(spec.color),
       });
+      // Histogram dua warna: warna ada di tiap titik, jadi diwarnai ulang hanya saat
+      // keadaan redupnya berubah.
+      if (handle.titik && handle.redup !== faded) {
+        handle.redup = faded;
+        handle.line.setData(warnaiTitik(spec, handle.titik, faded));
+      }
       if (handle.kembar) {
         // Garis utama Loss ikut saklar legend induknya. Smoothing Loss: saat keduanya
         // menyala diatur kotak kedua (mati di awal); saat hanya Loss, ikut kotak pertama.
@@ -1049,12 +1124,104 @@ loadLib(0).then(() => {
       swatch.style.display = '';
     }
     for (const { button, kunci } of saklar) button.classList.toggle('on', !!state[kunci]);
+    for (const { button, u } of saklarSatuan) button.classList.toggle('on', !!state.unitOn[u]);
+    // Kelompok legend yang satuannya mati disembunyikan seluruhnya.
+    if (SATUAN.length) {
+      for (const { wadah, anggota } of wadahKelompok.values()) {
+        wadah.style.display = anggota.some(h => satuanTampil(h.spec)) ? '' : 'none';
+      }
+    }
     for (const { button, group } of hlButtons) {
       button.classList.toggle('on', group === 'none'
         ? state.highlights.length === 0
         : state.highlights.includes(group));
     }
+    aturSisiSumbu();
+    aturAngkaSumbu();
     writeState(state);
+  }
+
+  // ---------------------------------------------------------------- sisi sumbu dinamis
+  // Seri berpasangan satuan (spec.pair = kolom seri satuan pertama, mis. OI USD -> OI BTC;
+  // 16 Sep 2026). Aturan:
+  //   - hanya salah satu menyala: yang menyala memakai sisi sumbu bawaan pasangan (OI selalu
+  //     di sisi yang sama kalau sendirian);
+  //   - dua-duanya menyala: seri pair pindah ke sisi seberang kalau sisi itu tidak dipakai
+  //     garis lain yang menyala (mis. funding dimatikan); kalau dipakai, memakai skala sendiri
+  //     tanpa angka sumbu.
+  // Garis smoothing ikut induknya (satu kelompok legend). Seri yang mati di sisi yang sedang
+  // dipinjam, dan seri induk yang mati, dipindah ke skala parkir supaya tidak jadi seri
+  // pertama sumbu itu — library mengambil format angka sumbu dari seri pertama, walau mati.
+  const tampak = h => h.line.options().visible || (!!h.kembar && h.kembar.options().visible);
+  const sisiRumah = h => h.spec.pane === 'price' ? 'right' : h.spec.axis;
+  const seberang = sisi => sisi === 'left' ? 'right' : 'left';
+  function pindahSkala(h, id) {
+    if (h.sisi === id) return;
+    h.sisi = id;
+    h.line.applyOptions({ priceScaleId: id });
+    if (h.kembar) h.kembar.applyOptions({ priceScaleId: id });
+  }
+  function aturSisiSumbu() {
+    // Seri bersatuan yang mati (mis. ΔOI BTC saat hanya USD menyala) diparkir juga, supaya
+    // angka sumbu dan label nilai terakhir memakai format seri yang menyala (40B, bukan
+    // 40,000,000,000).
+    const tujuan = new Map(handles.map(h => [h,
+      h.spec.unit && !tampak(h) ? 'parkir_' + h.spec.col : sisiRumah(h)]));
+    for (const me of handles.filter(h => h.spec.pair && h.spec.name === h.spec.group)) {
+      const induk = handles.find(h => h.spec.col === me.spec.pair && h.spec.name === h.spec.group);
+      if (!induk) continue;
+      const kelompokMe = handles.filter(h => h.spec.group === me.spec.group);
+      const kelompokInduk = handles.filter(h => h.spec.group === induk.spec.group);
+      const rumah = sisiRumah(induk);
+      const indukNyala = kelompokInduk.some(tampak);
+      const meNyala = kelompokMe.some(tampak);
+      let sisiMe = rumah;
+      if (meNyala && indukNyala) {
+        const lawan = seberang(rumah);
+        const dipakai = handles.some(h => h.spec.group && h.spec.pane === me.spec.pane
+          && !kelompokMe.includes(h) && !kelompokInduk.includes(h) && tampak(h) && sisiRumah(h) === lawan);
+        sisiMe = dipakai ? 'pair_' + me.spec.col : lawan;
+      }
+      for (const h of kelompokMe) if (tampak(h)) tujuan.set(h, sisiMe);
+      // Induk yang mati tidak boleh tinggal di sisi yang dipakai seri pair.
+      for (const h of kelompokInduk) if (!tampak(h) && sisiMe === rumah) tujuan.set(h, 'parkir_' + h.spec.col);
+      // Sisi seberang dipinjam: seri lain yang mati (dan garis acuannya) diparkir dulu.
+      if (sisiMe === seberang(rumah)) {
+        for (const h of handles) {
+          if (h.spec.pane === me.spec.pane && !kelompokMe.includes(h) && !kelompokInduk.includes(h)
+              && sisiRumah(h) === sisiMe && (!h.spec.group || !tampak(h))) {
+            tujuan.set(h, 'parkir_' + h.spec.col);
+          }
+        }
+      }
+    }
+    for (const [h, id] of tujuan) pindahSkala(h, id);
+  }
+
+  // ---------------------------------------------------------------- angka sumbu per pane
+  // Angka sumbu (dan garis acuan) di satu sisi pane disembunyikan kalau tidak ada garis
+  // legend yang menyala di sisi itu (16 Sep 2026). Hanya warna teks yang dibuat transparan:
+  // lebar sumbu tetap, jadi semua pane tetap sejajar dan area gambar tidak melebar.
+  const WARNA_ANGKA = '#d1d4dc';
+  function aturAngkaSumbu() {
+    for (const [paneId, chart] of Object.entries(panes)) {
+      for (const sisi of ['left', 'right']) {
+        const ada = handles.some(h => h.spec.group && h.spec.pane === paneId
+          && (h.sisi || sisiRumah(h)) === sisi && tampak(h));
+        const skala = chart.priceScale(sisi);
+        const warna = ada ? WARNA_ANGKA : 'rgba(0,0,0,0)';
+        if (skala.options().textColor !== warna) skala.applyOptions({ textColor: warna });
+        for (const h of handles) {
+          if (!h.spec.group && h.spec.pane === paneId && (h.sisi || sisiRumah(h)) === sisi) {
+            h.line.applyOptions({ visible: ada });
+          }
+        }
+      }
+    }
+    // Garis acuan yang sedang diparkir (sisinya dipinjam seri lain) tidak digambar.
+    for (const h of handles) {
+      if (!h.spec.group && String(h.sisi || '').startsWith('parkir_')) h.line.applyOptions({ visible: false });
+    }
   }
 
   apply();
@@ -1081,6 +1248,10 @@ loadLib(0).then(() => {
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
   function contohWarna(spec) {
+    if (duaWarna(spec)) {
+      const minus = baseColor(Object.assign({}, spec, { color: spec.negative_color }));
+      return `<span class="tbox" style="background:linear-gradient(90deg, ${baseColor(spec)} 50%, ${minus} 50%)"></span>`;
+    }
     return spec.kind === 'histogram'
       ? `<span class="tbox" style="background:${baseColor(spec)}"></span>`
       : `<span class="tsw" style="border-color:${spec.color}"></span>`;
@@ -1093,7 +1264,7 @@ loadLib(0).then(() => {
       if (state.highlights.length > 0 && group !== HARGA && !state.highlights.includes(group)) continue;
       // Saklar Profit dan Loss sama-sama mati: garis metrik tidak tampil, jadi barisnya juga tidak.
       const anggota = legendItems.filter(h => h.spec.group === group && !state.hidden.includes(h.spec.name)
-        && !(bisaDibalik(h.spec) && keduanyaMati()));
+        && !(bisaDibalik(h.spec) && keduanyaMati()) && satuanTooltip(h.spec));
       if (anggota.length === 0) continue;
       const utama = anggota.find(h => h.spec.name === group);
       const smoothing = anggota.filter(h => h !== utama && periodeDari(h.spec.name) !== null);
@@ -1265,7 +1436,8 @@ loadLib(0).then(() => {
   // Kembaran Loss ikut dikunci: kalau tidak, rentangnya (0–100) bergabung dengan rentang
   // yang dikunci dan sumbu tidak bisa digeser.
   const seriesOn = (pane, side) =>
-    handles.filter(h => h.spec.pane === pane && sideOf(h.spec) === side)
+    // Sisi sekarang (h.sisi), bukan sisi bawaan: seri pair bisa pindah sisi (aturSisiSumbu).
+    handles.filter(h => h.spec.pane === pane && (h.sisi || sideOf(h.spec)) === side)
       .flatMap(h => h.kembar ? [h.line, h.kembar] : [h.line]);
   const locked = new Map();
 
@@ -1348,7 +1520,8 @@ loadLib(0).then(() => {
       if (!cell || cell.cellIndex !== 1 || cell.parentElement.rowIndex !== 0) return;
       const sides = [...new Set(handles
         .filter(h => h.spec.pane === pane && state.highlights.includes(h.spec.name))
-        .map(h => sideOf(h.spec)))];
+        .map(h => h.sisi || sideOf(h.spec))
+        .filter(s => s === 'left' || s === 'right'))];
       if (sides.length === 0) return;
       pending = { pane, sides, x: event.clientX, y: event.clientY };
     }, true);
@@ -1406,7 +1579,8 @@ def _scale(mode):
 
 
 def render(df, lines, price_line, extra_lines, height, metric_mode, price_mode, store_key,
-           tooltip="Cursor", metric_range=None, complement=None, view=None):
+           tooltip="Cursor", metric_range=None, complement=None, view=None,
+           unit_switch=None, unit_label=""):
     """Gambar chart.
 
     view: (tanggal awal, tanggal akhir) yang tampil saat chart dibuka — dari kotak Range.
@@ -1475,6 +1649,8 @@ def render(df, lines, price_line, extra_lines, height, metric_mode, price_mode, 
         "nav": NAV_COL if nav else None,   # kolom isi slider rentang
         "navHeight": NAV_H,
         "view": list(view) if view else None,   # rentang tampil awal (kotak Range)
+        "unitSwitch": list(unit_switch) if unit_switch else None,   # saklar satuan (BTC | USD)
+        "unitLabel": unit_label,
         # Tinggi bingkai tetap; tinggi pane dihitung ulang di browser dari tinggi baris
         # legend yang sebenarnya (bisa lebih dari satu baris).
         "frameHeight": total_height,

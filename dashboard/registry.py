@@ -31,6 +31,12 @@ class Series:
                                       # (LTH-SOPR: 1.318 tapi 384, bukan 384.000)
     complement_color: str | None = None  # warna garis pasangan (Loss) saat Profit dan
                                          # Loss sama-sama menyala (MetricFamily.complement)
+    negative_color: str | None = None    # histogram: warna batang bernilai negatif
+                                         # (color dipakai untuk batang positif)
+    unit: str | None = None       # satuan untuk saklar MetricFamily.unit_switch ("BTC"/"USD")
+    pair: str | None = None       # kolom seri pasangan satuan pertama; seri ini pindah ke sisi
+                                  # sumbu seberang saat keduanya menyala (lihat lw_chart)
+    compact: bool = False         # angka ringkas K/M/B (40.81B)
 
 
 @dataclass
@@ -42,6 +48,9 @@ class RefLine:
     # memuat metrik — dipakai SOPR, yang LTH-SOPR-nya punya sumbu sendiri di kanan
     # dengan batas untung/rugi di 1.0 yang letaknya berbeda dari sumbu kiri.
     all_axes: bool = False
+    # Kolom seri yang diikuti sumbunya. Dipakai halaman yang satu pane-nya memuat dua skala
+    # (funding di satu sumbu, OI di sumbu lain): garis nol harus di sumbu funding, bukan OI.
+    follow: str | None = None
 
 
 @dataclass
@@ -69,6 +78,9 @@ class MetricFamily:
     metric_range: tuple[float, float] | None = None
     # Kolom tooltip untuk metrik yang punya pasangan 100 − nilai, mis. ("Profit", "Loss").
     complement: tuple[str, str] | None = None
+    # Saklar satuan di dalam chart, mis. ("BTC", "USD"); seri bertanda Series.unit ikut saklar.
+    unit_switch: tuple[str, ...] | None = None
+    unit_label: str = ""          # keterangan kecil sebelum saklar ("OI")
 
 
 MARKET_VALUATION = MetricFamily(
@@ -295,6 +307,52 @@ SUPPLY_IN_PROFIT = MetricFamily(
 )
 
 
+FUNDING_OI = MetricFamily(
+    key="funding_oi",
+    title="Funding Rates & Open Interest",   # nama menu (permintaan user 16 Sep 2026)
+    subtitle="Funding Rates & Open Interest",
+    group="Derivatives",
+    url_path="funding-oi",
+    loader=data.load_derivatives,
+    # Disetujui user 16 Sep 2026 dari pratinjau: funding batang dua warna, funding dan OI satu
+    # pane (sumbu berbeda), perubahan OI di pane bawah. Data mulai Mar 2020; tidak ada KB.
+    # Framework v2 hanya memakai funding < 0 (pengubah ukuran K2); ambang lain tidak dipasang.
+    btc_mode_default="Separate pane",
+    metric_scale_default="Auto",
+    price_scale_default="Log",
+    series=[
+        # Funding: batang dari nol, positif teal, negatif rust. Saat BTC di pane sendiri funding
+        # di sumbu kanan dan OI di kiri; saat Overlay ditukar supaya funding tidak berbagi
+        # sumbu dengan harga. Satuan tidak ditulis (tidak disebut sumber). 4 desimal.
+        Series("Funding Rate", "Funding Rate", color="#0b8e89", negative_color="#bf5546",
+               axis="left", separate_axis="right", dim=0.45, kind="histogram", alpha=0.80,
+               short="Funding", precision=4),
+        # OI adalah jumlah (selalu positif), jadi garis, bukan batang. Violet seperti AVIV Mean.
+        Series("Open Interest (BTC)", "Open Interest", color="#7b65d2", axis="right",
+               separate_axis="left", dim=0.42, short="OI", precision=0, unit="BTC"),
+        # OI USD = OI BTC x harga hari itu (API tidak mengirim USD). Violet muda, pasangan
+        # AVIV Mean/Upper. Saklar BTC | USD (16 Sep 2026): kalau dua-duanya menyala, USD pindah
+        # ke sisi sumbu seberang bila kosong (funding dimatikan), kalau tidak skala tanpa angka.
+        Series("Open Interest (USD)", "Open Interest USD", color="#a58df0", axis="right",
+               separate_axis="left", dim=0.30, short="OI USD", precision=0, unit="USD",
+               pair="Open Interest", compact=True),
+        # Perubahan OI harian (bersih dari bursa yang baru masuk): batang dua warna seperti
+        # funding (naik teal, turun rust). Batang ikut satuan pertama yang menyala.
+        Series("OI Change BTC (1d)", "OI Change", color="#0b8e89", negative_color="#bf5546",
+               axis="left", dim=0.45, kind="histogram", smoothing=False, alpha=0.80,
+               short="ΔOI", pane="extra", precision=0, unit="BTC"),
+        Series("OI Change USD (1d)", "OI Change USD", color="#0b8e89", negative_color="#bf5546",
+               axis="left", dim=0.45, kind="histogram", smoothing=False, alpha=0.80,
+               short="ΔOI", pane="extra", precision=0, unit="USD", compact=True),
+    ],
+    reference_lines=[RefLine(0.0, "Zero", follow="Funding Rate")],
+    extra_label="OI Change",
+    unit_switch=("BTC", "USD"),
+    unit_label="OI",
+)
+
+
 # Urutan di sini = urutan menu sidebar; kelompok muncul menurut halaman pertamanya.
 # Halaman pertama jadi halaman bawaan (alamat localhost:8503/).
-FAMILIES = {f.title: f for f in [MARKET_VALUATION, PRICE_LEVELS, SOPR, NUPL, SUPPLY_IN_PROFIT]}
+FAMILIES = {f.title: f for f in [MARKET_VALUATION, PRICE_LEVELS, SOPR, NUPL, SUPPLY_IN_PROFIT,
+                                   FUNDING_OI]}

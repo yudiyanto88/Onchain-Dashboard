@@ -111,6 +111,47 @@ def load_nupl():
 
 
 @st.cache_data(ttl=3600)
+def load_derivatives():
+    """Funding rate dan open interest futures (data_derivatives.csv), plus perubahan OI harian.
+
+    Satuan funding rate tidak disebut ChartInspect (median 0.0062, kemungkinan % per 8 jam),
+    jadi ditampilkan tanpa satuan. Open interest = total_oi API futures-open-interest, persis
+    jumlah kolom 13 bursa (dicek 16 Sep 2026, selisih 0). Satuannya tidak ditulis API; dari
+    besarnya BTC (CME 107.248 x harga = 8,2 miliar USD). Cakupan bursa bertambah: CME mulai
+    5 Jun 2020, Bitget 13 Agt 2021, Coinbase 2 Des 2023, Hyperliquid 25 Des 2024, MEXC
+    21 Mar 2025 — di hari itu total OI melompat karena bursa baru masuk.
+    OI tersedia sejak 28 Feb 2020, harga dan funding baru sejak 31 Mar 2020: baris sebelum
+    harga pertama dibuang supaya chart dan slider mulai di tanggal yang sama.
+    OI Change (disetujui user 16 Sep 2026) = jumlah perubahan OI per bursa, hanya bursa yang
+    OI-nya > 0 di baris ini dan baris sebelumnya: hari bursa masuk cakupan (atau sehari
+    bernilai 0 lalu kembali) tidak ikut dihitung. Kolom oi_* ditambahkan ke CSV oleh
+    auto_update.py 16 Sep 2026; kalau belum ada, dipakai selisih total_oi biasa.
+    Di 7 tanggal bolong selisihnya mencakup lebih dari satu hari.
+    """
+    df = pd.read_csv("data_derivatives.csv")
+    df.rename(columns={
+        'date': 'Date', 'btc_price': 'BTC Price',
+        'funding_rate': 'Funding Rate', 'total_oi': 'Open Interest',
+    }, inplace=True)
+    df = _prepare(df)
+    bursa = [c for c in df.columns if c.startswith('oi_')]
+    if bursa:
+        oi = df[bursa]
+        aktif = (oi > 0) & (oi.shift(1) > 0)
+        df['OI Change'] = oi.diff().where(aktif).sum(axis=1, min_count=1)
+        df.loc[df.index[0], 'OI Change'] = float('nan')
+    else:
+        df['OI Change'] = df['Open Interest'].diff()
+    # Versi USD (16 Sep 2026): BTC x harga BTC hari itu (API OI tidak mengirim USD).
+    df['Open Interest USD'] = df['Open Interest'] * df['BTC Price']
+    df['OI Change USD'] = df['OI Change'] * df['BTC Price']
+    awal = df.loc[df['BTC Price'].notna(), 'Date']
+    if not awal.empty:
+        df = df[df['Date'] >= awal.iloc[0]]
+    return df
+
+
+@st.cache_data(ttl=3600)
 def load_supply():
     """Persen supply dalam untung: semua holder, STH, LTH (data_supply.csv).
 
