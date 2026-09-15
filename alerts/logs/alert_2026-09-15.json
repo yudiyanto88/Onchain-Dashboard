@@ -1,0 +1,26 @@
+{
+  "timestamp_utc": "2026-09-15T09:04:04.879741+00:00",
+  "data_date": "2026-09-15",
+  "zone": "Z3",
+  "telegram_sent": true,
+  "triggered_count": 1,
+  "triggered_conditions": [
+    {
+      "name": "PULLBACK_5PCT",
+      "detail": "Turun 5.5% dari high 14D $81,218 \u2192 $76,784 \u2014 cek kondisi K5"
+    }
+  ],
+  "snapshot": {
+    "price": 76783.76,
+    "sth_rp": 71177.01,
+    "rp": 53237.13,
+    "lth_rp": 49457.19,
+    "cvdd": 50072.8,
+    "cvdd_ratio": 1.5334,
+    "aviv_mean_px": 90202.3,
+    "aviv_upper_px": 102699.39,
+    "sth_mvrv": 1.0776,
+    "supply_in_profit": 67.95,
+    "fg": 69
+  }
+}
