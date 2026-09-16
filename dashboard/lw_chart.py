@@ -466,8 +466,29 @@ loadLib(0).then(() => {
   // spec.color, negatif spec.negative_color. Warna per titik mengalahkan warna seri, jadi
   // saat seri diredupkan (Highlight) titiknya diwarnai ulang lewat warnaiTitik(..., true).
   const duaWarna = spec => spec.kind === 'histogram' && !!spec.negative_color;
+  // Garis bergradasi (spec.gradient = [[nilai, hex], ...], Fear & Greed; 16 Sep 2026): warna
+  // tiap titik diinterpolasi linear antar-titik henti.
+  const bergradasi = spec => Array.isArray(spec.gradient) && spec.gradient.length > 1;
+  const warnaPerTitik = spec => duaWarna(spec) || bergradasi(spec);
+  const rgb = hex => [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
+  function warnaGradasi(spec, v, alpha) {
+    const g = spec.gradient;
+    let i = 1;
+    while (i < g.length - 1 && v > g[i][0]) i++;
+    const [a, ca] = [g[i - 1][0], rgb(g[i - 1][1])], [b, cb] = [g[i][0], rgb(g[i][1])];
+    const t = b === a ? 0 : Math.max(0, Math.min(1, (v - a) / (b - a)));
+    const c = ca.map((x, k) => Math.round(x + (cb[k] - x) * t));
+    return `rgba(${c[0]},${c[1]},${c[2]},${alpha})`;
+  }
+  // CSS linear-gradient untuk contoh warna di legend dan tooltip.
+  const cssGradasi = spec => 'linear-gradient(90deg, '
+    + spec.gradient.map(([v, hex]) => `${hex} ${v}%`).join(', ') + ')';
   function warnaiTitik(spec, points, redup) {
     const alpha = redup ? spec.dim * (spec.alpha < 1 ? spec.alpha : 1) : (spec.alpha < 1 ? spec.alpha : 1);
+    if (bergradasi(spec)) {
+      for (const p of points) p.color = warnaGradasi(spec, p.value, alpha);
+      return points;
+    }
     const plus = dimmed(spec.color, alpha), minus = dimmed(spec.negative_color, alpha);
     for (const p of points) p.color = p.value < 0 ? minus : plus;
     return points;
@@ -481,7 +502,7 @@ loadLib(0).then(() => {
       if (values[i] !== null) points.push({ time: D.t[i], value: values[i] });
     }
     // Histogram dua warna (negative_color): tiap batang membawa warnanya sendiri.
-    if (duaWarna(spec)) warnaiTitik(spec, points, false);
+    if (warnaPerTitik(spec)) warnaiTitik(spec, points, false);
     const umum = {
       color: baseColor(spec),
       priceScaleId: spec.pane === 'price' ? 'right' : spec.axis,
@@ -511,7 +532,7 @@ loadLib(0).then(() => {
         }, umum));
     line.setData(points);
     const handle = { spec, line };
-    if (duaWarna(spec)) { handle.titik = points; handle.redup = false; }
+    if (warnaPerTitik(spec)) { handle.titik = points; handle.redup = false; }
     // Kembaran Loss: bentuk garis sama, lahir tersembunyi; nyala/warnanya diatur apply().
     if (bisaDibalik(spec)) {
       handle.kembar = panes[spec.pane].addLineSeries(Object.assign({
@@ -803,6 +824,11 @@ loadLib(0).then(() => {
       swatch.style.background = duaWarna(contoh.spec)
         ? `linear-gradient(90deg, ${baseColor(contoh.spec)} 50%, ${baseColor(Object.assign({}, contoh.spec, { color: contoh.spec.negative_color }))} 50%)`
         : baseColor(contoh.spec);
+    } else if (bergradasi(contoh.spec)) {
+      // Garis bergradasi: contoh warna berupa pita tipis bergradasi, lebih panjang dari biasa.
+      swatch.style.width = '22px';
+      swatch.style.height = '2px';
+      swatch.style.background = cssGradasi(contoh.spec);
     } else {
       swatch.style.borderTop = `${contoh.spec.alpha < 1 ? 3 : 2}px `
         + `${contoh.spec.style === 1 ? 'dotted' : contoh.spec.style ? 'dashed' : 'solid'} `
@@ -1252,9 +1278,19 @@ loadLib(0).then(() => {
       const minus = baseColor(Object.assign({}, spec, { color: spec.negative_color }));
       return `<span class="tbox" style="background:linear-gradient(90deg, ${baseColor(spec)} 50%, ${minus} 50%)"></span>`;
     }
+    if (bergradasi(spec)) {
+      return `<span class="tsw" style="border-top:0;height:2px;background:${cssGradasi(spec)}"></span>`;
+    }
     return spec.kind === 'histogram'
       ? `<span class="tbox" style="background:${baseColor(spec)}"></span>`
       : `<span class="tsw" style="border-color:${spec.color}"></span>`;
+  }
+
+  // Nama kelas di belakang angka ("69 · Greed") untuk seri bertanda value_labels.
+  function labelNilai(spec, v) {
+    if (!Array.isArray(spec.value_labels) || v === null || v === undefined) return '';
+    const kelas = spec.value_labels.find(([batas]) => v <= batas) || spec.value_labels[spec.value_labels.length - 1];
+    return ` <span style="font-weight:400;color:${bergradasi(spec) ? warnaGradasi(spec, v, 1) : '#aeb6c2'}">· ${esc(kelas[1])}</span>`;
   }
 
   function isiTooltip(i) {
@@ -1283,7 +1319,7 @@ loadLib(0).then(() => {
         // yang bertambah satu kolom tidak ikut melebar karena nama panjang.
         const lengkap = C.complement && group !== HARGA;
         baris.push({ label: lengkap && contoh.short ? contoh.short : group, spec: contoh,
-                     nilai: utama ? angkaSeri(utama.spec, v) : '', kolom,
+                     nilai: utama ? angkaSeri(utama.spec, v) + labelNilai(utama.spec, v) : '', kolom,
                      sisa: lengkap && v !== null ? angkaSeri(utama.spec, 100 - v) : '' });
       }
       // Kelompok tanpa garis utama (Rolling Z-Score 1y/2y/4y): satu baris mendatar, tiap

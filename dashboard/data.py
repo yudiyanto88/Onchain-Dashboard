@@ -152,6 +152,20 @@ def load_derivatives():
 
 
 @st.cache_data(ttl=3600)
+def load_fear_greed():
+    """Crypto Fear & Greed Index (data_fg.csv; sumber Alternative.me lewat ChartInspect).
+
+    CSV tidak menyimpan harga BTC; harga diambil dari data_mvrv.csv (identik dengan
+    bitcoinPrice di API F&G, dicek 16 Sep 2026). Data mulai 1 Feb 2018, 2 tanggal bolong.
+    """
+    df = pd.read_csv("data_fg.csv").rename(columns={'date': 'Date'})
+    df = _prepare(df)
+    harga = _prepare(pd.read_csv("data_mvrv.csv", usecols=['date', 'btc_price'])
+                     .rename(columns={'date': 'Date', 'btc_price': 'BTC Price'}))
+    return df.merge(harga, on='Date', how='left')
+
+
+@st.cache_data(ttl=3600)
 def load_supply():
     """Persen supply dalam untung: semua holder, STH, LTH (data_supply.csv).
 

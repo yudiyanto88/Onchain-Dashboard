@@ -32,6 +32,8 @@ class Line:
     unit: str | None = None              # satuan untuk saklar satuan di chart
     pair: str | None = None              # kolom seri pasangan satuan (pindah sisi sumbu)
     compact: bool = False                # angka ringkas K/M/B
+    gradient: list | None = None         # warna garis per titik menurut nilai [[nilai, hex], ...]
+    value_labels: list | None = None     # nama kelas per rentang [[batas atas, nama], ...]
 
 
 def render(df, lines, price_line, extra_lines, height, metric_mode, price_mode, key,

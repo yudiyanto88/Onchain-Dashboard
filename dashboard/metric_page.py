@@ -136,6 +136,12 @@ def _free_style(taken):
                 STYLE_ORDER[len(taken) % len(STYLE_ORDER)])
 
 
+def _default_style(family, period, taken):
+    """Gaya bawaan satu periode: pilihan halaman (MetricFamily.smoothing_style_default,
+    mis. SMA30 Fear & Greed = Band) kalau ada, selain itu urutan STYLE_ORDER."""
+    return family.smoothing_style_default.get(period) or _free_style(taken)
+
+
 def _assign_styles(family):
     """Beri gaya pada periode yang belum punya. Gaya yang sudah ada dipertahankan,
     termasuk saat periode lain dimatikan. Yang digeser hanya gaya kembar yang
@@ -152,7 +158,7 @@ def _assign_styles(family):
             entry["width"] = st.session_state.get(f"{k}_lwidth_{period}") or entry["width"]
         dipilih_sendiri = bool(entry) and entry["name"] != entry["auto"][0]
         if entry is None or (entry["name"] in taken and not dipilih_sendiri):
-            entry = _new_entry(_free_style(taken))
+            entry = _new_entry(_default_style(family, period, taken))
             store[period] = entry
         taken.append(entry["name"])
 
@@ -181,7 +187,7 @@ def _reset_line_style(family):
     store = _styles(family)
     taken = []
     for period in sorted(st.session_state[f"{k}_periods"]):
-        entry = _new_entry(_free_style(taken))
+        entry = _new_entry(_default_style(family, period, taken))
         store[period] = entry
         st.session_state[f"{k}_lstyle_{period}"] = entry["name"]
         st.session_state[f"{k}_lwidth_{period}"] = entry["width"]
@@ -278,7 +284,7 @@ def _init_state(family, dmin, dmax):
         f"{k}_from": lo,
         f"{k}_to": hi,
         f"{k}_smooth_kind": "SMA",
-        f"{k}_periods": [],
+        f"{k}_periods": list(family.smoothing_default),
         f"{k}_extra_periods": [],
         f"{k}_scale_price": family.price_scale_default,
         f"{k}_scale_metric": family.metric_scale_default,
@@ -606,16 +612,21 @@ def render_metric_page(family: MetricFamily):
                          hidden_default=sr.hidden_default, whole_from=sr.whole_from,
                          complement_color=sr.complement_color,
                          negative_color=sr.negative_color,
-                         unit=sr.unit, pair=sr.pair, compact=sr.compact))
+                         unit=sr.unit, pair=sr.pair, compact=sr.compact,
+                         gradient=sr.gradient, value_labels=sr.value_labels))
         if not sr.smoothing:
             continue
         for p in periods:
             col = f"{sr.col}__{kind}{p}"
             if col in df.columns:
                 # Nama "<metrik> <SMA|EMA>(<periode>)" dibaca tooltip untuk kolom periodenya.
-                plan.append(Line(f"{sr.label} {kind}({p})", col, sr.color, axis,
-                                 group=sr.label, dim=sr.dim, precision=sr.precision,
-                                 whole_from=sr.whole_from, complement_color=sr.complement_color,
+                plan.append(Line(f"{sr.label} {kind}({p})", col, sr.smoothing_color or sr.color, axis,
+                                 group=sr.label, dim=sr.dim,
+                                 precision=(sr.precision if sr.smoothing_precision is None
+                                            else sr.smoothing_precision),
+                                 whole_from=(sr.whole_from if sr.smoothing_precision is None
+                                             else None),
+                                 complement_color=sr.complement_color,
                                  unit=sr.unit, compact=sr.compact,
                                  **_smooth_style(family, p)))
 

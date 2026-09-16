@@ -37,6 +37,12 @@ class Series:
     pair: str | None = None       # kolom seri pasangan satuan pertama; seri ini pindah ke sisi
                                   # sumbu seberang saat keduanya menyala (lihat lw_chart)
     compact: bool = False         # angka ringkas K/M/B (40.81B)
+    # Garis bergradasi: warna tiap titik diinterpolasi dari daftar [nilai, hex] (Fear & Greed).
+    gradient: list | None = None
+    smoothing_color: str | None = None   # warna garis smoothing kalau beda dari color
+    smoothing_precision: int | None = None  # desimal garis smoothing kalau beda (F&G: 0 vs 1)
+    # Nama kelas di tooltip ("69 · Greed"): daftar [batas atas inklusif, nama], urut naik.
+    value_labels: list | None = None
 
 
 @dataclass
@@ -81,6 +87,9 @@ class MetricFamily:
     # Saklar satuan di dalam chart, mis. ("BTC", "USD"); seri bertanda Series.unit ikut saklar.
     unit_switch: tuple[str, ...] | None = None
     unit_label: str = ""          # keterangan kecil sebelum saklar ("OI")
+    smoothing_default: list[int] = field(default_factory=list)   # periode menyala sejak awal
+    # Gaya bawaan per periode, mis. {30: "Band"}; periode lain ikut urutan Dotted/Step/Band.
+    smoothing_style_default: dict[int, str] = field(default_factory=dict)
 
 
 MARKET_VALUATION = MetricFamily(
@@ -352,7 +361,45 @@ FUNDING_OI = MetricFamily(
 )
 
 
+FEAR_GREED = MetricFamily(
+    key="fear_greed",
+    title="Fear & Greed",
+    subtitle="Crypto Fear & Greed Index",
+    group="Sentiment & Macro",
+    url_path="fear-greed",
+    loader=data.load_fear_greed,
+    # Disetujui user 16 Sep 2026 dari pratinjau: garis bergradasi
+    # halus menurut nilai, SMA30 menyala sejak awal dengan satu warna. Framework v2 memakai
+    # F&G < 30 (K2), < 50 (K5) dan F&G SMA30 (konteks K1/K4); garis ambang itu tidak dipasang.
+    # BTC di pane sendiri sejak awal (sempat Overlay satu pane; diganti permintaan user 16 Sep
+    # 2026). F&G pindah ke sumbu kanan lewat separate_axis, kembali ke kiri saat Overlay.
+    btc_mode_default="Separate pane",
+    metric_scale_default="Auto",
+    price_scale_default="Log",
+    metric_range=(0, 100),
+    smoothing_default=[30],
+    # SMA30 berbentuk pita (Band, transparan 60 %) sejak awal (permintaan user 16 Sep 2026).
+    smoothing_style_default={30: "Band"},
+    series=[
+        # Gradasi: rust (takut) -> merah muda -> abu (netral) -> aqua -> teal (serakah); bukan
+        # merah-hijau supaya aman untuk buta warna, sekeluarga dengan warna funding.
+        # SMA30 kuning pucat supaya menonjol di atas garis harian yang ramai.
+        # Kelas resmi dari API: Extreme Fear <=25, Fear 26-46, Neutral 47-54, Greed 55-75,
+        # Extreme Greed >=76 (dibaca dari valueClassification, 16 Sep 2026).
+        Series("Fear & Greed", "Fear & Greed", color="#8b949e", axis="left",
+               separate_axis="right", dim=0.45, short="F&G", precision=0, whole_from=0,
+               # Nilai harian bilangan bulat (69); SMA30 satu desimal seperti framework (92.4).
+               smoothing_precision=1,
+               gradient=[[0, "#bf5546"], [25, "#bf5546"], [40, "#dc9390"], [50, "#8b949e"],
+                         [62, "#38d1b4"], [75, "#0b8e89"], [100, "#0b8e89"]],
+               smoothing_color="#F7E9A8",
+               value_labels=[[25, "Extreme Fear"], [46, "Fear"], [54, "Neutral"],
+                             [75, "Greed"], [100, "Extreme Greed"]]),
+    ],
+)
+
+
 # Urutan di sini = urutan menu sidebar; kelompok muncul menurut halaman pertamanya.
 # Halaman pertama jadi halaman bawaan (alamat localhost:8503/).
 FAMILIES = {f.title: f for f in [MARKET_VALUATION, PRICE_LEVELS, SOPR, NUPL, SUPPLY_IN_PROFIT,
-                                   FUNDING_OI]}
+                                   FUNDING_OI, FEAR_GREED]}

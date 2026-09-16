@@ -1,6 +1,7 @@
 # Handoff — Upgrade Dashboard Streamlit (v2)
 
-Ditulis ulang: 15 September 2026 (pembaruan kedelapan: dashboard nyaman di HP, tombol Scale untuk layar sentuh, layar penuh semu di iPhone, MVRV bawaan Separate pane + Log — commit `32a8abd` dan `024807a`, live). Untuk dilanjutkan di sesi Claude Code berikutnya.
+Ditulis ulang: 16 September 2026 (pembaruan kesembilan: halaman NUPL, Funding Rates & Open Interest, Fear & Greed; OI per bursa di `auto_update.py`; saklar OI BTC | USD; angka sumbu per pane; Realized P/L ditunda — commit `24e1fe1`, `3fe3619`, dan commit Fear & Greed + handoff sesudahnya — semua live). Untuk dilanjutkan di sesi Claude Code berikutnya.
+(Pembaruan kedelapan 15 Sep: dashboard nyaman di HP, tombol Scale untuk layar sentuh, layar penuh semu di iPhone, MVRV bawaan Separate pane + Log — commit `32a8abd` dan `024807a`.)
 (Pembaruan ketujuh 14 Sep: slider rentang di bawah chart, Range memindahkan jendela (pilihan B), Supply in Profit bawaan Separate pane — commit `8bb65d7`.)
 (Pembaruan keenam 14 Sep: halaman Supply in Profit, saklar Profit/Loss, sumbu 0–100, rapikan Price Levels, BTC terakhir di legend.)
 (Pembaruan kelima 14 Sep: halaman SOPR, kotak Tooltip, menu berkelompok `st.navigation`, commit `073a997`.)
@@ -20,7 +21,7 @@ Baca dokumen ini dan `CLAUDE.md` sebelum mulai. Bagian **3 (keputusan pending)**
   4. Tampilan
 - **Pembagian halaman:** satu halaman per keluarga metrik (sekitar 17 halaman).
 - **Pendekatan yang dipilih:** satu renderer dipakai semua halaman, konfigurasi metrik terpisah. Coba satu halaman dulu. Dashboard lama tidak boleh terganggu — sampai 13 Sep 2026, saat v2 menggantikannya (v1 diarsipkan di `archive/app_v1.py`).
-- **Posisi sekarang (15 Sep 2026):** empat halaman — MVRV, Price Levels (Valuation), SOPR, Supply in Profit (Profitability), semuanya dengan slider rentang (bagian 3.2) dan sudah nyaman dibuka di HP Android dan iPhone (bagian 3.15). **Pekerjaan berikutnya: memilih halaman metrik kelima (tanyakan user).** Prioritas 3 (navigasi) sudah berjalan: menu `st.navigation` berkelompok jenis metrik dengan alamat per halaman (bagian 3.11). Halaman berikutnya tinggal menambah `MetricFamily` dengan `group` dan `url_path`.
+- **Posisi sekarang (16 Sep 2026):** tujuh halaman dalam empat kelompok menu — Valuation (MVRV, Price Levels), Profitability (SOPR, NUPL, Supply in Profit), Derivatives (Funding Rates & Open Interest), Sentiment & Macro (Fear & Greed). Semuanya dengan slider rentang (bagian 3.2) dan nyaman di HP (bagian 3.15). **Pekerjaan berikutnya: pilih halaman berikutnya** (usulan di bagian 3.11; Realized P/L ditunda, bagian 3.18). Halaman baru tinggal menambah `MetricFamily` dengan `group` dan `url_path`.
 
 ---
 
@@ -202,6 +203,50 @@ User bertanya apakah dashboard nyaman dibuka di HP. Diukur di localhost dengan v
 ### 3.16 Halaman MVRV: bawaan BTC Separate pane + sumbu Log — SELESAI 15 Sep 2026 (commit `32a8abd`)
 Permintaan user. `MARKET_VALUATION` di registry: `btc_mode_default="Separate pane"`, `metric_scale_default="Log"`, `price_scale_default="Log"`. Sempat dipasang Overlay karena salah paham, lalu diganti. Terukur: 2 pane, semua sumbu Log, LTH MVRV otomatis ke sumbu kanan (`separate_axis`), kotak Display menulis "Mixed". Pane Z-Score tetap linear.
 
+### 3.17 Halaman NUPL — SELESAI 16 Sep 2026 (commit `24e1fe1`, live)
+Dasar: KB NUPL v1.4 (framework v2 tidak memakai NUPL). Dipratinjau dengan data mingguan, disetujui user.
+- **Data:** `data.load_nupl()` dari `data_momentum.csv` (`nupl`, `sth_nupl`, `lth_nupl`, sejak 17 Jul 2010). `NUPL Gap` = LTH-NUPL − STH-NUPL (KB §8.1). **Ratio LTH/STH tidak dimuat**: KB §8.2 menyebut angkanya melompat tanpa makna saat STH dekat nol (+73 ke −561 sehari).
+- **Tampilan:** menu "NUPL" (Profitability, `/nupl`), judul "Net Unrealized Profit/Loss". Garis NUPL navy, STH-NUPL rust, LTH-NUPL teal, 3 desimal. Garis acuan Break-even (0). BTC Separate pane, skala metrik linear (Auto; ada nilai negatif). Pane bawah "NUPL Gap" histogram rust, **mati sejak awal** (permintaan user).
+- **Sumbu tidak dipaku −1..1** (pilihan user dari pratinjau): lembah 2011 (STH −3.6, NUPL −1.5) membuat Range All gepeng, tapi zoom/Range 4y lega dan data 2011 tidak terpotong.
+- **Sumbu kanan saat Separate pane** (permintaan user, juga untuk Supply in Profit): `separate_axis="right"` di ketiga garis, kembali ke kiri saat Overlay. Aturan user: metrik yang skalanya sama pindah ke kanan; kecuali seperti LTH-SOPR/LTH-MVRV yang skalanya jauh berbeda.
+- **Terukur cocok KB:** 28 Okt 2025 NUPL 0.507 · STH −0.001 · LTH 0.669; 21 Nov 2022 STH −0.206 · LTH −0.309 (NUPL −0.286 vs KB −0.288, kemungkinan revisi data); Gap 22 Jun 2021 1.196 (KB 1.20), 10 Feb 2023 −0.031.
+- Garis ambang KB (0.55, 0.50, −0.20, …) tidak dipasang: KB sendiri menyebut ambang tetap tidak andal lintas siklus.
+
+### 3.18 Realized P/L — DITUNDA 16 Sep 2026 (keputusan user: skip)
+Data `data_pl.csv` bermasalah dan tidak ada KB. Temuan (sejak 2020, 2.450 hari):
+- `rpl_ratio` melonjak sampai ratusan juta karena 77 hari realized loss < 1 BTC (mis. 0.0002 BTC 31 Des 2020 vs profit 51.504 BTC); 70 hari > 1.000.
+- `sth_pl_ratio` / `lth_pl_ratio` **macet**: sama persis dengan hari sebelumnya di 179 / 246 hari (mis. LTH 3.302.512 lima hari berturut 24–28 Mar 2024 padahal profit/loss berbeda).
+- Yang sehat: `daily_realized_profit_btc`, `daily_realized_loss_btc` (kecuali 77 hari tadi), `rrp`, `rrl`, `relative_realized_pl` (= rrp − rrl), `rpl_ratio` = profit ÷ loss persis.
+- Usulan kalau dilanjutkan: buat KB dulu di Claude.ai; ratio dihitung ulang dari jumlah 30 hari profit ÷ loss (sejak 2016: 0.11–101, median 2.1); STH/LTH ratio jangan dipakai.
+
+### 3.19 Halaman Funding Rates & Open Interest — SELESAI 16 Sep 2026 (commit `3fe3619`, live)
+Tidak ada KB. Framework v2 hanya memakai funding < 0 (pengubah ukuran K2). Semua bentuk dipilih user dari pratinjau.
+- **Data:** `data.load_derivatives()` dari `data_derivatives.csv`. Baris sebelum harga pertama (OI mulai 28 Feb 2020, harga/funding 31 Mar 2020) dibuang.
+  - **Funding:** satuan tidak ditulis ChartInspect (median 0.0062, kemungkinan % per 8 jam) → ditampilkan tanpa satuan, 4 desimal. 364 dari 2.353 hari negatif.
+  - **OI:** dicek di API `futures-open-interest`: `total_oi` = **persis jumlah 13 bursa** (CME, Binance, Bybit, Hyperliquid, Bitget, OKX, Deribit, Coinbase, BitMEX, Kraken, Bitfinex, MEXC, Huobi), selisih 0 di 2.385 hari. Satuan tidak ditulis; dari besarnya **BTC** (CME 107.248 × 75.990 = 8,2 miliar USD). Halaman ChartInspect punya pilihan "Unit: USD".
+  - **Cakupan bursa bertambah:** CME 5 Jun 2020, Bitget 13 Agt 2021, Coinbase 2 Des 2023, Hyperliquid 25 Des 2024, MEXC 21 Mar 2025 — total OI melompat di hari itu. OI CME sama persis Sabtu–Minggu (bursa tutup) — wajar.
+- **`auto_update.py` diubah (izin user):** hanya blok `# 3. PIPELINE: DERIVATIVES` — daftar `OI_EXCHANGES` dan 13 kolom `oi_<bursa>` ikut disimpan ke CSV (kolom lama tetap di depan). Efek: `data_master_all_metrics.csv` ikut bertambah 13 kolom saat script lengkap jalan di GitHub Actions. CSV lokal diisi dengan menjalankan **hanya blok Derivatives** (skrip sekali pakai yang mengeksekusi header + blok 3 dari `auto_update.py`), bukan seluruh script. Perubahan user yang belum di-commit di file yang sama (pipeline 19 Treasury 2Y) **tidak ikut commit** (hanya hunk Derivatives di-stage lewat `git apply --cached`).
+- **OI Change (ΔOI) bersih:** jumlah `diff()` per bursa, hanya bursa yang OI-nya > 0 kemarin **dan** hari ini — hari bursa masuk cakupan atau sehari bernilai 0 tidak dihitung. Terukur: 5 Jun 2020 +53.921 → +9.528; 21 Mar 2025 +20.766 → −9.295; 30 Apr 2020 −91.759 → −23.108. Tanpa kolom `oi_*`, jatuh ke selisih `total_oi`.
+- **Tampilan:** menu "Funding Rates & Open Interest" (kelompok Derivatives, `/funding-oi`). BTC Separate pane. **Funding + OI satu pane** (permintaan user): funding batang dua warna (positif teal, negatif rust) di sumbu kanan; OI garis violet `#7b65d2` di sumbu kiri (OI jumlah selalu positif → garis, bukan batang). Garis "Zero" mengikuti sumbu funding (`RefLine.follow`). Mode Overlay: funding kiri, OI kanan (berbagi dengan harga). Pane bawah "OI Change (1d)" batang dua warna, mati sejak awal.
+- **Saklar OI BTC | USD** di baris Highlight (`OI [BTC] [USD] │ Highlight …`; label "OI" supaya tidak tertukar tombol sorot "BTC"). Boleh menyala dua-duanya, tersimpan di localStorage (`unitOn`).
+  - OI USD = `total_oi` × harga hari itu, violet muda `#a58df0`, format ringkas (40.82B). ΔOI USD = ΔOI BTC × harga.
+  - Sisi sumbu: satu OI menyala → sisi OI (kiri); dua-duanya → USD pindah ke sisi seberang **kalau kosong** (funding dimatikan), kalau tidak skala sendiri tanpa angka. Semua kombinasi terukur 16 Sep.
+  - ΔOI: batang ikut satuan pertama yang menyala; tooltip menampilkan baris ΔOI untuk semua satuan yang menyala (dua baris, bukan dua kolom).
+
+### 3.20 Angka sumbu disembunyikan per pane — SELESAI 16 Sep 2026 (commit `3fe3619`, semua halaman)
+Permintaan user: kalau semua garis di satu sisi sebuah pane dimatikan di legend, **hanya angkanya** yang hilang — lebar sumbu tetap, pane tetap sejajar, area gambar tidak melebar. Caranya `priceScale(side).applyOptions({textColor: 'rgba(0,0,0,0)'})` (lebar dihitung dari panjang teks, bukan warnanya). Garis acuan (Zero, Break-even, Neutral) tidak dihitung sebagai garis menyala dan ikut disembunyikan. Terukur MVRV: LTH MVRV mati → angka kanan pane MVRV hilang, angka BTC pane atas tetap, lebar sumbu tetap 70 px.
+
+### 3.21 Halaman Fear & Greed — SELESAI 16 Sep 2026 (live; di-push atas permintaan user sebelum pindah sesi)
+Dasar: framework v2 memakai F&G < 30 (K2: dip kelas dalam), F&G < 50 (K5 staging), F&G SMA30 (konteks K1/K4). Tidak ada KB.
+- **Data:** `data.load_fear_greed()` dari `data_fg.csv` (sumber Alternative.me lewat ChartInspect, 3.145 hari sejak 1 Feb 2018, 2 tanggal bolong, nilai bulat 5–95). CSV tidak punya harga → digabung dari `data_mvrv.csv` (identik dengan `bitcoinPrice` API).
+- **Kelas resmi dari API** (`valueClassification`): Extreme Fear ≤25 · Fear 26–46 · Neutral 47–54 · Greed 55–75 · Extreme Greed ≥76.
+- **Tampilan (pilihan user dari pratinjau):** menu "Fear & Greed" (kelompok **Sentiment & Macro**, `/fear-greed`), judul "Crypto Fear & Greed Index". **BTC Separate pane** (sempat Overlay satu pane, diganti user), F&G di sumbu kanan tetap 0–100, angka bulat.
+  - **Garis bergradasi halus** per titik menurut nilai: rust `#bf5546` (0–25) → `#dc9390` (40) → abu `#8b949e` (50) → aqua `#38d1b4` (62) → teal `#0b8e89` (75–100). Bukan merah-hijau (aman buta warna, sekeluarga warna funding). Ditolak: pita batas kelas di latar, batang warna kelas, gradasi per kelas.
+  - **SMA30 menyala sejak awal**, bentuk **Band** (tebal 3 px, transparan 60 %) warna kuning pucat `#F7E9A8`, satu desimal (SMA30 10 Jan 2021 = 92.4, cocok framework).
+  - **Tooltip** menulis nama kelas berwarna gradasi: 08 Jan 2021 `93 · Extreme Greed` · 30d 92.2 · BTC 40,736 (cocok CSV).
+- Garis ambang framework (30, 50) tidak dipasang.
+- Catatan kecil yang belum diminta diubah: label nilai terakhir SMA30 di sumbu tertulis bulat (65) karena library memakai format seri pertama di sumbu itu; nilai tepat (64.7) ada di tooltip.
+
 ### 3.5 Kotak L / R untuk pilihan sumbu — ditahan
 Ide user: tombol Left/Right diganti dua kotak kecil "L" dan "R" bergaya kotak angka periode di legend. Hasil ukur: **tidak menghemat lebar sama sekali** (lebar popover ditentukan baris CHART HEIGHT, bukan baris axis), hanya menghemat tinggi ±14 px per baris. Ditahan sampai ada halaman dengan garis banyak — bukan khusus HODL Waves, metrik lain juga bisa. Kalau dipakai, pakai untuk semua halaman sekaligus.
 
@@ -316,6 +361,13 @@ Periode ke-4 dan seterusnya mengulang ketiga gaya itu dengan garis 0,5 px lebih 
 - **Field baru pembaruan keenam (14 Sep):** `MetricFamily.metric_range` (sumbu metrik tetap, dikirim sebagai `C.metricRange`), `MetricFamily.complement` (`C.complement`, judul kolom tooltip + saklar), `Series.complement_color` / `Line.complement_color` (warna kembaran Loss). `lw_chart.render(..., metric_range=, complement=)` dan `charts.render` meneruskannya.
 - **Di browser (`lw_chart.py`):** `rentangTetap(spec)` memasang `autoscaleInfoProvider` 0–100 + formatter yang mengosongkan angka di luar rentang; `handle.kembar` = seri Loss; `bisaDibalik(spec)` = garis metrik pane utama (bukan BTC, bukan garis acuan); `apply()` mengatur nyala/warna Profit, Loss, kotak smoothing Loss (`titikLoss`), label kelompok (`labelKelompok`), dan saklar. Kelompok legend diurutkan BTC Price terakhir.
 - **Pembaruan kedelapan (15 Sep):** di browser `adaFullscreenApi()`, `sedangSemu()`, kelas `penuh-semu` (`KELAS_SEMU`), tombol `skalaBtn` (hanya kalau `sentuh`); `app.py` aturan `html.penuh-semu …` di samping setiap aturan `:fullscreen` dan `@media (max-width: 768px)` untuk jarak atas. Tidak ada field Python baru selain bawaan MVRV di registry.
+- **Pembaruan kesembilan (16 Sep), field baru:**
+  - `Series`: `negative_color` (histogram dua warna), `unit` / `pair` / `compact` (saklar satuan, pasangan sisi sumbu, format K/M/B), `gradient` (garis bergradasi `[[nilai, hex], …]`), `smoothing_color`, `smoothing_precision`, `value_labels` (nama kelas di tooltip).
+  - `RefLine.follow` (garis acuan di sumbu seri tertentu).
+  - `MetricFamily`: `unit_switch`, `unit_label`, `smoothing_default` (periode menyala sejak awal), `smoothing_style_default` (gaya per periode, mis. `{30: "Band"}`; dipakai `_default_style` di `metric_page.py`).
+  - `Line` di `charts.py` membawa field yang sama; `charts.render` / `lw_chart.render` menerima `unit_switch`, `unit_label` → `C.unitSwitch`, `C.unitLabel`.
+  - Di browser (`lw_chart.py`): `warnaiTitik` (warna per titik, diwarnai ulang saat diredupkan Highlight), `warnaGradasi` / `cssGradasi`, `angkaRingkas`, `satuanTampil` / `satuanTooltip`, `aturSisiSumbu` (pindah `priceScaleId` + parkir seri mati), `aturAngkaSumbu` (warna angka sumbu per pane), `handle.sisi` (sisi sumbu sekarang; `seriesOn` dan tarik-sumbu memakainya), `labelNilai`.
+  - Loader baru: `load_nupl`, `load_derivatives`, `load_fear_greed`.
 - **Field baru pembaruan ketujuh (14 Sep):** `lw_chart.NAV_H = 52`, `NAV_COL = "BTC Price"`; `C.nav` (kolom isi slider atau None), `C.navHeight`, `C.view` (tanggal From/To). `lw_chart.render(..., view=)` dan `charts.render(..., view=)`. Di browser: `gambarNav()` (dipanggil dari `rapikanBar` dan dari perubahan rentang chart), `rentangRange`, `zoomSimpanan`; `pulihkanZoom` sekarang = zoom tersimpan atau rentang Range.
 - **Desimal data yang dikirim ke chart ikut precision seri** (14 Sep): `_num(v, digits)` dengan `digits = max(4, precision + 1)` untuk nilai < 1000. Sebelumnya dipaku 4 desimal, sehingga gap 5 desimal tampil dari angka yang sudah terpotong.
 
@@ -361,6 +413,11 @@ Periode ke-4 dan seterusnya mengulang ketiga gaya itu dengan garis 0,5 px lebih 
 - **HP: sidebar "auto", geser jari atas-bawah menggulir halaman, tombol Scale khusus perangkat sentuh (tidak disimpan), layar penuh semu hanya untuk browser tanpa Fullscreen API** (15 Sep, bagian 3.15). **Tahap 2 khusus HP ditolak** (khawatir mengganggu laptop).
 - **Angka sumbu terpotong setengah di tepi pane dibiarkan** — wajar, bawaan library; `entireTextOnly` tidak dipasang (15 Sep, bagian 3.15).
 - **MVRV: bawaan BTC Separate pane, sumbu metrik dan harga Log** (15 Sep, bagian 3.16).
+- **NUPL:** tanpa Ratio LTH/STH, sumbu tidak dipaku, pane Gap mati sejak awal, metrik di sumbu kanan saat Separate pane (16 Sep, bagian 3.17). **Supply in Profit** juga metrik kanan saat Separate pane.
+- **Realized P/L ditunda** sampai ada KB dan keputusan ratio mana yang dipercaya (16 Sep, bagian 3.18).
+- **Funding & OI:** satu pane (funding batang dua warna kanan, OI garis kiri), ΔOI bersih per bursa di pane bawah (mati awal), saklar BTC | USD boleh dua-duanya, USD pindah ke sisi kosong (16 Sep, bagian 3.19). Menu bernama "Funding Rates & Open Interest".
+- **Angka sumbu per pane disembunyikan tanpa mengubah lebar** saat semua garis di sisi itu mati (16 Sep, bagian 3.20).
+- **Fear & Greed:** BTC Separate pane, garis gradasi halus rust→abu→teal, SMA30 Band kuning pucat menyala sejak awal, nama kelas di tooltip, tanpa garis ambang framework (16 Sep, bagian 3.21).
 
 ---
 
@@ -375,7 +432,9 @@ Periode ke-4 dan seterusnya mengulang ketiga gaya itu dengan garis 0,5 px lebih 
 ## 7. Belum dikerjakan
 
 - ~~Slider rentang di bawah chart~~ — selesai 14 Sep (bagian 3.2, commit `8bb65d7`).
-- **Halaman metrik lainnya — PEKERJAAN BERIKUTNYA** (15 dari usulan 19 di bagian 3.11). Halaman kelima belum dipilih; tanyakan user. ~~Navigasi seluruh halaman~~ — selesai 14 Sep.
+- ~~Push halaman Fear & Greed~~ — selesai 16 Sep (bagian 3.21). User belum sempat mengecek di browsernya sendiri sebelum push; kalau ada keluhan tampilan, ukur dulu di halaman hidup.
+- **Halaman metrik lainnya — PEKERJAAN BERIKUTNYA** (tujuh dari usulan 19 sudah ada; bagian 3.11). Belum dipilih; tanyakan user. Realized P/L ditunda (bagian 3.18).
+- **`auto_update.py` masih punya perubahan user yang belum di-commit** (pipeline 19 Treasury 2Y + `data_treasury_2y.csv` di daftar master). Jangan ikut di-commit tanpa izin; kalau perlu commit hunk lain, stage per hunk (`git diff` → saring hunk → `git apply --cached`).
 - **Detail kecil Supply in Profit yang sudah dilaporkan ke user, belum diminta diubah:** saat saklar Profit dan Loss sama-sama mati, nama di legend tetap tampil normal (tidak dicoret) walau garisnya tidak ada; dengan smoothing menyala legend kembali dua baris (kotak angka dobel) dan label nilai terakhir di sumbu kiri makin padat (lihat poin label bertumpuk di bawah).
 - **Semua kontrol Python diingat per halaman — diminta user 14 Sep, lalu DIPENDING.** Sekarang Range, Smoothing, Scale, BTC price, pane bawah, Display, dan Line style kembali ke bawaan setiap pindah halaman (terukur: Range 1y di SOPR → All setelah ke MVRV dan balik), karena `st.navigation` membuang nilai widget halaman lain. Pola solusinya sudah ada: gudang key biasa + widget sebagai cerminan (`TIP_STORE` untuk Tooltip, `{key}_lstyles` untuk Line style). Belum diputuskan: cukup selama sesi browser, atau juga setelah reload (butuh URL query atau localStorage).
 - **Rumus gap STH-SOPR di `alerts/alert_check.py` berbeda dari KB §12** — menunggu keputusan user di Claude.ai (bagian 3.9). Jangan diubah tanpa diminta.
@@ -413,19 +472,19 @@ Semua file punya kolom `date`. Kolom `btc_price` ada di sebagian besar file.
 | `data_price_level.csv` | btc_price, sth_cost_basis, lth_cost_basis, realized_price, cvdd, active_realized_price, MVRV 0σ, true_market_mean_price, 200_dma, 50_wma, 200_wma, cum_pl_price, pl_price_ratio |
 | `data_aviv.csv` | btc_price, aviv_ratio, aviv_mean, aviv_upper_1sd, aviv_upper_2sd, aviv_lower_1sd, aviv_lower_2sd, price_at_aviv_mean, price_at_aviv_plus_1_sigma, price_at_aviv_plus_2_sigma, price_at_aviv_minus_1_sigma, investor_cap, active_realized_price, liveliness |
 | `data_momentum.csv` | btc_price, asopr, lth_sopr, sth_sopr, net_realized_pl_usd, nupl, sth_nupl, lth_nupl |
-| `data_pl.csv` | btc_price, daily_realized_profit_btc, daily_realized_loss_btc, rpl_ratio, sth_pl_ratio, lth_pl_ratio, rrp, rrl, relative_realized_pl |
+| `data_pl.csv` ⚠️ ratio bermasalah (bagian 3.18) | btc_price, daily_realized_profit_btc, daily_realized_loss_btc, rpl_ratio, sth_pl_ratio, lth_pl_ratio, rrp, rrl, relative_realized_pl |
 | `data_supply.csv` | btc_price, lth_supply_btc, sth_supply_btc, pct_lth_in_profit, pct_sth_in_profit, pct_lth_in_loss, pct_sth_in_loss, percent_btc_in_profit, percent_btc_in_loss |
 | `data_hodl_waves.csv` | btc_price, lalu `supply_<band>` dan `realized_cap_<band>` untuk **12** band: 0-1d, 1d-1w, 1w-1m, 1m-3m, 3m-6m, 6m-12m, 1y-2y, 2y-3y, 3y-5y, 5y-7y, 7y-10y, 10y+ |
 | `data_realized_cap.csv` | btc_price, realized_cap_usd, lth_realized_cap_usd, sth_realized_cap_usd |
 | `data_rhodl.csv` | btc_price, rhodl_ratio, realized_cap_1w, realized_cap_1_2y |
 | `data_cdd.csv` | cdd, vdd_30d_ma, vdd_365d_ma, vdd_multiple (tanpa btc_price) |
 | `data_exchange.csv` | btc_price, total_balance, net_flow, inflow, outflow |
-| `data_derivatives.csv` | btc_price, funding_rate, total_oi |
+| `data_derivatives.csv` ✅ dipakai | btc_price, funding_rate, total_oi, lalu (sejak 16 Sep 2026) `oi_cme`, `oi_binance`, `oi_bybit`, `oi_hyperliquid`, `oi_bitget`, `oi_okx`, `oi_deribit`, `oi_coinbase`, `oi_bitmex`, `oi_kraken`, `oi_bitfinex`, `oi_mexc`, `oi_huobi` (BTC; total_oi = jumlahnya) |
 | `data_futures_basis.csv` | btc_price, annualized_basis_3m, avg_tenor_days, n_exchanges, binance/deribit/okx/bybit_basis_annualized (file masih sangat kecil) |
 | `data_sentiment.csv` | btc_price, trend_bitcoin, trend_crypto, trend_ethereum, trend_nft, wiki_bitcoin, wiki_cryptocurrency, wiki_ethereum, wiki_blockchain |
 | `data_lth_flow.csv` | lth_pl_price, lth_pl_flow_btc (tanpa btc_price) |
 | `data_apparent_demand.csv` | btc_price, apparent_demand |
-| `data_fg.csv` | Fear & Greed |
+| `data_fg.csv` ✅ dipakai | Fear & Greed (tanpa btc_price; loader mengambil harga dari data_mvrv.csv) |
 | `data_treasury_2y.csv` | treasury_2y_yield |
 
 Bukan untuk halaman: `data_master_all_metrics.csv` (file hasil generate) dan `data_*_events.csv` (file lama).
@@ -515,6 +574,12 @@ Bukan untuk halaman: `data_master_all_metrics.csv` (file hasil generate) dan `da
   - Pola uji yang terbukti berguna: pasang pengambil cuplikan di halaman induk (`setInterval` 25–40 ms) yang mencatat rentang tiap chart + isi `localStorage`, lalu jalankan pergantian mode lewat klik JavaScript. Itu yang memunculkan urutan "zoom terpasang di 1,1 detik → lebar menyusut di 2,1 detik → nilai geser tersimpan di 2,4 detik".
 - Screenshot kadang timeout kalau jendela aplikasi tertutup jendela lain.
 - **Emulasi HP di panel Claude** (`resize_window` preset mobile) mengaktifkan `pointer: coarse` dan user agent Android, jadi tombol khusus sentuh bisa dicek keberadaannya. Gerakan jari sungguhan tidak bisa ditiru (klik panel = mouse); perilaku sentuh harus diuji user di HP. Screenshot di mode ini kadang tampil berulang empat petak — artefak panel, isinya tetap bisa dibaca.
+- **Format angka sumbu dan label nilai terakhir diambil dari seri PERTAMA di skala itu — walau seri itu mati** (dicek di kode 4.2.3: `_formatterSource()` = `dataSources[0]`). Saat seri bersatuan/berpasangan pindah skala, seri mati di skala tujuan harus "diparkir" ke skala lain (`priceScaleId: 'parkir_<kolom>'`); kalau tidak, angka sumbu USD tertulis "2,000,000,000". Garis acuan yang diparkir disembunyikan.
+- **Memindah seri antar-sumbu cukup `series.applyOptions({priceScaleId})`** (library memanggil `moveSeriesToScale`). Warna angka per sumbu: `priceScale(side).applyOptions({textColor})`.
+- **Warna per titik:** data `{time, value, color}` berlaku untuk histogram dan garis. Warna titik mengalahkan warna seri, jadi saat Highlight meredupkan seri, data harus di-`setData` ulang dengan warna redup.
+- **`git commit -m @'…'@` di PowerShell 5.1 rusak kalau pesannya berisi tanda kutip ganda** (argumen terpecah, muncul `pathspec … did not match`). Tulis pesan ke file lalu `git commit -F <file>`.
+- **Patch file lewat skrip Python:** file repo memakai CRLF — baca dengan `newline=''`, olah dengan `\n`, kembalikan ke CRLF, tulis dengan `newline=''`. Heredoc Bash panjang yang berisi banyak tanda kutip bisa gagal di-parse; tulis skripnya ke file dulu.
+- **Pratinjau `show_widget` dengan data tertanam:** pastikan JSON benar-benar ditempel, bukan placeholder (16 Sep dua kali terkirim widget rusak).
 - **Menguji layar penuh semu tanpa iPhone:** di halaman induk jalankan `Object.defineProperty(document, 'fullscreenEnabled', {configurable: true, get: () => false})`, klik Full di chart, ukur, lalu Exit dan `delete document.fullscreenEnabled`.
 - **Kalau chart terbuka di zoom aneh, atau sorot/legend tersisa dari percobaan lama**, kosongkan penyimpanannya: `localStorage.removeItem('dash_v2_market_valuation')` lalu muat ulang halaman. Key-nya `dash_v2_<family.key>`, berisi `highlights`, `hidden`, `bars`, dan `sig`.
 - **Heredoc di Bash merusak backslash dan kutip** pada skrip Python yang panjang (pola `\n`, backtick JS). Untuk patch yang rumit, tulis skrip ke file dulu lalu jalankan.
@@ -547,7 +612,7 @@ Konfigurasi di `.claude/launch.json`: `dashboard-lama` (8501, `archive/app_v1.py
 
 1. Baca `CLAUDE.md` dan dokumen ini.
 2. Jalankan `dashboard-v2-uji`, buka halaman Market Valuation, dan lihat sendiri keadaannya sebelum mengubah apa pun.
-3. **Tanyakan halaman metrik kelima** — slider rentang sudah selesai dan live (bagian 3.2). MVRV, Price Levels, SOPR, dan Supply in Profit sudah live dengan menu berkelompok dan slider. Daftar usulan dan kelompoknya di bagian 3.11. Halaman baru = satu `MetricFamily` dengan `group` dan `url_path`. Pakai gaya judul B2, aturan teal (bagian 4–5), `precision`/`whole_from` per seri, dan uji palet bagian 9. Pending yang bisa ditanyakan: kontrol diingat per halaman (bagian 7), Line style ke dalam chart (bagian 3.3), rumus gap `alert_check.py` (bagian 3.9). Kerjakan di localhost dulu; push hanya setelah user menyatakan valid.
+3. **Tanyakan halaman berikutnya** (Fear & Greed sudah live, bagian 3.21; tanyakan juga apakah tampilannya sudah oke di browser user) — sudah ada tujuh halaman (MVRV, Price Levels, SOPR, NUPL, Supply in Profit, Funding Rates & Open Interest, Fear & Greed); Realized P/L ditunda (bagian 3.18); sisa usulan di bagian 3.11. Halaman baru = satu `MetricFamily` dengan `group` dan `url_path`. Pakai gaya judul B2, aturan teal (bagian 4–5), `precision`/`whole_from` per seri, uji palet bagian 9, dan **cek kualitas data dulu** (nilai macet, lonjakan, satuan, cakupan) seperti bagian 3.18–3.19. Aturan sumbu dari user: metrik berskala sama ke kanan saat Separate pane. Pending yang bisa ditanyakan: kontrol diingat per halaman (bagian 7), Line style ke dalam chart (bagian 3.3), rumus gap `alert_check.py` (bagian 3.9). Kerjakan di localhost dulu; push hanya setelah user menyatakan valid.
 4. Untuk urusan tampilan apa pun, buat widget pratinjau dengan data asli lebih dulu, lalu tunggu pilihan user. Untuk warna garis baru, jalankan uji palet di bagian 9 sebelum menunjukkan pratinjau.
 5. Sesudah mengubah apa pun di `dashboard/`, **restart server** — modul yang sudah dimuat tidak dibaca ulang.
 6. Kalau ada keluhan tampilan yang terdengar kecil ("kurang rata", "kebesaran"), **ukur dulu di halaman hidup** lewat `getBoundingClientRect` dan `getComputedStyle`, jangan menebak dari kode. Semua perbaikan tata letak 13 Sep ketemu dengan cara itu, dan dua tebakan pertama meleset.
