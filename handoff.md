@@ -1,6 +1,6 @@
 # Handoff — Dashboard Streamlit v2
 
-Diperbarui 17 Sep 2026 (versi ringkas, commit sesudah `8c89986`). Versi lengkap sebelum diringkas — cerita pengerjaan tiap fitur, opsi yang ditolak, hasil ukur piksel — ada di `archive/handoff_riwayat_2026-09-17.md` (buka hanya kalau perlu detail sejarah; nomor bagian 3.x yang disebut di bawah merujuk ke file itu).
+Diperbarui 17 Sep 2026 (versi ringkas, commit sesudah `d6c2d27`). Versi lengkap sebelum diringkas — cerita pengerjaan tiap fitur, opsi yang ditolak, hasil ukur piksel — ada di `archive/handoff_riwayat_2026-09-17.md` (buka hanya kalau perlu detail sejarah; nomor bagian 3.x yang disebut di bawah merujuk ke file itu).
 
 Baca dokumen ini dan `CLAUDE.md` sebelum mulai. Semua yang ditandai **ditahan/ditunda** harus ditanyakan ke user dulu.
 
@@ -48,11 +48,11 @@ Semua: BTC oranye `#F7931A` (kecuali HODL Waves), key localStorage `dash_v2_<key
 
 | Menu / alamat | Loader & kolom | Bawaan & bentuk | Catatan data / keputusan |
 |---|---|---|---|
-| **MVRV** `/` (key `market_valuation`) | `load_mvrv` — `data_mvrv.csv`; Rolling Z-Score 1y/2y/4y dihitung | BTC Separate pane, metrik & harga Log; LTH MVRV sumbu kanan; ref Neutral 1.0; pane bawah **Z-Score** (Hidden): Z-Score navy 80 % + Rolling hijau `#97c459` 55 % (2y/4y mati awal) | LTH MVRV bisa puluhan (2011: 374). Z-Score full-history untuk aturan, rolling untuk mata (KB MVRV). Tanpa pita "extreme" berambang tetap |
-| **Price Levels** `/price-levels` | `load_price_levels` — `data_price_level.csv` + AVIV Mean/Upper dari `data_aviv.csv` | Overlay, satu sumbu kanan, skala Auto. STH RP, Realized Price, LTH RP, AVIV Mean `#7b65d2`, AVIV Upper `#a58df0`, CVDD `#a8963f`; mati awal: MVRV 0σ, 200 DMA, 50 WMA, 200 WMA (abu) | AVIV dihitung ulang `btc_price/aviv_ratio × band` (kolom `price_at_aviv_*` salah basis ±9–10 %). 84 hari pertama AVIV disembunyikan (`_aviv_awal`) |
-| **AVIV** `/aviv` | `load_aviv` — `data_aviv.csv` (satuan rasio) | Separate pane, Log/Log; AVIV Ratio navy, Mean violet, Upper (+0.5σ) violet muda, sumbu kanan; kelompok **σ Bands** (+1σ +2σ −1σ −2σ, abu, mati awal); pane bawah **Deviation (σ)** menyala awal (`extra_default`) | Rasio ≥ Upper ⇔ harga ≥ AVIV Upper (1.279 hari sejak 2011). Band bawah negatif s/d 2014 dikosongkan |
-| **SOPR** `/sopr` | `load_sopr` — `data_momentum.csv` | Separate pane, Log/Log; LTH-SOPR sumbu kanan; Break-even 1.0 di semua sumbu; pane **SOPR Gap** (Hidden) | **Gap = SMA90(STH-SOPR) − SMA60 dari SMA90 itu (KB §12)** — `alert_check.py` memakai SMA60 − SMA90 (bagian 6). SOPR 3 desimal, gap 5, LTH ≥ 100 tanpa desimal |
-| **NUPL** `/nupl` | `load_nupl` — `data_momentum.csv` | Separate pane, metrik Auto, harga Log; ketiga garis sumbu kanan; Break-even 0; pane **NUPL Gap** (LTH − STH, Hidden) | Ratio LTH/STH sengaja tidak dimuat (melompat saat STH ≈ 0). Sumbu tidak dipaku −1..1 |
+| **MVRV** `/` (key `market_valuation`) | `load_mvrv` — `data_mvrv.csv`; Rolling Z-Score 1y/2y/4y dihitung | BTC Separate pane, metrik & harga Log; LTH MVRV sumbu kanan; ref Neutral 1.0; pane bawah **Z-Score** (Hidden, sumbu kanan): Z-Score navy 80 % + Rolling hijau `#97c459` 55 % (2y/4y mati awal) | LTH MVRV bisa puluhan (2011: 374). Z-Score full-history untuk aturan, rolling untuk mata (KB MVRV). Tanpa pita "extreme" berambang tetap |
+| **Price Levels** `/price-levels` | `load_price_levels` — `data_price_level.csv` + AVIV Mean/Upper dari `data_aviv.csv` | Overlay, satu sumbu kanan, skala Auto. STH RP, Realized Price, LTH RP, **True Market Mean sky `#8fd3ff`**, AVIV Mean `#7b65d2`, AVIV Upper `#a58df0`, CVDD `#a8963f`; mati awal: MVRV 0σ, 200 DMA, 50 WMA, 200 WMA (abu). Pane bawah **Price / CVDD** (Hidden, `extra_scale="Log"`, sumbu kanan, olive); **Price / RP** navy mati awal | Price/CVDD dipakai framework v2 K4 (#4 < 1,10; flag ≤ 1,0), garis ambang tidak dipasang; di bawah 1,0 hanya 14 Jan 2015 & 21 Nov 2022 (KB: 9 & 21 Nov 2022, beda karena tidak entity-adjusted); CVDD = 0 s/d 16 Jul 2010 → rasio kosong. Price/RP untuk divergence KB §4.3. AVIV dihitung ulang `btc_price/aviv_ratio × band` (kolom `price_at_aviv_*` salah basis ±9–10 %). 84 hari pertama AVIV disembunyikan (`_aviv_awal`) |
+| **AVIV** `/aviv` | `load_aviv` — `data_aviv.csv` (satuan rasio) | Separate pane, Log/Log; AVIV Ratio navy, Mean violet, Upper (+0.5σ) violet muda, sumbu kanan; kelompok **σ Bands** (+1σ +2σ −1σ −2σ, abu, mati awal); pane bawah **Deviation (σ)** menyala awal (`extra_default`), sumbu kanan | Rasio ≥ Upper ⇔ harga ≥ AVIV Upper (1.279 hari sejak 2011). Band bawah negatif s/d 2014 dikosongkan |
+| **SOPR** `/sopr` | `load_sopr` — `data_momentum.csv` | Separate pane, Log/Log; LTH-SOPR sumbu kanan; Break-even 1.0 di semua sumbu; pane **SOPR Gap** (Hidden, sumbu kanan) | **Gap = SMA90(STH-SOPR) − SMA60 dari SMA90 itu (KB §12)** — `alert_check.py` memakai SMA60 − SMA90 (bagian 6). SOPR 3 desimal, gap 5, LTH ≥ 100 tanpa desimal |
+| **NUPL** `/nupl` | `load_nupl` — `data_momentum.csv` | Separate pane, metrik Auto, harga Log; ketiga garis sumbu kanan; Break-even 0; pane **NUPL Gap** (LTH − STH, Hidden, sumbu kanan) | Ratio LTH/STH sengaja tidak dimuat (melompat saat STH ≈ 0). Sumbu tidak dipaku −1..1 |
 | **Supply in Profit** `/supply-in-profit` | `load_supply` — `data_supply.csv` | Separate pane, sumbu 0–100 kanan; saklar **Profit / Loss** di chart (boleh dua-duanya/mati); warna Loss saat keduanya: `#839df0` `#dc9390` `#38d1b4` | Loss = 100 − Profit (kembaran di browser). 1 desimal |
 | **HODL Waves** `/hodl-waves` (key `hodl_waves`) | `load_hodl_waves` — `data_hodl_waves.csv` (`RC <band>`, `Supply <band>`) | **Overlay, garis BTC putih** (`btc_color`, `btc_dim` 0,17); 12 band area bertumpuk (`kind="stack"`), muda di bawah, spektrum `#d73027 … #9e7bd6`; saklar **Realized Cap \| Supply** (bawaan Realized Cap); tanpa Highlight/smoothing | Mematikan band di legend menumpuk ulang sisanya. Dulu bernama "RHODL Waves" `/rhodl-waves` |
 | **RHODL Ratio** `/rhodl-ratio` | `load_rhodl_ratio` — `data_hodl_waves.csv` | Judul "RHODL Ratio (6m–2y ÷ 1d–3m)"; **Overlay, metrik Auto, harga Log**; garis navy sumbu kiri | = RC (6m–12m + 1y–2y) ÷ (1d–1w + 1w–1m + 1m–3m), cocok persis `research/findings/_cohort_state_plane.csv`. **Bukan** `rhodl_ratio` di `data_rhodl.csv`. 86 % varians dari penyebut → jangan dibaca sendirian. Calon tempat Cohort State |
@@ -76,7 +76,7 @@ Semua: BTC oranye `#F7931A` (kecuali HODL Waves), key localStorage `dash_v2_<key
 | `archive/app_v1.py` | Dashboard v1 (arsip) |
 
 **Kemampuan renderer (dipakai lewat registry):**
-- Pane: `price` (BTC Separate pane) → `main` → `extra` (pane bawah, selalu linear; `extra_label`, `extra_default`; sisi sumbu dari `Series.axis`, bawaan kiri). Zoom dan lebar sumbu tersinkron; sumbu waktu hanya di pane terbawah; slider rentang (isi BTC Log) di bawah semua.
+- Pane: `price` (BTC Separate pane) → `main` → `extra` (pane bawah; `extra_label`, `extra_default`; skala `extra_scale` bawaan linear, "Log" untuk rasio positif; sisi sumbu dari `Series.axis`, bawaan kiri — semua pane bawah kanan kecuali OI Change). Garis pembatas antar pane putih 22 % (CSS `#panes > div + div::before`). Zoom dan lebar sumbu tersinkron; sumbu waktu hanya di pane terbawah; slider rentang (isi BTC Log) di bawah semua.
 - Sumbu: `axis` bawaan + `separate_axis` saat Separate pane (aturan user: metrik berskala sama ke kanan saat Separate pane). `metric_range` (sumbu tetap, angka bulat tanpa desimal, di luar rentang kosong). Angka sumbu disembunyikan (lebar tetap) kalau semua garis di sisi itu mati. Seri mati diparkir ke skala lain supaya format sumbu tidak kacau.
 - Jenis seri: garis, histogram (`negative_color` dua warna), gradasi per titik (`gradient`), area bertumpuk (`kind="stack"`, `stack_index`, `stack_cols` + `stack_units`), kembaran Loss (`complement`).
 - Legend berkelompok (garis utama + kotak angka periode/anggota), `hidden_default` (sekali, dicatat di `seen`), Highlight multi (redup kontras 1,70:1; disembunyikan kalau hanya BTC), tarik chart menggeser sumbu garis yang disorot, klik dua kali reset.
@@ -101,6 +101,7 @@ Semua: BTC oranye `#F7931A` (kecuali HODL Waves), key localStorage `dash_v2_<key
 - Kotak Display tidak menghitung BTC. Popover Scale memakai nama metrik.
 - Tombol layar penuh satu, di dalam chart. Line style di **tombol Style dalam chart (opsi B)**, bukan popover dan bukan klik kanan kotak periode.
 - Tooltip bawaan **Cursor**, latar 94 %.
+- Garis pembatas antar pane **22 %** (dipilih dari 10/16/22/28 %). Pane bawah dengan legend tetap masuk legend (Price/CVDD: supaya Price/RP bisa dinyalakan).
 - Slider rentang: isi BTC, semua halaman, 52 px. Range memindahkan jendela (pilihan B).
 - HP: tahap 2 (chart lebih pendek, angka ringkas, tombol legend besar) **ditolak**. Angka sumbu terpotong di tepi pane dibiarkan.
 - Z-Score di pane ketiga (bukan di chart MVRV), histogram polos (gradasi ditunda), tanpa pita ambang tetap.
@@ -138,7 +139,7 @@ Semua file punya `date`; sebagian besar punya `btc_price`. Bukan untuk halaman: 
 | File | Kolom | Status |
 |---|---|---|
 | `data_mvrv.csv` | btc_price, mvrv_ratio, sth_mvrv, lth_mvrv, mvrv_zscore | dipakai (MVRV; harga untuk F&G) |
-| `data_price_level.csv` | sth_cost_basis, lth_cost_basis, realized_price, cvdd, active_realized_price, MVRV 0σ, true_market_mean_price, 200_dma, 50_wma, 200_wma, cum_pl_price, pl_price_ratio | dipakai (Price Levels) |
+| `data_price_level.csv` | sth_cost_basis, lth_cost_basis, realized_price, cvdd, active_realized_price, MVRV 0σ, true_market_mean_price, 200_dma, 50_wma, 200_wma, cum_pl_price, pl_price_ratio | dipakai (Price Levels; TMM ≈ harga ÷ AVIV Ratio, beda harian ±5 %) |
 | `data_aviv.csv` | aviv_ratio, aviv_mean, aviv_upper/lower_1sd/2sd, price_at_aviv_* (**salah basis**), investor_cap, active_realized_price, liveliness | dipakai (Price Levels, AVIV) |
 | `data_momentum.csv` | asopr, lth_sopr, sth_sopr, net_realized_pl_usd, nupl, sth_nupl, lth_nupl | dipakai (SOPR, NUPL) |
 | `data_supply.csv` | lth/sth_supply_btc, pct_lth/sth_in_profit/loss, percent_btc_in_profit/loss | dipakai (Supply in Profit) |
@@ -194,6 +195,7 @@ Semua file punya `date`; sebagian besar punya `btc_price`. Bukan untuk halaman: 
 - `st.navigation` menaruh menu di atas sidebar → dibalik dengan flex `order`. `st.Page` fungsi: identitas dari `url_path`; halaman `default=True` beralamat `/`.
 - Sidebar yang baru dibuka terbaca lebar 0 ±1 detik (animasi).
 - Legend di dalam chart tidak bisa membuat pane → saklar pane harus kontrol Python.
+- **Sumbu Log di pane bawah yang pendek (±130 px) hanya menampilkan 1–4 angka** (Price/CVDD; lebih sedikit saat Price/RP menyala atau panel sempit). Penyebab belum dipastikan (dugaan: angka rapat dibuang / tertutup label nilai terakhir) — dibiarkan (keputusan user 17 Sep).
 - **`RefLine` hanya digambar di pane tengah** (`metric_page`, dari seri non-`extra`) → garis acuan untuk pane bawah belum bisa; memasangnya di halaman berskala besar menarik sumbu pane tengah ke nilai itu.
 
 ### lightweight-charts 4.2.3
