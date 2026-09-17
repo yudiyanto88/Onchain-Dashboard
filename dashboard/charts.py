@@ -40,8 +40,8 @@ class Line:
 
 def render(df, lines, price_line, extra_lines, height, metric_mode, price_mode, key,
            tooltip="Cursor", metric_range=None, complement=None, view=None,
-           unit_switch=None, unit_label="", stack_units=None):
+           unit_switch=None, unit_label="", stack_units=None, extra_mode="Auto"):
     """Legend dan sorot diproses di browser; key dipakai untuk menyimpan pilihan."""
     lw_chart.render(df, lines, price_line, extra_lines, height,
                     metric_mode, price_mode, key, tooltip, metric_range, complement, view,
-                    unit_switch, unit_label, stack_units)
+                    unit_switch, unit_label, stack_units, extra_mode)

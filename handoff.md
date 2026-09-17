@@ -1,6 +1,6 @@
 # Handoff — Dashboard Streamlit v2
 
-Diperbarui 17 Sep 2026 (versi ringkas, commit sesudah `d1dff1d`). Versi lengkap sebelum diringkas — cerita pengerjaan tiap fitur, opsi yang ditolak, hasil ukur piksel — ada di `archive/handoff_riwayat_2026-09-17.md` (buka hanya kalau perlu detail sejarah; nomor bagian 3.x yang disebut di bawah merujuk ke file itu).
+Diperbarui 17 Sep 2026 (versi ringkas, commit sesudah `8c89986`). Versi lengkap sebelum diringkas — cerita pengerjaan tiap fitur, opsi yang ditolak, hasil ukur piksel — ada di `archive/handoff_riwayat_2026-09-17.md` (buka hanya kalau perlu detail sejarah; nomor bagian 3.x yang disebut di bawah merujuk ke file itu).
 
 Baca dokumen ini dan `CLAUDE.md` sebelum mulai. Semua yang ditandai **ditahan/ditunda** harus ditanyakan ke user dulu.
 
@@ -17,7 +17,7 @@ Baca dokumen ini dan `CLAUDE.md` sebelum mulai. Semua yang ditandai **ditahan/di
 
 ## 1. Status dan langkah berikutnya
 
-- **Live (10 halaman, 5 kelompok):** Valuation (MVRV · Price Levels · AVIV) · Profitability (SOPR · NUPL · Supply in Profit) · Holder Behavior (HODL Waves · RHODL Ratio) · Derivatives (Funding Rates & Open Interest) · Sentiment & Macro (Fear & Greed). Semua halaman: slider rentang, nyaman di HP, kontrol diingat per halaman, tombol Style di chart.
+- **Live (11 halaman, 6 kelompok):** Valuation (MVRV · Price Levels · AVIV) · Profitability (SOPR · NUPL · Supply in Profit) · Holder Behavior (HODL Waves · RHODL Ratio) · Exchange (Exchange Flow) · Derivatives (Funding Rates & Open Interest) · Sentiment & Macro (Fear & Greed). Semua halaman: slider rentang, nyaman di HP, kontrol diingat per halaman, tombol Style di chart.
 - **Langkah pertama sesi baru:**
   1. Cek server `dashboard-v2-uji` (bagian 2), buka halaman, lihat keadaannya sebelum mengubah apa pun.
   2. Tanyakan apakah Streamlit Cloud perlu **Reboot app** sesudah push terakhir (`dashboard/` berubah).
@@ -36,7 +36,7 @@ Baca dokumen ini dan `CLAUDE.md` sebelum mulai. Semua yang ditandai **ditahan/di
 - Kalau mengecilkan/mengoptimasi sesuatu, pertimbangkan efek ke elemen lain (lebar, tinggi, jarak).
 - **Keluhan tampilan sekecil piksel hampir selalu benar → ukur dulu di halaman hidup** (`getBoundingClientRect`, `getComputedStyle`), jangan menebak dari kode.
 - **Selera tampilan:** kontrol ringkas, lambang ketimbang kata, ukuran seragam, kedudukan lurus dengan elemen sekitar.
-- **Localhost uji: http://localhost:8503** (server `dashboard-v2-uji` dari `.claude/launch.json`). "Nyalakan localhost" = server ini. **Restart sesudah mengubah `dashboard/`** (modul yang sudah dimuat tidak dibaca ulang). **Server ikut mati kalau sesi Claude Code ditutup/dibuka ulang** — cek `curl http://localhost:8503/_stcore/health`. Kalau port dipakai server sesi lain, `preview_start` menolak: pakai server itu atau minta user. User juga bisa menjalankan sendiri: `streamlit run app.py --server.port 8503`.
+- **Localhost uji: http://localhost:8503** (server `dashboard-v2-uji` dari `.claude/launch.json`). "Nyalakan localhost" = server ini. **Restart sesudah mengubah `dashboard/`** (modul yang sudah dimuat tidak dibaca ulang). **Server bisa tetap hidup sesudah sesi Claude Code ditutup** (terjadi 17 Sep) — cek dulu `curl http://localhost:8503/_stcore/health`. Server sisa sesi lama tidak bisa dihentikan `preview_stop`, dan mematikan prosesnya (`Stop-Process`) ditolak pengaman kecuali user mengizinkan → minta izin user, lalu `preview_start`. Tanpa restart, kode `dashboard/` yang baru tidak terbaca. User juga bisa menjalankan sendiri: `streamlit run app.py --server.port 8503`.
 - **Handoff:** jangan diedit tanpa persetujuan; daftarkan usulan poin dulu (kecuali user sudah minta dicatat).
 - **Git:** commit hanya file dashboard yang relevan + handoff, dan hanya kalau user minta. Repo punya banyak perubahan user yang belum di-commit (`CLAUDE.md`, `auto_update.py`, `references/`, `research/`) — jangan ikut. Sebelum push **merge dulu dari GitHub** (`git fetch`; `git diff --name-only HEAD...origin/main` — kalau hanya `data_*.csv` dan `alerts/logs/`, aman). Sesudah push yang mengubah `dashboard/`, ingatkan **Manage app → ⋮ → Reboot app** bila versi online error (Streamlit Cloud tidak membaca ulang modul).
 
@@ -55,7 +55,8 @@ Semua: BTC oranye `#F7931A` (kecuali HODL Waves), key localStorage `dash_v2_<key
 | **NUPL** `/nupl` | `load_nupl` — `data_momentum.csv` | Separate pane, metrik Auto, harga Log; ketiga garis sumbu kanan; Break-even 0; pane **NUPL Gap** (LTH − STH, Hidden) | Ratio LTH/STH sengaja tidak dimuat (melompat saat STH ≈ 0). Sumbu tidak dipaku −1..1 |
 | **Supply in Profit** `/supply-in-profit` | `load_supply` — `data_supply.csv` | Separate pane, sumbu 0–100 kanan; saklar **Profit / Loss** di chart (boleh dua-duanya/mati); warna Loss saat keduanya: `#839df0` `#dc9390` `#38d1b4` | Loss = 100 − Profit (kembaran di browser). 1 desimal |
 | **HODL Waves** `/hodl-waves` (key `hodl_waves`) | `load_hodl_waves` — `data_hodl_waves.csv` (`RC <band>`, `Supply <band>`) | **Overlay, garis BTC putih** (`btc_color`, `btc_dim` 0,17); 12 band area bertumpuk (`kind="stack"`), muda di bawah, spektrum `#d73027 … #9e7bd6`; saklar **Realized Cap \| Supply** (bawaan Realized Cap); tanpa Highlight/smoothing | Mematikan band di legend menumpuk ulang sisanya. Dulu bernama "RHODL Waves" `/rhodl-waves` |
-| **RHODL Ratio** `/rhodl-ratio` | `load_rhodl_ratio` — `data_hodl_waves.csv` | Judul "RHODL Ratio (6m–2y ÷ 1d–3m)"; **Overlay, skala Auto/Auto**; garis navy sumbu kiri | = RC (6m–12m + 1y–2y) ÷ (1d–1w + 1w–1m + 1m–3m), cocok persis `research/findings/_cohort_state_plane.csv`. **Bukan** `rhodl_ratio` di `data_rhodl.csv`. 86 % varians dari penyebut → jangan dibaca sendirian. Calon tempat Cohort State |
+| **RHODL Ratio** `/rhodl-ratio` | `load_rhodl_ratio` — `data_hodl_waves.csv` | Judul "RHODL Ratio (6m–2y ÷ 1d–3m)"; **Overlay, metrik Auto, harga Log**; garis navy sumbu kiri | = RC (6m–12m + 1y–2y) ÷ (1d–1w + 1w–1m + 1m–3m), cocok persis `research/findings/_cohort_state_plane.csv`. **Bukan** `rhodl_ratio` di `data_rhodl.csv`. 86 % varians dari penyebut → jangan dibaca sendirian. Calon tempat Cohort State |
+| **Exchange Flow** `/exchange-flow` (kelompok Exchange) | `load_exchange` — `data_exchange.csv` + harga dari `data_mvrv.csv` | Separate pane; Exchange Balance navy (sumbu kanan saat Separate); pane **Net Flow** menyala awal: batang **masuk teal / keluar rust**, **sumbu kanan**; tanpa garis Zero, tanpa smoothing | `net_flow` + = masuk bursa; selisih saldo = net flow. Semua nilai sebelum 2012 dikosongkan (2011: pindah dompet ±400–600k BTC sehari). Hari inflow = outflow = 0 (8 hari 2026) → arus kosong, saldo tetap. Harga file ini beda sumber → pakai `data_mvrv` |
 | **Funding Rates & Open Interest** `/funding-oi` | `load_derivatives` — `data_derivatives.csv` (+13 kolom `oi_<bursa>`) | Separate pane; funding batang dua warna (teal/rust) kanan, OI garis violet kiri, satu pane; ref Zero ikut sumbu funding; saklar **OI BTC \| USD** (boleh dua-duanya); pane **OI Change (1d)** (Hidden) | Funding tanpa satuan (4 desimal). `total_oi` = jumlah 13 bursa; ΔOI hanya bursa yang OI > 0 kemarin & hari ini (cakupan bursa bertambah 2020–2025). OI USD = OI × harga |
 | **Fear & Greed** `/fear-greed` | `load_fear_greed` — `data_fg.csv` + harga dari `data_mvrv.csv` | Separate pane, sumbu 0–100 kanan; garis bergradasi rust→abu→teal; **SMA30 Band kuning `#F7E9A8` menyala awal**; nama kelas di tooltip | Kelas API: ≤25 Extreme Fear · 26–46 Fear · 47–54 Neutral · 55–75 Greed · ≥76 Extreme Greed. Label nilai terakhir SMA30 di sumbu tertulis bulat (format seri pertama) |
 
@@ -75,7 +76,7 @@ Semua: BTC oranye `#F7931A` (kecuali HODL Waves), key localStorage `dash_v2_<key
 | `archive/app_v1.py` | Dashboard v1 (arsip) |
 
 **Kemampuan renderer (dipakai lewat registry):**
-- Pane: `price` (BTC Separate pane) → `main` → `extra` (pane bawah, selalu linear; `extra_label`, `extra_default`). Zoom dan lebar sumbu tersinkron; sumbu waktu hanya di pane terbawah; slider rentang (isi BTC Log) di bawah semua.
+- Pane: `price` (BTC Separate pane) → `main` → `extra` (pane bawah, selalu linear; `extra_label`, `extra_default`; sisi sumbu dari `Series.axis`, bawaan kiri). Zoom dan lebar sumbu tersinkron; sumbu waktu hanya di pane terbawah; slider rentang (isi BTC Log) di bawah semua.
 - Sumbu: `axis` bawaan + `separate_axis` saat Separate pane (aturan user: metrik berskala sama ke kanan saat Separate pane). `metric_range` (sumbu tetap, angka bulat tanpa desimal, di luar rentang kosong). Angka sumbu disembunyikan (lebar tetap) kalau semua garis di sisi itu mati. Seri mati diparkir ke skala lain supaya format sumbu tidak kacau.
 - Jenis seri: garis, histogram (`negative_color` dua warna), gradasi per titik (`gradient`), area bertumpuk (`kind="stack"`, `stack_index`, `stack_cols` + `stack_units`), kembaran Loss (`complement`).
 - Legend berkelompok (garis utama + kotak angka periode/anggota), `hidden_default` (sekali, dicatat di `seen`), Highlight multi (redup kontras 1,70:1; disembunyikan kalau hanya BTC), tarik chart menggeser sumbu garis yang disorot, klik dua kali reset.
@@ -95,7 +96,7 @@ Semua: BTC oranye `#F7931A` (kecuali HODL Waves), key localStorage `dash_v2_<key
 - **Teal gelap `#006d77` warna utama** (isian, garis, lencana; tulisan di atasnya putih). **Tidak pernah jadi warna huruf** — tulisan teal pakai `#2aa6b0`.
 - Judul halaman **gaya B2**: lencana kelompok teal kecil + nama metrik 18,4 px tebal 600.
 - Menu `st.navigation`, kelompok **jenis metrik** (bukan peran framework), nama menu pendek, judul kelompok `#2aa6b0`.
-- Semua garis utama **2 px** (`LINE_WIDTH`). Palet kohort navy/rust/teal setara terang. Uji buta warna = cek cepat, bukan syarat mutlak.
+- Semua garis utama **2 px** (`LINE_WIDTH`). Palet kohort navy/rust/teal setara terang. **Navy `#0070a6` = warna dasar metrik utama semua halaman** (kecuali pengecualian yang disetujui); cornflower `#5b8def` ditolak (mirip violet AVIV, lebih terang dari rust/teal). Uji buta warna = cek cepat, bukan syarat mutlak.
 - Legend berkelompok per metrik; **BTC Price selalu terakhir** di legend, tombol sorot, tooltip. Tanpa simbol/marker smoothing. Tingkat terang legend / angka periode / tombol sorot sengaja berbeda (hierarki). Label "Highlight" setara tombol.
 - Kotak Display tidak menghitung BTC. Popover Scale memakai nama metrik.
 - Tombol layar penuh satu, di dalam chart. Line style di **tombol Style dalam chart (opsi B)**, bukan popover dan bukan klik kanan kotak periode.
@@ -148,7 +149,7 @@ Semua file punya `date`; sebagian besar punya `btc_price`. Bukan untuk halaman: 
 | `data_realized_cap.csv` | realized_cap_usd, lth/sth_realized_cap_usd | kandidat |
 | `data_rhodl.csv` | rhodl_ratio, realized_cap_1w, realized_cap_1_2y | kandidat |
 | `data_cdd.csv` | cdd, vdd_30d_ma, vdd_365d_ma, vdd_multiple (tanpa harga) | ditunda (bagian 6) |
-| `data_exchange.csv` | total_balance, net_flow, inflow, outflow | kandidat |
+| `data_exchange.csv` | total_balance, net_flow, inflow, outflow | dipakai (Exchange Flow) |
 | `data_apparent_demand.csv` | apparent_demand | kandidat |
 | `data_treasury_2y.csv` | treasury_2y_yield (bulanan) | kandidat |
 | `data_lth_flow.csv` | lth_pl_price, lth_pl_flow_btc | skip |
@@ -157,7 +158,7 @@ Semua file punya `date`; sebagian besar punya `btc_price`. Bukan untuk halaman: 
 
 **Hasil cek kualitas kandidat (17 Sep; jangan diulang kecuali data berubah):**
 - **Realized Cap:** bersih (LTH + STH = total ≤ 0,01 %); loncatan LTH +7,2 % 26 Apr 2026 wajar (koin 22 Nov 2025 genap 155 hari). Isinya ≈ RP × supply, mirip Price Levels.
-- **Exchange:** net = in − out persis. ⚠️ 8 hari 2026 inflow = outflow = 0 (data kosong diisi nol: 8 Apr, 18–19 Apr, 7 & 10 Mei, 12 & 28 Jul, 5 Agt). ⚠️ `btc_price` beda sumber di 2026 (maks 16 %) → pakai harga `data_mvrv`. Lompatan −100k BTC 28 Jul 2021.
+- **Exchange (dipakai):** +43,8k BTC masuk 8 Sep 2026 dan saldo tetap di level baru (3,36M → 3,40M) — transaksi besar atau dompet bursa baru di sumber; dibiarkan. Net = in − out persis. ⚠️ 8 hari 2026 inflow = outflow = 0 (data kosong diisi nol: 8 Apr, 18–19 Apr, 7 & 10 Mei, 12 & 28 Jul, 5 Agt). ⚠️ `btc_price` beda sumber di 2026 (maks 16 %) → pakai harga `data_mvrv`. Lompatan −100k BTC 28 Jul 2021.
 - **RHODL (`data_rhodl.csv`):** = persen RC 1d–1w ÷ 1y–2y, tanpa pengali umur pasar Glassnode; puncak 443 (2011), p99 sejak 2012 = 37. Didominasi penyebut.
 - **Apparent Demand:** hari pertama −952k (artefak), lonjakan +325k 22 Nov 2025; dua kali diuji sebagai sinyal → REJECT (data_dictionary).
 - **Treasury 2Y:** bulanan 1976 – Agt 2026; pipeline masih perubahan user yang belum di-commit.
@@ -193,6 +194,7 @@ Semua file punya `date`; sebagian besar punya `btc_price`. Bukan untuk halaman: 
 - `st.navigation` menaruh menu di atas sidebar → dibalik dengan flex `order`. `st.Page` fungsi: identitas dari `url_path`; halaman `default=True` beralamat `/`.
 - Sidebar yang baru dibuka terbaca lebar 0 ±1 detik (animasi).
 - Legend di dalam chart tidak bisa membuat pane → saklar pane harus kontrol Python.
+- **`RefLine` hanya digambar di pane tengah** (`metric_page`, dari seri non-`extra`) → garis acuan untuk pane bawah belum bisa; memasangnya di halaman berskala besar menarik sumbu pane tengah ke nilai itu.
 
 ### lightweight-charts 4.2.3
 - `minBarSpacing` 0.005 supaya `fitContent()` muat ~5.900 titik. `fitContent()` gagal selama lebar chart 0 → tampilan awal diulang lewat poller.

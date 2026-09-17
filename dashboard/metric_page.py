@@ -579,4 +579,4 @@ def render_metric_page(family: MetricFamily):
                   metric_range=family.metric_range, complement=family.complement,
                   view=(f"{date_from:%Y-%m-%d}", f"{date_to:%Y-%m-%d}"),
                   unit_switch=family.unit_switch, unit_label=family.unit_label,
-                  stack_units=family.stack_units)
+                  stack_units=family.stack_units, extra_mode=family.extra_scale)

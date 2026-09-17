@@ -56,7 +56,12 @@ TEMPLATE = """
   .fssep { width: 1px; height: 16px; background: #232838; margin: 0 4px; flex: none; }
   .fsbtn { display: inline-flex; align-items: center; gap: 6px; }
   .fsbtn svg { width: 12px; height: 12px; }
-  #panes > div + div { margin-top: __GAP__px; }
+  #panes > div + div { margin-top: __GAP__px; position: relative; }
+  /* Garis pembatas antar pane di tengah celah, selebar chart (pilihan user 17 Sep 2026:
+     putih 22 %, antara thin dan brighter). */
+  #panes > div + div::before { content: ''; position: absolute; left: 0; right: 0; top: -4px;
+                               height: 1px; background: rgba(255, 255, 255, 0.22);
+                               pointer-events: none; }
   /* Slider rentang (navigator): paling bawah, di bawah sumbu tanggal. */
   #nav { margin-top: __GAP__px; }
   /* pan-y: geser jari atas-bawah di slider tetap menggulir halaman; kiri-kanan untuk slider. */
@@ -1856,7 +1861,7 @@ def _scale(mode):
 
 def render(df, lines, price_line, extra_lines, height, metric_mode, price_mode, store_key,
            tooltip="Cursor", metric_range=None, complement=None, view=None,
-           unit_switch=None, unit_label="", stack_units=None):
+           unit_switch=None, unit_label="", stack_units=None, extra_mode="Auto"):
     """Gambar chart.
 
     view: (tanggal awal, tanggal akhir) yang tampil saat chart dibuka — dari kotak Range.
@@ -1912,9 +1917,10 @@ def render(df, lines, price_line, extra_lines, height, metric_mode, price_mode, 
     daftar_pane.append({"id": "main", "height": tinggi_pane - tinggi_harga - tinggi_extra,
                         "left": _scale(_mode_sumbu("left")), "right": _scale(_mode_sumbu("right"))})
     if extra_lines:
-        # Pane Z-Score selalu linear: angkanya melewati nol, jadi skala log tidak berlaku.
+        # Pane bawah linear kecuali halaman memintanya lain (MetricFamily.extra_scale):
+        # Z-Score dan gap melewati nol, jadi skala log hanya untuk rasio yang selalu positif.
         daftar_pane.append({"id": "extra", "height": tinggi_extra,
-                            "left": _scale("Auto"), "right": _scale("Auto")})
+                            "left": _scale(extra_mode), "right": _scale(extra_mode)})
 
     banyak_pane = len(daftar_pane) > 1
     jarak = PANE_GAP * (len(daftar_pane) - 1)

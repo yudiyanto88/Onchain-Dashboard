@@ -53,6 +53,7 @@ def load_price_levels():
         'sth_cost_basis': 'STH RP', 'realized_price': 'RP', 'lth_cost_basis': 'LTH RP',
         'cvdd': 'CVDD', 'MVRV 0σ': 'MVRV 0σ',
         '200_dma': '200 DMA', '50_wma': '50 WMA', '200_wma': '200 WMA',
+        'true_market_mean_price': 'True Market Mean',
     }, inplace=True)
     df = _prepare(df)
 
@@ -62,6 +63,9 @@ def load_price_levels():
     aviv['AVIV Mean'] = dasar * aviv['aviv_mean']
     aviv['AVIV Upper'] = dasar * (aviv['aviv_mean'] + 0.5 * (aviv['aviv_upper_1sd'] - aviv['aviv_mean']))
     aviv.loc[aviv['Date'] < _aviv_awal(aviv), ['AVIV Mean', 'AVIV Upper']] = float('nan')
+    # Rasio untuk pane bawah. CVDD bernilai 0 sampai 16 Jul 2010: rasionya dikosongkan.
+    df['Price / CVDD'] = df['BTC Price'] / df['CVDD'].where(df['CVDD'] > 0)
+    df['Price / RP'] = df['BTC Price'] / df['RP'].where(df['RP'] > 0)
     return df.merge(aviv[['Date', 'AVIV Mean', 'AVIV Upper']], on='Date', how='left')
 
 

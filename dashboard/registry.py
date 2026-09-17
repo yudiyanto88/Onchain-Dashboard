@@ -81,6 +81,8 @@ class MetricFamily:
     # misalnya "Z-Score" atau nanti "Net flow". Kotaknya hanya muncul kalau ada seri itu.
     extra_label: str = "Bottom pane"
     extra_default: bool = False   # True = pane tambahan menyala sejak awal (AVIV Deviation)
+    # Skala pane tambahan: "Auto" (linear) atau "Log" untuk rasio yang selalu positif (Price/CVDD).
+    extra_scale: str = "Auto"
     # Saklar bobot area bertumpuk di dalam chart, mis. ("Realized Cap", "Supply"); pilih satu.
     stack_units: tuple[str, ...] | None = None
     # Warna garis harga BTC kalau bukan oranye bawaan (HODL Waves: putih) dan opasitas redupnya
@@ -142,19 +144,21 @@ MARKET_VALUATION = MetricFamily(
         # Pasangan navy + violet ditolak: sama-sama biru gelap saat bertumpuk
         # (jarak Lab 24 untuk mata normal, 10 saat buta warna; navy + hijau 61/59).
         # dim 0.45 x alpha 0.80 = redup 1.44:1, setara violet lama (1.40:1).
-        Series("MVRV Z-Score", "MVRV Z-Score", color="#0070a6", axis="left",
+        # Pane bawah memakai sumbu kanan (permintaan user 17 Sep 2026), begitu juga SOPR Gap
+        # dan AVIV Deviation.
+        Series("MVRV Z-Score", "MVRV Z-Score", color="#0070a6", axis="right",
                dim=0.45, kind="histogram", smoothing=False, short="Z", alpha=0.80,
                pane="extra"),
         # Tiga jendela rolling satu kelompok legend: namanya keterangan, angka
         # jendelanya kotak kecil yang bisa diklik sendiri-sendiri — sama seperti
         # angka periode smoothing. Hanya 1Y yang menyala di awal.
-        Series("Rolling Z-Score (1y)", "MVRV Z-Score 1Y", color="#97c459", axis="left",
+        Series("Rolling Z-Score (1y)", "MVRV Z-Score 1Y", color="#97c459", axis="right",
                dim=0.45, kind="histogram", smoothing=False, short="Z roll", alpha=0.55,
                pane="extra", group="Rolling Z-Score"),
-        Series("Rolling Z-Score (2y)", "MVRV Z-Score 2Y", color="#97c459", axis="left",
+        Series("Rolling Z-Score (2y)", "MVRV Z-Score 2Y", color="#97c459", axis="right",
                dim=0.45, kind="histogram", smoothing=False, alpha=0.55,
                pane="extra", group="Rolling Z-Score", hidden_default=True),
-        Series("Rolling Z-Score (4y)", "MVRV Z-Score 4Y", color="#97c459", axis="left",
+        Series("Rolling Z-Score (4y)", "MVRV Z-Score 4Y", color="#97c459", axis="right",
                dim=0.45, kind="histogram", smoothing=False, alpha=0.55,
                pane="extra", group="Rolling Z-Score", hidden_default=True),
     ],
@@ -185,6 +189,12 @@ PRICE_LEVELS = MetricFamily(
                precision=0),
         Series("LTH RP", "LTH RP", color="#0b8e89", axis="right", dim=0.39,
                short="LTH", precision=0),
+        # True Market Mean (Cointime): dasar AVIV — AVIV Mean/Upper = TMM x rata-rata rasio AVIV.
+        # Menyala sejak awal, biru langit (pilihan user 17 Sep 2026 dari pratinjau; violet sudah
+        # dipakai AVIV). Terdekat: 0σ 31 normal, AVIV Upper 23 buta warna. Redup 1,70:1 di 0.23.
+        # Tidak dipakai framework v2.
+        Series("True Market Mean", "True Market Mean", color="#8fd3ff", axis="right", dim=0.23,
+               short="TMM", precision=0),
         # AVIV Mean dan Upper satu pasang batas zona: satu keluarga violet, dibedakan terang.
         # Uji jarak Lab (patokan longgar handoff bagian 9): terdekat RP–AVIV Mean 16 saat
         # buta warna; Mean–Upper sengaja mirip (17 normal). Terang dijaga setara kohort.
@@ -206,7 +216,21 @@ PRICE_LEVELS = MetricFamily(
                short="50W", precision=0, hidden_default=True),
         Series("200 WMA", "200 WMA", color="#d3d1c7", axis="right", dim=0.22,
                short="200W", precision=0, hidden_default=True),
+        # Pane bawah (disetujui user 17 Sep 2026 dari pratinjau): Price/CVDD dipakai framework v2
+        # di K4 (kondisi #4 < 1,10; flag <= 1,0) — garis ambang tidak dipasang. Skala Log supaya
+        # jarak ke 1,0 terbaca di semua siklus (2010-2013 rasionya sampai 72). Warna ikut induknya.
+        # Angka >= 10 tanpa desimal di sumbu (50, bukan 50.00).
+        Series("Price / CVDD", "Price / CVDD", color="#a8963f", axis="right", dim=0.32,
+               kind="line", smoothing=False, short="P/CVDD", pane="extra", precision=2,
+               whole_from=10),
+        # Price/RP mati sejak awal: pasangan divergence KB Price Level §4.3 (Price/CVDD > 1
+        # sementara Price/RP < 1).
+        Series("Price / RP", "Price / RP", color="#0070a6", axis="right", dim=0.49,
+               kind="line", smoothing=False, short="P/RP", pane="extra", precision=2,
+               whole_from=10, hidden_default=True),
     ],
+    extra_label="Price / CVDD",
+    extra_scale="Log",
 )
 
 
@@ -245,7 +269,7 @@ AVIV = MetricFamily(
                  group="σ Bands", hidden_default=True)
           for nama in ["+1σ", "+2σ", "−1σ", "−2σ"]],
         # Jarak rasio dari Mean dalam σ: batang navy seperti Z-Score ikut MVRV (redup 1.44:1).
-        Series("Deviation (σ)", "AVIV Deviation", color="#0070a6", axis="left", dim=0.45,
+        Series("Deviation (σ)", "AVIV Deviation", color="#0070a6", axis="right", dim=0.45,
                kind="histogram", smoothing=False, short="Dev", alpha=0.80, pane="extra",
                precision=2),
     ],
@@ -281,7 +305,7 @@ SOPR = MetricFamily(
         # Gap SMA90 − SMA60(SMA90), rumus KB SOPR §12 (lihat data.load_sopr). Batang ikut
         # warna induknya (rust STH), sama seperti Z-Score ikut navy MVRV. 5 desimal: KB
         # menulis nilai seperti +0.00096. dim 0.41 x alpha 0.80 = redup 1.44:1, setara Z-Score.
-        Series("STH-SOPR Gap", "STH-SOPR Gap", color="#bf5546", axis="left", dim=0.41,
+        Series("STH-SOPR Gap", "STH-SOPR Gap", color="#bf5546", axis="right", dim=0.41,
                kind="histogram", smoothing=False, short="Gap", alpha=0.80,
                pane="extra", precision=5),
     ],
@@ -320,7 +344,7 @@ NUPL = MetricFamily(
         Series("LTH-NUPL", "LTH-NUPL", color="#0b8e89", axis="left", separate_axis="right", dim=0.39,
                short="LTH", precision=3),
         # Gap LTH − STH (KB NUPL §8.1): batang rust, dim sama dengan SOPR Gap (redup 1.44:1).
-        Series("Gap (LTH − STH)", "NUPL Gap", color="#bf5546", axis="left", dim=0.41,
+        Series("Gap (LTH − STH)", "NUPL Gap", color="#bf5546", axis="right", dim=0.41,
                kind="histogram", smoothing=False, short="Gap", alpha=0.80,
                pane="extra", precision=3),
     ],
