@@ -4,6 +4,15 @@ Diperbarui 17 Sep 2026 (versi ringkas, commit sesudah `d1dff1d`). Versi lengkap 
 
 Baca dokumen ini dan `CLAUDE.md` sebelum mulai. Semua yang ditandai **ditahan/ditunda** harus ditanyakan ke user dulu.
 
+**Cara memperbarui dokumen ini (supaya tetap ringkas, target < 35 KB):**
+- Susunan tetap: 1 Status · 2 Cara kerja user · 3 Halaman live (tabel) · 4 Arsitektur · 5 Keputusan final · 6 Ditahan/ditunda · 7 Data & cek kualitas · 8 Warna · 9 Jebakan teknis · 10 Cara menjalankan.
+- Halaman baru = satu baris di tabel bagian 3, bukan bagian cerita baru.
+- Tulis hasil dan keputusan saja. Cerita pengerjaan, opsi yang ditolak, dan hasil ukur piksel tidak masuk; kalau perlu disimpan, tambahkan ke file arsip di `archive/`.
+- Item yang selesai dihapus dari bagian 6, bukan dicoret.
+- Jebakan teknis hanya yang masih bisa terulang; hapus kalau fiturnya sudah tidak ada.
+- Perubahan handoff diusulkan ke user dulu sebelum ditulis.
+- **Saat user konfirmasi akan lanjut di sesi baru:** sesudah handoff diperbarui (dan di-commit/push kalau diminta), tulis **prompt pembuka sesi baru langsung di chat** — sesuaikan dengan status terakhir. Prompt itu tidak disimpan di handoff.
+
 ---
 
 ## 1. Status dan langkah berikutnya
