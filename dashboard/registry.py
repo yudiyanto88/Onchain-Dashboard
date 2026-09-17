@@ -24,7 +24,9 @@ class Series:
     alpha: float = 1.0                # < 1 = tembus pandang (dipakai batang histogram)
     group: str | None = None          # kelompok legend; bawaannya label sendiri
     hidden_default: bool = False      # lahir dalam keadaan mati di legend
-    pane: str = "main"                # "main" atau "extra" (pane tambahan paling bawah)
+    pane: str = "main"                # "main", "extra" (pane tambahan paling bawah), atau
+                                      # "price" (di pane harga BTC saat Separate pane, di belakang
+                                      # garis harga; saat Overlay/Hidden pindah ke pane bawah)
     precision: int = 2                # desimal di sumbu, label nilai terakhir, dan tooltip
                                       # (harga 0; rasio 2; nanti funding rate bisa 5)
     whole_from: float | None = None   # angka sebesar ini ke atas ditulis tanpa desimal
@@ -450,6 +452,43 @@ RHODL_RATIO = MetricFamily(
 )
 
 
+HOLDER_SUPPLY = MetricFamily(
+    key="holder_supply",
+    title="LTH/STH Supply",
+    subtitle="Long- & Short-Term Holder Supply",
+    group="Holder Behavior",
+    url_path="lth-sth-supply",
+    loader=data.load_holder_supply,
+    # Disetujui user 17 Sep 2026 dari pratinjau: garis (bukan area bertumpuk), warna kohort,
+    # saklar satuan BTC | % di chart (bawaan BTC), harga BTC di pane sendiri. Tidak dipakai
+    # framework v2, tanpa garis ambang.
+    btc_mode_default="Separate pane",
+    metric_scale_default="Auto",
+    price_scale_default="Log",
+    unit_switch=("BTC", "%"),
+    series=[
+        Series("LTH Supply", "LTH Supply", color="#0b8e89", axis="left", separate_axis="right",
+               dim=0.39, short="LTH", precision=0, unit="BTC", compact=True),
+        Series("STH Supply", "STH Supply", color="#bf5546", axis="left", separate_axis="right",
+               dim=0.44, short="STH", precision=0, unit="BTC", compact=True),
+        # Persen supply beredar: pasangan satuan BTC, pindah ke sumbu seberang kalau dua-duanya
+        # menyala (lihat Series.pair).
+        Series("LTH Supply (%)", "LTH Supply %", color="#0b8e89", axis="left",
+               separate_axis="right", dim=0.39, short="LTH %", precision=1, unit="%",
+               pair="LTH Supply"),
+        Series("STH Supply (%)", "STH Supply %", color="#bf5546", axis="left",
+               separate_axis="right", dim=0.44, short="STH %", precision=1, unit="%",
+               pair="STH Supply"),
+        # Di pane harga, di belakang garis BTC, sumbu kiri (pilihan user 17 Sep 2026: "pane bawah
+        # digabung dengan BTC price"). Naik teal, turun rust. Lompatan pindah dompet koin lama
+        # ikut tampil (mis. -1,03 juta Nov 2025, +1,13 juta Apr 2026). Selalu BTC.
+        Series("LTH 30d Change", "LTH 30d Change", color="#0b8e89", negative_color="#bf5546",
+               axis="left", dim=0.45, kind="histogram", smoothing=False, alpha=0.60,
+               short="LTH 30d", pane="price", precision=0, compact=True),
+    ],
+)
+
+
 EXCHANGE_FLOW = MetricFamily(
     key="exchange_flow",
     title="Exchange Flow",
@@ -569,5 +608,5 @@ FEAR_GREED = MetricFamily(
 # Urutan di sini = urutan menu sidebar; kelompok muncul menurut halaman pertamanya.
 # Halaman pertama jadi halaman bawaan (alamat localhost:8503/).
 FAMILIES = {f.title: f for f in [MARKET_VALUATION, PRICE_LEVELS, AVIV, SOPR, NUPL, SUPPLY_IN_PROFIT,
-                                   HODL_WAVES, RHODL_RATIO, EXCHANGE_FLOW,
+                                   HODL_WAVES, RHODL_RATIO, HOLDER_SUPPLY, EXCHANGE_FLOW,
                                    FUNDING_OI, FEAR_GREED]}

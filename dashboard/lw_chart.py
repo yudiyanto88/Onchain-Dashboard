@@ -536,7 +536,7 @@ loadLib(0).then(() => {
     if (warnaPerTitik(spec)) warnaiTitik(spec, points, false);
     const umum = {
       color: baseColor(spec),
-      priceScaleId: spec.pane === 'price' ? 'right' : spec.axis,
+      priceScaleId: spec.pane === 'price' ? (spec.axis || 'right') : spec.axis,
       title: spec.group ? spec.name : '',
       priceLineVisible: false,
       lastValueVisible: !!spec.group,
@@ -1274,7 +1274,7 @@ loadLib(0).then(() => {
   // dipinjam, dan seri induk yang mati, dipindah ke skala parkir supaya tidak jadi seri
   // pertama sumbu itu — library mengambil format angka sumbu dari seri pertama, walau mati.
   const tampak = h => h.line.options().visible || (!!h.kembar && h.kembar.options().visible);
-  const sisiRumah = h => h.spec.pane === 'price' ? 'right' : h.spec.axis;
+  const sisiRumah = h => h.spec.pane === 'price' ? (h.spec.axis || 'right') : h.spec.axis;
   const seberang = sisi => sisi === 'left' ? 'right' : 'left';
   function pindahSkala(h, id) {
     if (h.sisi === id) return;
@@ -1567,7 +1567,7 @@ loadLib(0).then(() => {
   // Library 4.x tidak punya perintah untuk mengatur rentang sumbu harga, jadi rentangnya
   // dikunci lewat autoscaleInfoProvider pada semua garis di sumbu tersebut.
   // Klik dua kali di chart mengembalikan semua sumbu ke Auto.
-  const sideOf = spec => spec.pane === 'price' ? 'right' : spec.axis;
+  const sideOf = spec => spec.pane === 'price' ? (spec.axis || 'right') : spec.axis;
   // Kembaran Loss ikut dikunci: kalau tidak, rentangnya (0–100) bergabung dengan rentang
   // yang dikunci dan sumbu tidak bisa digeser.
   const seriesOn = (pane, side) =>
@@ -1861,7 +1861,8 @@ def _scale(mode):
 
 def render(df, lines, price_line, extra_lines, height, metric_mode, price_mode, store_key,
            tooltip="Cursor", metric_range=None, complement=None, view=None,
-           unit_switch=None, unit_label="", stack_units=None, extra_mode="Auto"):
+           unit_switch=None, unit_label="", stack_units=None, extra_mode="Auto",
+           price_extra=None):
     """Gambar chart.
 
     view: (tanggal awal, tanggal akhir) yang tampil saat chart dibuka — dari kotak Range.
@@ -1869,13 +1870,17 @@ def render(df, lines, price_line, extra_lines, height, metric_mode, price_mode, 
 
     price_line: garis harga BTC bila dipisah ke pane sendiri (pane paling atas).
     extra_lines: garis untuk pane tambahan paling bawah (mis. Z-Score), atau kosong.
+    price_extra: seri tambahan di pane harga (mis. LTH 30d change), digambar di belakang harga.
     Tinggi dibagi menurut jumlah pane; perbandingannya dipakai lagi saat layar penuh.
     """
     extra_lines = extra_lines or []
+    price_extra = (price_extra or []) if price_line is not None else []
     specs = [dict(vars(ln), pane="main") for ln in lines]
-    specs += [dict(vars(ln), pane="extra") for ln in extra_lines]
+    # Seri tambahan pane harga dibuat sebelum garis harga, supaya harga tergambar di atasnya.
+    specs += [dict(vars(ln), pane="price") for ln in price_extra]
     if price_line is not None:
-        specs.insert(0, dict(vars(price_line), pane="price"))
+        specs.append(dict(vars(price_line), pane="price"))
+    specs += [dict(vars(ln), pane="extra") for ln in extra_lines]
 
     digits = {}
     for spec in specs:
@@ -1912,8 +1917,12 @@ def render(df, lines, price_line, extra_lines, height, metric_mode, price_mode, 
 
     daftar_pane = []
     if price_line is not None:
+        # Sisi yang dipakai seri tambahan (batang, bisa negatif) selalu linear.
+        kiri_tambahan = any(ln.axis == "left" for ln in price_extra)
+        kanan_tambahan = any(ln.axis == "right" for ln in price_extra)
         daftar_pane.append({"id": "price", "height": tinggi_harga,
-                            "left": _scale(price_mode), "right": _scale(price_mode)})
+                            "left": _scale("Auto" if kiri_tambahan else price_mode),
+                            "right": _scale("Auto" if kanan_tambahan else price_mode)})
     daftar_pane.append({"id": "main", "height": tinggi_pane - tinggi_harga - tinggi_extra,
                         "left": _scale(_mode_sumbu("left")), "right": _scale(_mode_sumbu("right"))})
     if extra_lines:

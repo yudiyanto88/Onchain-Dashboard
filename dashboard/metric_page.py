@@ -162,7 +162,7 @@ def _on_btc_mode(family):
     _keep(f"{k}_btc", OVERLAY)
     separate = st.session_state[f"{k}_btc"] == PANE
     for s in family.series:
-        if s.separate_axis and s.pane != "extra":
+        if s.separate_axis and s.pane == "main":
             st.session_state[f"{k}_axis_{s.col}"] = s.separate_axis if separate else s.axis
 
 
@@ -199,7 +199,7 @@ def _init_state(family, dmin, dmax):
     separate = st.session_state[f"{k}_btc"] == PANE
     axis_keys = []
     for s in family.series:
-        if s.pane != "extra":
+        if s.pane == "main":
             axis = s.separate_axis if separate and s.separate_axis else s.axis
             key = f"{k}_axis_{s.col}"
             if key not in st.session_state:
@@ -260,7 +260,7 @@ def _axis_summary(family):
     """Nilai di kotak Display: sisi sumbu yang dipakai garis metrik, atau Mixed."""
     k = family.key
     sides = {st.session_state[f"{k}_axis_{s.col}"]
-             for s in family.series if s.pane != "extra"}
+             for s in family.series if s.pane == "main"}
     if len(sides) == 1:
         return "Left" if sides.pop() == "left" else "Right"
     return "Mixed"
@@ -427,7 +427,7 @@ def _render_controls(family, dmin, dmax):
             # membuat bagian ini tiga kali lebih tinggi daripada isinya, dan popover jadi
             # lebih tinggi daripada chart saat halaman punya banyak garis.
             for s in family.series:
-                if s.pane == "extra" or s.kind == "stack":
+                if s.pane != "main" or s.kind == "stack":
                     continue   # pane tambahan punya sumbunya sendiri; band bertumpuk ikut satu sumbu
                 # segmented_control, bukan st.radio, supaya bentuknya sama dengan kontrol lain.
                 _axis_control(s.label, f"{k}_axis_{s.col}", s.axis)
@@ -463,7 +463,7 @@ def render_metric_page(family: MetricFamily):
     k = family.key
 
     # Tanggal terakhir yang benar-benar punya nilai metrik, bukan sekadar baris tanggal.
-    latest = df_raw.dropna(subset=[s.col for s in family.series if s.pane != "extra"],
+    latest = df_raw.dropna(subset=[s.col for s in family.series if s.pane == "main"],
                            how="all")['Date'].max()
     _render_header(family, latest)
     _render_controls(family, dmin, dmax)
@@ -492,8 +492,21 @@ def render_metric_page(family: MetricFamily):
     # Semua garis dikirim ke chart; menyalakan dan mematikannya diurus legend di browser.
     plan = []
     extra = []
+    price_extra = []
     pane_extra = st.session_state[f"{k}_extra"] == Z_BOTTOM
     for sr in family.series:
+        if sr.pane == "price":
+            # Seri di pane harga (LTH 30d change): di belakang harga saat Separate pane. Saat
+            # Overlay/Hidden pane harga tidak ada, jadi seri pindah ke pane bawah sendiri dengan
+            # sumbu kanan — tidak pernah hilang (keputusan user 17 Sep 2026).
+            separate = btc_mode == PANE
+            (price_extra if separate else extra).append(
+                Line(sr.label, sr.col, sr.color, sr.axis if separate else "right",
+                     width=LINE_WIDTH, group=sr.group or sr.label, dim=sr.dim, kind=sr.kind,
+                     short=sr.short, alpha=sr.alpha, hidden_default=sr.hidden_default,
+                     precision=sr.precision, whole_from=sr.whole_from,
+                     negative_color=sr.negative_color, compact=sr.compact))
+            continue
         if sr.pane == "extra":
             # Pane tambahan mati: serinya tidak dikirim sama sekali, bukan sekadar
             # disembunyikan — supaya sumbu pane metrik tidak ikut menghitungnya.
@@ -579,4 +592,5 @@ def render_metric_page(family: MetricFamily):
                   metric_range=family.metric_range, complement=family.complement,
                   view=(f"{date_from:%Y-%m-%d}", f"{date_to:%Y-%m-%d}"),
                   unit_switch=family.unit_switch, unit_label=family.unit_label,
-                  stack_units=family.stack_units, extra_mode=family.extra_scale)
+                  stack_units=family.stack_units, extra_mode=family.extra_scale,
+                  price_extra=price_extra)

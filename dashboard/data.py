@@ -267,6 +267,28 @@ def load_fear_greed():
 
 
 @st.cache_data(ttl=3600)
+def load_holder_supply():
+    """Jumlah supply LTH dan STH (data_supply.csv), dalam BTC dan persen supply beredar.
+
+    LTH + STH = seluruh supply beredar (20,09 juta BTC 17 Sep 2026, cocok jadwal halving).
+    Tidak entity-adjusted: koin lama yang pindah dompet (bursa/kustodian) pindah ke STH lalu
+    kembali ke LTH 155 hari kemudian — mis. −536k BTC 22 Nov 2025 dan +598k 26 Apr 2026.
+    Persen dihitung di sini karena CSV hanya menyimpan BTC.
+    """
+    df = _prepare(pd.read_csv("data_supply.csv").rename(columns={
+        'date': 'Date', 'btc_price': 'BTC Price',
+        'lth_supply_btc': 'LTH Supply', 'sth_supply_btc': 'STH Supply'}))
+    total = (df['LTH Supply'] + df['STH Supply']).where(lambda s: s > 0)
+    df['LTH Supply %'] = df['LTH Supply'] / total * 100
+    df['STH Supply %'] = df['STH Supply'] / total * 100
+    # Perubahan saldo LTH 30 hari kalender (bukan 30 baris), dalam BTC.
+    lth = df.set_index('Date')['LTH Supply']
+    df['LTH 30d Change'] = (lth - lth.shift(freq='30D').reindex(lth.index)).to_numpy()
+    return df[['Date', 'BTC Price', 'LTH Supply', 'STH Supply', 'LTH Supply %', 'STH Supply %',
+               'LTH 30d Change']]
+
+
+@st.cache_data(ttl=3600)
 def load_supply():
     """Persen supply dalam untung: semua holder, STH, LTH (data_supply.csv).
 
