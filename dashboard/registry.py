@@ -43,6 +43,9 @@ class Series:
     smoothing_precision: int | None = None  # desimal garis smoothing kalau beda (F&G: 0 vs 1)
     # Nama kelas di tooltip ("69 · Greed"): daftar [batas atas inklusif, nama], urut naik.
     value_labels: list | None = None
+    # Area bertumpuk (kind="stack", RHODL Waves): urutan band dari bawah dan kolom per bobot.
+    stack_index: int | None = None
+    stack_cols: dict | None = None
 
 
 @dataclass
@@ -78,6 +81,8 @@ class MetricFamily:
     # misalnya "Z-Score" atau nanti "Net flow". Kotaknya hanya muncul kalau ada seri itu.
     extra_label: str = "Bottom pane"
     extra_default: bool = False   # True = pane tambahan menyala sejak awal (AVIV Deviation)
+    # Saklar bobot area bertumpuk di dalam chart, mis. ("Realized Cap", "Supply"); pilih satu.
+    stack_units: tuple[str, ...] | None = None
     # Keadaan awal kotak BTC price ("Overlay" / "Separate pane" / "Hidden").
     # Nilainya sama dengan pilihan di metric_page.
     btc_mode_default: str = "Overlay"
@@ -359,6 +364,34 @@ SUPPLY_IN_PROFIT = MetricFamily(
 )
 
 
+RHODL_WAVES = MetricFamily(
+    key="rhodl_waves",
+    title="RHODL Waves",
+    subtitle="RHODL Waves",
+    group="Holder Behavior",
+    url_path="rhodl-waves",
+    loader=data.load_hodl_waves,
+    # Dipilih user 17 Sep 2026 dari pratinjau: area bertumpuk 12 band umur, warna spektrum
+    # (muda merah -> tua ungu), band muda di bawah, saklar bobot Realized Cap | Supply di chart
+    # (bawaan Realized Cap = RHODL Waves; Supply = HODL Waves). Tidak dipakai framework v2.
+    btc_mode_default="Separate pane",
+    metric_scale_default="Auto",
+    price_scale_default="Log",
+    metric_range=(0, 100),
+    stack_units=("Realized Cap", "Supply"),
+    series=[
+        # Band tidak ikut smoothing dan tidak punya tombol sorot (13 tombol terlalu padat).
+        # Mematikan band di legend menumpuk ulang band yang tersisa (lihat tumpuk() di lw_chart).
+        Series(nama, f"RC {nama}", color=warna, axis="left", separate_axis="right", dim=0.35,
+               kind="stack", smoothing=False, precision=1, stack_index=i,
+               stack_cols={"Realized Cap": f"RC {nama}", "Supply": f"Supply {nama}"})
+        for i, ((_, nama), warna) in enumerate(zip(data.HODL_BANDS, [
+            "#d73027", "#f46d43", "#fdae61", "#fee08b", "#d9ef8b", "#a6d96a",
+            "#66bd63", "#1a9850", "#35978f", "#2166ac", "#5e4fa2", "#9e7bd6"]))
+    ],
+)
+
+
 FUNDING_OI = MetricFamily(
     key="funding_oi",
     title="Funding Rates & Open Interest",   # nama menu (permintaan user 16 Sep 2026)
@@ -445,4 +478,5 @@ FEAR_GREED = MetricFamily(
 # Urutan di sini = urutan menu sidebar; kelompok muncul menurut halaman pertamanya.
 # Halaman pertama jadi halaman bawaan (alamat localhost:8503/).
 FAMILIES = {f.title: f for f in [MARKET_VALUATION, PRICE_LEVELS, AVIV, SOPR, NUPL, SUPPLY_IN_PROFIT,
+                                   RHODL_WAVES,
                                    FUNDING_OI, FEAR_GREED]}

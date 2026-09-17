@@ -78,6 +78,28 @@ def _aviv_awal(aviv):
     return aviv.loc[wajar, 'Date'].iloc[0] if wajar.any() else aviv['Date'].min()
 
 
+# Band umur HODL Waves: (akhiran kolom CSV, nama di legend), dari paling muda ke paling tua.
+HODL_BANDS = [("0-1d", "24h"), ("1d-1w", "1d–1w"), ("1w-1m", "1w–1m"), ("1m-3m", "1m–3m"),
+              ("3m-6m", "3m–6m"), ("6m-12m", "6m–12m"), ("1y-2y", "1y–2y"), ("2y-3y", "2y–3y"),
+              ("3y-5y", "3y–5y"), ("5y-7y", "5y–7y"), ("7y-10y", "7y–10y"), ("10y+", "10y+")]
+
+
+@st.cache_data(ttl=3600)
+def load_hodl_waves():
+    """RHODL Waves (porsi realized cap) dan HODL Waves (porsi supply) per band umur, dalam %.
+
+    Kolom "RC <band>" dan "Supply <band>"; 12 band selalu berjumlah 100 (dicek 17 Sep 2026).
+    Baris sebelum harga BTC pertama (2009 – 16 Jul 2010) dibuang, seperti halaman lain.
+    """
+    df = pd.read_csv("data_hodl_waves.csv").rename(columns={'date': 'Date', 'btc_price': 'BTC Price'})
+    df = _prepare(df)
+    df = df[df['Date'] >= df.loc[df['BTC Price'].notna(), 'Date'].min()]
+    for akhiran, nama in HODL_BANDS:
+        df[f"RC {nama}"] = df[f"realized_cap_{akhiran}"]
+        df[f"Supply {nama}"] = df[f"supply_{akhiran}"]
+    return df[['Date', 'BTC Price'] + [f"{u} {nama}" for _, nama in HODL_BANDS for u in ("RC", "Supply")]]
+
+
 @st.cache_data(ttl=3600)
 def load_aviv():
     """AVIV Ratio dan band simpangan bakunya dari data_aviv.csv (satuan rasio, bukan harga).

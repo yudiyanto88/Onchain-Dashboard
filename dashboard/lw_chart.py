@@ -77,6 +77,24 @@ TEMPLATE = """
   #tip .v.sisa { color: #aeb6c2; }
   #tip .tsw { display: inline-block; width: 14px; height: 0; border-top: 2px solid; vertical-align: 4px; margin-right: 6px; }
   #tip .tbox { display: inline-block; width: 11px; height: 9px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+  /* Panel Line style (tombol Style di baris sorot, 17 Sep 2026): mengubah bentuk dan tebal
+     garis smoothing langsung di browser, tanpa memuat ulang chart. */
+  #gaya { position: absolute; z-index: 6; display: none; width: 236px; box-sizing: border-box;
+          overflow-y: auto; background: rgba(28, 34, 48, 0.97); border: 1px solid #2a2e39;
+          border-radius: 8px; padding: 8px 10px 10px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45); }
+  #gaya .gjudul { color: #8b949e; font-size: 11px; letter-spacing: 0.08em; }
+  #gaya .gbaris { margin-top: 10px; }
+  #gaya .gnama { display: flex; justify-content: space-between; font-size: 11px; color: #c9d1d9;
+                 margin-bottom: 4px; }
+  #gaya .gnama span:last-child { color: #8b949e; font-variant-numeric: tabular-nums; }
+  #gaya .gpilih { display: flex; gap: 3px; }
+  #gaya .gpilih button { flex: 1; height: 24px; padding: 0; display: flex; align-items: center;
+                         justify-content: center; border-color: #232838; }
+  #gaya .gpilih button.on { background: rgba(0, 109, 119, 0.40); border-color: #006d77; }
+  #gaya .gpilih svg { width: 31px; height: 12px; }
+  #gaya input[type=range] { width: 100%; margin: 6px 0 0; accent-color: #006d77; }
+  #gaya .greset { width: 100%; margin-top: 10px; border-color: #232838; color: #8b949e; }
+  #gaya .gkosong { margin-top: 6px; color: #8b949e; font-size: 11px; white-space: normal; }
   #err { color: #DA3633; padding: 16px; }
 </style>
 <div id="bar">
@@ -88,6 +106,7 @@ TEMPLATE = """
 <div id="panes"></div>
 <div id="nav"></div>
 <div id="tip"></div>
+<div id="gaya"></div>
 <div id="err"></div>
 <script>
 const D = __DATA__;
@@ -494,8 +513,14 @@ loadLib(0).then(() => {
     return points;
   }
 
+  // Area bertumpuk (kind "stack", RHODL Waves; 17 Sep 2026): tiap band digambar sebagai area
+  // dari garis kumulatifnya ke dasar pane. Band paling tua (kumulatif 100) dibuat duluan dan
+  // band paling muda terakhir, supaya area yang lebih kecil tergambar di atasnya.
+  const tumpukan = spec => spec.kind === 'stack';
+  const urutanBuat = S.filter(sp => !tumpukan(sp))
+    .concat(S.filter(tumpukan).sort((a, b) => b.stack_index - a.stack_index));
   const handles = [];
-  for (const spec of S) {
+  for (const spec of urutanBuat) {
     const values = D.cols[spec.col];
     const points = [];
     for (let i = 0; i < D.t.length; i++) {
@@ -522,7 +547,12 @@ loadLib(0).then(() => {
       });
     }
     // Batang digambar dari garis nol, jadi nilai negatif turun ke bawah sendiri.
-    const line = spec.kind === 'histogram'
+    const line = tumpukan(spec)
+      ? panes[spec.pane].addAreaSeries(Object.assign({}, umum, {
+          topColor: spec.color, bottomColor: spec.color, lineColor: spec.color, lineWidth: 1,
+          crosshairMarkerVisible: false, lastValueVisible: false, title: '',
+        }))
+      : spec.kind === 'histogram'
       ? panes[spec.pane].addHistogramSeries(Object.assign({ base: 0 }, umum))
       : panes[spec.pane].addLineSeries(Object.assign({
           lineWidth: spec.width,
@@ -530,7 +560,7 @@ loadLib(0).then(() => {
           lineType: spec.steps ? 1 : 0,
           crosshairMarkerVisible: !!spec.group,
         }, umum));
-    line.setData(points);
+    if (!tumpukan(spec)) line.setData(points);   // area bertumpuk diisi tumpuk() di apply()
     const handle = { spec, line };
     if (warnaPerTitik(spec)) { handle.titik = points; handle.redup = false; }
     // Kembaran Loss: bentuk garis sama, lahir tersembunyi; nyala/warnanya diatur apply().
@@ -548,8 +578,10 @@ loadLib(0).then(() => {
   // Sumbu berentang tetap: ruang tepi bawaan (atas 20 %, bawah 10 %) dipersempit supaya
   // 0–100 memakai hampir seluruh tinggi pane dan tidak menyisakan pita kosong di atas 100.
   if (C.metricRange) {
+    const adaTumpukan = handles.some(h => tumpukan(h.spec));
     new Set(handles.filter(h => rentangTetap(h.spec)).map(h => h.spec.axis)).forEach(side =>
-      panes.main.priceScale(side).applyOptions({ scaleMargins: { top: 0.06, bottom: 0.04 } }));
+      panes.main.priceScale(side).applyOptions({ scaleMargins: adaTumpukan
+        ? { top: 0.03, bottom: 0 } : { top: 0.06, bottom: 0.04 } }));
   }
   // Tampilan awal: pulihkan zoom terakhir, atau tampilkan seluruh data.
   // Sidik data ikut disimpan, jadi kalau rentang tanggalnya memang berubah
@@ -723,8 +755,12 @@ loadLib(0).then(() => {
   const legendItems = handles.filter(h => h.spec.group);
   // BTC Price selalu kelompok terakhir di legend, tombol sorot, dan tooltip. Saat Separate
   // pane seri harga disisipkan paling depan (pane atas), dan sebelum ini ikut tampil pertama.
+  const indeksTumpuk = group => {
+    const h = legendItems.find(x => x.spec.group === group && tumpukan(x.spec));
+    return h ? h.spec.stack_index : -1;
+  };
   const groups = [...new Set(legendItems.map(h => h.spec.group))]
-    .sort((a, b) => (a === 'BTC Price') - (b === 'BTC Price'));
+    .sort((a, b) => ((a === 'BTC Price') - (b === 'BTC Price')) || (indeksTumpuk(a) - indeksTumpuk(b)));
   // Beberapa garis bisa disorot sekaligus. Penyimpanan lama berisi satu nama
   // (highlight: 'MVRV' atau 'none'), jadi diubah ke daftar bila masih format lama.
   const saved = readState();
@@ -816,7 +852,7 @@ loadLib(0).then(() => {
     button.className = 'lg';
     const swatch = document.createElement('span');
     swatch.className = 'sw';
-    if (contoh.spec.kind === 'histogram') {
+    if (contoh.spec.kind === 'histogram' || tumpukan(contoh.spec)) {
       swatch.style.height = '9px';
       swatch.style.width = '11px';
       swatch.style.borderRadius = '2px';
@@ -892,7 +928,7 @@ loadLib(0).then(() => {
   for (const h of handles) {
     if (h.spec.group && h.spec.short) namaPendek[h.spec.group] = h.spec.short;
   }
-  const hlButtons = ['none'].concat(groups).map(group => {
+  const hlButtons = ['none'].concat(groups.filter(g => indeksTumpuk(g) < 0)).map(group => {
     const button = document.createElement('button');
     button.className = 'hl';
     button.textContent = group === 'none' ? 'None' : (namaPendek[group] || group.split(' ')[0]);
@@ -949,6 +985,49 @@ loadLib(0).then(() => {
     const pemisah = document.createElement('span');
     pemisah.className = 'fssep';
     hlEl.insertBefore(pemisah, labelHighlight);
+  }
+  // Saklar bobot area bertumpuk (C.stackUnits, mis. Realized Cap | Supply; 17 Sep 2026): satu
+  // yang aktif. Realized Cap = RHODL Waves, Supply = HODL Waves. Tersimpan di localStorage.
+  const BOBOT = C.stackUnits || [];
+  if (!BOBOT.includes(state.stackUnit)) state.stackUnit = BOBOT[0];
+  const saklarBobot = [];
+  if (BOBOT.length) {
+    const labelHighlight = hlEl.querySelector('.hllabel');
+    for (const u of BOBOT) {
+      const button = document.createElement('button');
+      button.className = 'hl';
+      button.textContent = u;
+      button.title = `Weight the waves by ${u}`;
+      button.onclick = () => { state.stackUnit = u; apply(); };
+      hlEl.insertBefore(button, labelHighlight);
+      saklarBobot.push({ button, u });
+    }
+    const pemisah = document.createElement('span');
+    pemisah.className = 'fssep';
+    hlEl.insertBefore(pemisah, labelHighlight);
+  }
+
+  // Tumpuk ulang area: kumulatif dari band paling muda, hanya band yang menyala di legend,
+  // dengan kolom bobot yang dipilih. Dihitung ulang hanya kalau bobot atau daftar band berubah.
+  let kunciTumpuk = null;
+  function tumpuk() {
+    const band = handles.filter(h => tumpukan(h.spec)).sort((a, b) => a.spec.stack_index - b.spec.stack_index);
+    if (band.length === 0) return;
+    const nyala = band.filter(h => !state.hidden.includes(h.spec.name));
+    const kunci = state.stackUnit + '|' + nyala.map(h => h.spec.stack_index).join(',');
+    if (kunci === kunciTumpuk) return;
+    kunciTumpuk = kunci;
+    const jumlah = new Array(D.t.length).fill(0);
+    for (const h of nyala) {
+      const nilai = D.cols[h.spec.stack_cols[state.stackUnit] || h.spec.col];
+      const titik = [];
+      for (let i = 0; i < D.t.length; i++) {
+        if (nilai[i] === null) continue;
+        jumlah[i] += nilai[i];
+        titik.push({ time: D.t[i], value: jumlah[i] });
+      }
+      h.line.setData(titik);
+    }
   }
 
   // Tombol layar penuh hidup di dalam chart, bukan di baris kontrol Streamlit.
@@ -1118,6 +1197,10 @@ loadLib(0).then(() => {
         visible: !hidden && (!handle.kembar || tampilProfit()) && satuanTampil(spec),
         color: warna(spec.color),
       });
+      if (tumpukan(spec)) {
+        const c = warna(spec.color);
+        handle.line.applyOptions({ topColor: c, bottomColor: c, lineColor: c });
+      }
       // Histogram dua warna: warna ada di tiap titik, jadi diwarnai ulang hanya saat
       // keadaan redupnya berubah.
       if (handle.titik && handle.redup !== faded) {
@@ -1151,6 +1234,8 @@ loadLib(0).then(() => {
     }
     for (const { button, kunci } of saklar) button.classList.toggle('on', !!state[kunci]);
     for (const { button, u } of saklarSatuan) button.classList.toggle('on', !!state.unitOn[u]);
+    for (const { button, u } of saklarBobot) button.classList.toggle('on', state.stackUnit === u);
+    tumpuk();
     // Kelompok legend yang satuannya mati disembunyikan seluruhnya.
     if (SATUAN.length) {
       for (const { wadah, anggota } of wadahKelompok.values()) {
@@ -1267,7 +1352,7 @@ loadLib(0).then(() => {
   const teksWaktu = t => typeof t === 'string' ? t
     : `${t.year}-${String(t.month).padStart(2, '0')}-${String(t.day).padStart(2, '0')}`;
   const nilaiDi = (spec, i) => {
-    const v = D.cols[spec.col][i];
+    const v = D.cols[spec.stack_cols ? spec.stack_cols[state.stackUnit] || spec.col : spec.col][i];
     if (v === null) return null;
     return hanyaLoss() && bisaDibalik(spec) ? 100 - v : v;   // hanya Loss: kolom utama = Loss
   };
@@ -1281,7 +1366,7 @@ loadLib(0).then(() => {
     if (bergradasi(spec)) {
       return `<span class="tsw" style="border-top:0;height:2px;background:${cssGradasi(spec)}"></span>`;
     }
-    return spec.kind === 'histogram'
+    return spec.kind === 'histogram' || tumpukan(spec)
       ? `<span class="tbox" style="background:${baseColor(spec)}"></span>`
       : `<span class="tsw" style="border-color:${spec.color}"></span>`;
   }
@@ -1296,7 +1381,9 @@ loadLib(0).then(() => {
   function isiTooltip(i) {
     const baris = [];
     const semuaPeriode = new Set();
-    for (const group of groups) {
+    const urutanTooltip = groups.filter(g => indeksTumpuk(g) >= 0).reverse()
+      .concat(groups.filter(g => indeksTumpuk(g) < 0));
+    for (const group of urutanTooltip) {
       if (state.highlights.length > 0 && group !== HARGA && !state.highlights.includes(group)) continue;
       // Saklar Profit dan Loss sama-sama mati: garis metrik tidak tampil, jadi barisnya juga tidak.
       const anggota = legendItems.filter(h => h.spec.group === group && !state.hidden.includes(h.spec.name)
@@ -1440,11 +1527,13 @@ loadLib(0).then(() => {
   // Ambang dinaikkan supaya bentuk tangga baru dipakai saat anak tangganya benar-benar
   // lebar; di bawah itu polanya putus panjang, bukan tangga yang nyaris rata.
   const PIKSEL_PER_BAR_TANGGA = 6;
-  const garisTangga = handles.filter(h => h.spec.steps);
+  // Dihitung ulang tiap kali: panel Line style bisa mengubah garis mana yang bertangga.
+  const garisTangga = () => handles.filter(h => h.spec.steps);
   let polaTanggaSekarang = null;
 
-  function sesuaikanTangga() {
-    if (garisTangga.length === 0) return;
+  function sesuaikanTangga(paksa) {
+    if (paksa) polaTanggaSekarang = null;
+    if (garisTangga().length === 0) return;
     const ts = panes.main.timeScale();
     const rentang = ts.getVisibleLogicalRange();
     const lebar = ts.width();
@@ -1453,7 +1542,7 @@ loadLib(0).then(() => {
     const pola = perBar >= PIKSEL_PER_BAR_TANGGA ? 0 : 3;   // 0 = penuh, 3 = putus panjang
     if (pola === polaTanggaSekarang) return;
     polaTanggaSekarang = pola;
-    for (const handle of garisTangga) {
+    for (const handle of garisTangga()) {
       handle.line.applyOptions({ lineStyle: pola });
       if (handle.kembar) handle.kembar.applyOptions({ lineStyle: pola });
     }
@@ -1591,6 +1680,141 @@ loadLib(0).then(() => {
   document.addEventListener('mouseup', () => { drag = null; pending = null; });
   window.addEventListener('blur', () => { drag = null; pending = null; });
 
+  // ---------------------------------------------------------------- panel Line style
+  // Pilihan user 17 Sep 2026 (opsi B): tombol Style di sebelah Full membuka panel kecil di
+  // pojok kanan atas chart. Bentuk dan tebal garis smoothing diubah langsung di browser, jadi
+  // chart tidak dimuat ulang. Satu pilihan per periode (SMA 30 MVRV/STH/LTH ikut sama),
+  // tersimpan di localStorage halaman ini (state.gaya). Python tetap mengirim gaya bawaan
+  // (Dotted/Step/Band berurutan); Reset mengembalikannya.
+  const GAYA = ['Solid', 'Dotted', 'Dashed', 'Step', 'Band'];
+  const IKON_GAYA = {
+    Solid: '<path d="M1 6H30" stroke-width="1.6"/>',
+    Dotted: '<path d="M2 6H30" stroke-width="2" stroke-linecap="round" stroke-dasharray="0.1 4"/>',
+    Dashed: '<path d="M1 6H30" stroke-width="1.6" stroke-dasharray="5 3"/>',
+    Step: '<path d="M1 9.5H14V2.5H30" stroke-width="1.2"/>',
+    Band: '<path d="M1 6H30" stroke-width="4.5" stroke-opacity="0.6"/>',
+  };
+  const svgGaya = nama => '<svg viewBox="0 0 31 12" fill="none" stroke="#c9d1d9">' + IKON_GAYA[nama] + '</svg>';
+  const namaGaya = spec => spec.steps ? 'Step' : spec.alpha < 1 ? 'Band'
+    : spec.style === 1 ? 'Dotted' : spec.style === 2 ? 'Dashed' : 'Solid';
+  const jenisSmoothing = nama => { const m = /(SMA|EMA)[(][0-9]+[)]$/.exec(nama); return m ? m[1] : 'SMA'; };
+  const garisSmoothing = handles.filter(h => h.spec.group && h.spec.kind !== 'histogram'
+    && periodeDari(h.spec.name) !== null);
+  for (const h of garisSmoothing) h.gayaAsal = { name: namaGaya(h.spec), width: h.spec.width };
+  const periodeGaya = [...new Set(garisSmoothing.map(h => periodeDari(h.spec.name)))].sort((a, b) => a - b);
+  state.gaya = state.gaya && typeof state.gaya === 'object' ? state.gaya : {};
+
+  function pasangGaya(periode, nama, lebar) {
+    for (const h of garisSmoothing.filter(g => periodeDari(g.spec.name) === periode)) {
+      const s = h.spec;
+      s.width = lebar;
+      s.style = nama === 'Dotted' ? 1 : nama === 'Dashed' ? 2 : 0;
+      s.steps = nama === 'Step';
+      s.alpha = nama === 'Band' ? 0.60 : 1;
+      const opsi = { lineWidth: lebar, lineStyle: s.style, lineType: s.steps ? 1 : 0 };
+      h.line.applyOptions(opsi);
+      if (h.kembar) h.kembar.applyOptions(opsi);
+      for (const b of legendButtons) if (b.handle === h) b.button.style.borderColor = baseColor(s);
+    }
+  }
+  function terapkanSemuaGaya() {
+    apply();                 // warna (pita tembus pandang) dan penyimpanan
+    sesuaikanTangga(true);   // pola tangga mengikuti zoom
+  }
+  let adaGayaSimpanan = false;
+  for (const p of periodeGaya) {
+    const g = state.gaya[p];
+    if (g && GAYA.includes(g.name) && g.width > 0) { pasangGaya(p, g.name, g.width); adaGayaSimpanan = true; }
+  }
+  if (adaGayaSimpanan) terapkanSemuaGaya();
+
+  const gayaEl = document.getElementById('gaya');
+  const IKON_STYLE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M3 6h18"/><path d="M3 12h3M10 12h4M18 12h3"/><path d="M3 18h1M8 18h1M13 18h1M18 18h1"/></svg>';
+  const gayaBtn = document.createElement('button');
+  gayaBtn.className = 'hl fsbtn';
+  gayaBtn.innerHTML = IKON_STYLE + 'Style';
+  gayaBtn.title = 'Line style of smoothing lines';
+  fsSep.after(gayaBtn);
+
+  function isiPanelGaya() {
+    gayaEl.innerHTML = '<div class="gjudul">LINE STYLE</div>';
+    if (periodeGaya.length === 0) {
+      gayaEl.insertAdjacentHTML('beforeend', '<div class="gkosong">Turn on Smoothing to style its lines. Colours always follow the metric.</div>');
+      return;
+    }
+    for (const p of periodeGaya) {
+      const contoh = garisSmoothing.find(h => periodeDari(h.spec.name) === p);
+      const baris = document.createElement('div');
+      baris.className = 'gbaris';
+      const nama = document.createElement('div');
+      nama.className = 'gnama';
+      nama.innerHTML = '<span>' + jenisSmoothing(contoh.spec.name) + ' ' + p + 'D</span><span></span>';
+      const angka = nama.lastChild;
+      const pilih = document.createElement('div');
+      pilih.className = 'gpilih';
+      const geser = document.createElement('input');
+      geser.type = 'range'; geser.min = '0.5'; geser.max = '5'; geser.step = '0.25';
+      const segarkan = () => {
+        const aktif = namaGaya(contoh.spec);
+        for (const b of pilih.children) b.classList.toggle('on', b.dataset.gaya === aktif);
+        geser.value = String(contoh.spec.width);
+        angka.textContent = contoh.spec.width + 'px';
+      };
+      const simpan = (namaBaru, lebar) => {
+        pasangGaya(p, namaBaru, lebar);
+        state.gaya[p] = { name: namaBaru, width: lebar };
+        terapkanSemuaGaya();
+        segarkan();
+      };
+      for (const g of GAYA) {
+        const b = document.createElement('button');
+        b.dataset.gaya = g;
+        b.title = g;
+        b.innerHTML = svgGaya(g);
+        b.onclick = () => simpan(g, contoh.spec.width);
+        pilih.appendChild(b);
+      }
+      geser.oninput = () => simpan(namaGaya(contoh.spec), parseFloat(geser.value));
+      baris.append(nama, pilih, geser);
+      gayaEl.appendChild(baris);
+      segarkan();
+    }
+    const reset = document.createElement('button');
+    reset.className = 'greset';
+    reset.textContent = 'Reset to default';
+    reset.onclick = () => {
+      for (const p of periodeGaya) {
+        const asal = garisSmoothing.find(h => periodeDari(h.spec.name) === p).gayaAsal;
+        pasangGaya(p, asal.name, asal.width);
+      }
+      state.gaya = {};
+      terapkanSemuaGaya();
+      isiPanelGaya();
+    };
+    gayaEl.appendChild(reset);
+  }
+  const panelGayaTerbuka = () => gayaEl.style.display === 'block';
+  function tutupPanelGaya() {
+    gayaEl.style.display = 'none';
+    gayaBtn.classList.remove('on');
+  }
+  function bukaPanelGaya() {
+    isiPanelGaya();
+    // Tepat di bawah baris legend, rata kanan dengan area gambar (jarak kanan baris legend).
+    const bar = document.getElementById('bar');
+    gayaEl.style.top = (bar.offsetHeight + 2) + 'px';
+    gayaEl.style.right = (parseFloat(bar.style.paddingRight) || JARAK_TEPI_MIN) + 'px';
+    gayaEl.style.maxHeight = Math.max(120, document.body.clientHeight - bar.offsetHeight - 12) + 'px';
+    gayaEl.style.display = 'block';
+    gayaBtn.classList.add('on');
+  }
+  gayaBtn.onclick = () => (panelGayaTerbuka() ? tutupPanelGaya() : bukaPanelGaya());
+  // Klik di luar panel atau Esc menutupnya, seperti popover kontrol di atas chart.
+  document.addEventListener('pointerdown', event => {
+    if (panelGayaTerbuka() && !gayaEl.contains(event.target) && !gayaBtn.contains(event.target)) tutupPanelGaya();
+  }, true);
+  document.addEventListener('keydown', event => { if (event.key === 'Escape') tutupPanelGaya(); });
+
   window.__chart = { charts, handles, locked, resetScales, bootedAt: Date.now() };
 }).catch(err => {
   document.getElementById('err').textContent = 'Chart gagal dimuat: ' + err.message;
@@ -1616,7 +1840,7 @@ def _scale(mode):
 
 def render(df, lines, price_line, extra_lines, height, metric_mode, price_mode, store_key,
            tooltip="Cursor", metric_range=None, complement=None, view=None,
-           unit_switch=None, unit_label=""):
+           unit_switch=None, unit_label="", stack_units=None):
     """Gambar chart.
 
     view: (tanggal awal, tanggal akhir) yang tampil saat chart dibuka — dari kotak Range.
@@ -1635,6 +1859,9 @@ def render(df, lines, price_line, extra_lines, height, metric_mode, price_mode, 
     digits = {}
     for spec in specs:
         digits[spec["col"]] = max(digits.get(spec["col"], 4), spec.get("precision", 2) + 1)
+        # Band bertumpuk membawa kolom untuk setiap bobot (Realized Cap / Supply).
+        for col in (spec.get("stack_cols") or {}).values():
+            digits[col] = max(digits.get(col, 4), spec.get("precision", 2) + 1)
     # Slider rentang selalu berisi harga BTC, juga saat garis harganya Hidden. Halaman tanpa
     # kolom harga tidak mendapat slider.
     nav = NAV_COL in df.columns
@@ -1687,6 +1914,7 @@ def render(df, lines, price_line, extra_lines, height, metric_mode, price_mode, 
         "view": list(view) if view else None,   # rentang tampil awal (kotak Range)
         "unitSwitch": list(unit_switch) if unit_switch else None,   # saklar satuan (BTC | USD)
         "unitLabel": unit_label,
+        "stackUnits": list(stack_units) if stack_units else None,   # saklar bobot area bertumpuk
         # Tinggi bingkai tetap; tinggi pane dihitung ulang di browser dari tinggi baris
         # legend yang sebenarnya (bisa lebih dari satu baris).
         "frameHeight": total_height,

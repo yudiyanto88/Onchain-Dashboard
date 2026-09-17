@@ -3,8 +3,6 @@
 Satu fungsi render_metric_page() melayani semua keluarga metrik.
 Perbaikan layout di sini langsung berlaku untuk seluruh halaman.
 """
-import base64
-
 import streamlit as st
 from . import charts, data
 from .charts import Line
@@ -65,7 +63,8 @@ LINE_WIDTH = 2.0    # semua garis utama, termasuk BTC (uji 13 Sep: 1,5 px tampak
                     # layar rasio 1 karena library tidak membulatkan tebal garis data)
 BTC_PRECISION = 0   # harga BTC tanpa desimal
 
-# Bentuk garis yang bisa dipilih untuk tiap garis smoothing.
+# Bentuk bawaan garis smoothing. Sejak 17 Sep 2026 pengguna mengubahnya lewat tombol Style
+# di dalam chart (lw_chart), tanpa memuat ulang chart; Python hanya mengirim bawaan ini.
 LINE_STYLES = {
     "Solid": dict(),
     "Dotted": dict(style=1),
@@ -73,41 +72,6 @@ LINE_STYLES = {
     "Step": dict(steps=True),
     "Band": dict(alpha=0.60),
 }
-STYLE_NAMES = list(LINE_STYLES)
-# Nama saja tidak memberi tahu bentuk garisnya, jadi pilihan ditampilkan sebagai lambang
-# bentuknya. Nama tetap tersedia lewat keterangan kecil di sudut kontrol.
-# Solid, Dotted, dan Dashed ditulis sebagai kode (huruf monospace, tepat empat karakter)
-# supaya semua selebar sama. Step dan Band digambar sebagai gambar garis sungguhan:
-# huruf tidak bisa membuat tangga yang rapi, dan tidak bisa tembus pandang seperti pita
-# di chart. Ukuran gambarnya 31 x 12 px, selebar empat karakter monospace.
-STYLE_GLYPHS = {
-    "Solid": "────",   # ────
-    "Dotted": "····",  # ····
-    "Dashed": "╌╌╌╌",  # ╌╌╌╌
-}
-
-
-def _svg_ikon(isi):
-    svg = ('<svg xmlns="http://www.w3.org/2000/svg" width="31" height="12" '
-           f'viewBox="0 0 31 12">{isi}</svg>')
-    return "data:image/svg+xml;base64," + base64.b64encode(svg.encode()).decode()
-
-
-STYLE_ICONS = {
-    # satu anak tangga naik, garis saja tanpa isi
-    "Step": _svg_ikon('<path d="M1 9.5 H14 V2.5 H30" fill="none" stroke="#c9d1d9" '
-                      'stroke-width="1.2"/>'),
-    # balok tebal dengan transparansi yang sama dengan pita di chart (alpha 0.60)
-    "Band": _svg_ikon('<line x1="1" y1="6" x2="30" y2="6" stroke="#c9d1d9" '
-                      f'stroke-width="4.5" stroke-opacity="{LINE_STYLES["Band"]["alpha"]}"/>'),
-}
-
-
-def _style_label(name):
-    if name in STYLE_ICONS:
-        return f"![{name}]({STYLE_ICONS[name]})"
-    return f"`{STYLE_GLYPHS[name]}`"
-WIDTH_MIN, WIDTH_MAX, WIDTH_STEP = 0.5, 5.0, 0.25
 
 # Urutan pemberian gaya saat sebuah periode dinyalakan: titik-titik, tangga, lalu pita.
 # Gaya menempel pada periodenya, jadi mematikan periode lain tidak menggeser gaya
@@ -117,12 +81,7 @@ STYLE_WIDTH = {"Solid": 1.5, "Dotted": 2.0, "Dashed": 1.25, "Step": 1.5, "Band":
 
 
 def _styles(family):
-    """Gudang gaya garis smoothing: dict biasa, bukan nilai widget.
-
-    Nilai widget ikut dibuang Streamlit kalau satu putaran berhenti di tengah
-    sebelum bagian Line style sempat digambar, sehingga gaya bisa bergeser sendiri
-    saat periode lain dimatikan. Gudang ini tidak bergantung pada putaran itu.
-    """
+    """Gudang gaya bawaan garis smoothing per periode (dict biasa, bertahan antar-rerun)."""
     return st.session_state.setdefault(f"{family.key}_lstyles", {})
 
 
@@ -143,93 +102,24 @@ def _default_style(family, period, taken):
 
 
 def _assign_styles(family):
-    """Beri gaya pada periode yang belum punya. Gaya yang sudah ada dipertahankan,
-    termasuk saat periode lain dimatikan. Yang digeser hanya gaya kembar yang
-    belum pernah diubah sendiri oleh pengguna."""
+    """Beri gaya bawaan pada periode yang belum punya. Gaya yang sudah ada dipertahankan,
+    termasuk saat periode lain dimatikan; yang digeser hanya gaya kembar. Pilihan pengguna
+    dari tombol Style disimpan chart di localStorage dan menimpa bawaan ini di browser."""
     k = family.key
     store = _styles(family)
     taken = []
     for period in sorted(st.session_state[f"{k}_periods"]):
         entry = store.get(period)
-        # Pilihan terbaru dari tombol disalin dulu, supaya tulisan Default/Custom di
-        # kotak kontrol (dihitung sebelum isi popover digambar) sudah ikut terbaru.
-        if entry:
-            entry["name"] = st.session_state.get(f"{k}_lstyle_{period}") or entry["name"]
-            entry["width"] = st.session_state.get(f"{k}_lwidth_{period}") or entry["width"]
-        dipilih_sendiri = bool(entry) and entry["name"] != entry["auto"][0]
-        if entry is None or (entry["name"] in taken and not dipilih_sendiri):
+        if entry is None or entry["name"] in taken:
             entry = _new_entry(_default_style(family, period, taken))
             store[period] = entry
         taken.append(entry["name"])
 
 
 def _smooth_style(family, period):
-    """Bentuk dan tebal garis smoothing untuk satu periode."""
+    """Bentuk dan tebal bawaan garis smoothing untuk satu periode."""
     entry = _styles(family).get(period) or _new_entry(STYLE_ORDER[0])
     return dict(LINE_STYLES[entry["name"]], width=entry["width"])
-
-
-def _style_summary(family):
-    store = _styles(family)
-    periods = sorted(st.session_state[f"{family.key}_periods"])
-    if not periods:
-        return "Off"
-    for period in periods:
-        entry = store.get(period)
-        if entry and (entry["name"], entry["width"]) != tuple(entry["auto"]):
-            return "Custom"
-    return "Default"
-
-
-def _reset_line_style(family):
-    """Kembalikan bentuk dan tebal semua garis smoothing ke urutan bawaan."""
-    k = family.key
-    store = _styles(family)
-    taken = []
-    for period in sorted(st.session_state[f"{k}_periods"]):
-        entry = _new_entry(_default_style(family, period, taken))
-        store[period] = entry
-        st.session_state[f"{k}_lstyle_{period}"] = entry["name"]
-        st.session_state[f"{k}_lwidth_{period}"] = entry["width"]
-        taken.append(entry["name"])
-
-
-def _render_line_style(family):
-    """Satu blok pengaturan per garis smoothing: bentuk garis dan tebalnya."""
-    k = family.key
-    kind = st.session_state[f"{k}_smooth_kind"]
-    periods = sorted(st.session_state[f"{k}_periods"])
-    store = _styles(family)
-
-    st.markdown(f"<div class='pop-head'><span>LINE STYLE</span>"
-                f"<span class='pop-val'>{_style_summary(family)}</span></div>",
-                unsafe_allow_html=True)
-    if not periods:
-        st.caption("Turn on smoothing first. Colours always follow the metric.")
-        return
-
-    for period in periods:
-        entry = store[period]
-        # Nilai widget disemai dari gudang, lalu pilihan pengguna ditulis balik ke gudang.
-        st.session_state.setdefault(f"{k}_lstyle_{period}", entry["name"])
-        st.session_state.setdefault(f"{k}_lwidth_{period}", entry["width"])
-
-        st.caption(f"{kind} {period}D")
-        st.segmented_control(f"Style {period}", STYLE_NAMES, key=f"{k}_lstyle_{period}",
-                             on_change=_keep, args=(f"{k}_lstyle_{period}", entry["name"]),
-                             format_func=_style_label,
-                             help="Solid · Dotted · Dashed · Step · Band",
-                             label_visibility="collapsed")
-        # Angkanya ditampilkan oleh label bawaan slider, yang ikut bergerak dengan kenop.
-        st.slider(f"Width {period}", min_value=WIDTH_MIN, max_value=WIDTH_MAX,
-                  step=WIDTH_STEP, key=f"{k}_lwidth_{period}",
-                  label_visibility="collapsed")
-
-        entry["name"] = st.session_state[f"{k}_lstyle_{period}"] or entry["name"]
-        entry["width"] = st.session_state[f"{k}_lwidth_{period}"] or entry["width"]
-
-    st.button("Reset to default", key=f"{k}_style_reset", use_container_width=True,
-              on_click=_reset_line_style, args=(family,))
 
 
 def _render_header(family, latest):
@@ -291,19 +181,34 @@ def _init_state(family, dmin, dmax):
         f"{k}_btc": family.btc_mode_default,
         f"{k}_axis_btc": BTC_AXIS,
         f"{k}_extra": Z_BOTTOM if family.extra_default else Z_HIDDEN,
-        TIP_STORE: TIP_DEFAULT,
         f"{k}_height": 720,
     }
+    # Ingatan per halaman (permintaan user 17 Sep 2026, pilihan a: selama tab browser terbuka).
+    # Pindah halaman lewat st.navigation membuat Streamlit membuang nilai widget halaman lain
+    # (bagian 10 handoff), jadi nilai terakhir tiap kontrol disalin ke gudang biasa
+    # {k}_mem dan dipakai lagi saat kontrolnya hilang. Periode smoothing ({k}_periods) sudah
+    # key biasa sehingga tidak perlu. Reload browser = sesi baru = kembali ke bawaan.
+    mem = st.session_state.setdefault(f"{k}_mem", {})
     for key, val in defaults.items():
-        st.session_state.setdefault(key, val)
+        if key not in st.session_state:
+            st.session_state[key] = mem.get(key, val)
+    st.session_state.setdefault(TIP_STORE, TIP_DEFAULT)
     st.session_state.setdefault(TIP_KEY, st.session_state[TIP_STORE])
     # Halaman yang sejak awal memisahkan harga BTC (SOPR) langsung memakai separate_axis,
     # sama seperti kalau pengguna sendiri memilih Separate pane (_on_btc_mode).
     separate = st.session_state[f"{k}_btc"] == PANE
+    axis_keys = []
     for s in family.series:
         if s.pane != "extra":
             axis = s.separate_axis if separate and s.separate_axis else s.axis
-            st.session_state.setdefault(f"{k}_axis_{s.col}", axis)
+            key = f"{k}_axis_{s.col}"
+            if key not in st.session_state:
+                st.session_state[key] = mem.get(key, axis)
+            axis_keys.append(key)
+    # Nilai sekarang (sudah termasuk klik terakhir, karena callback berjalan sebelum putaran
+    # ini) dicatat untuk kunjungan berikutnya.
+    for key in [*defaults, *axis_keys]:
+        mem[key] = st.session_state[key]
 
 
 def _smooth_summary(family, short=False):
@@ -454,7 +359,7 @@ def _render_controls(family, dmin, dmax):
     scale_txt = price_s if price_s == metric_s else "Mixed"
 
     # Satu kolom per kotak kontrol; CSS membuat tiap kolom menyusut ke lebar isinya.
-    cols = st.columns(8, vertical_alignment="bottom", gap="small")
+    cols = st.columns(7, vertical_alignment="bottom", gap="small")
 
     with cols[0]:
         with st.popover(f"Range\n\n**{_range_summary(family)}**"):
@@ -522,8 +427,8 @@ def _render_controls(family, dmin, dmax):
             # membuat bagian ini tiga kali lebih tinggi daripada isinya, dan popover jadi
             # lebih tinggi daripada chart saat halaman punya banyak garis.
             for s in family.series:
-                if s.pane == "extra":
-                    continue   # pane tambahan punya sumbunya sendiri
+                if s.pane == "extra" or s.kind == "stack":
+                    continue   # pane tambahan punya sumbunya sendiri; band bertumpuk ikut satu sumbu
                 # segmented_control, bukan st.radio, supaya bentuknya sama dengan kontrol lain.
                 _axis_control(s.label, f"{k}_axis_{s.col}", s.axis)
             # Harga BTC juga bisa dipindah sumbu. Berguna untuk halaman yang metriknya
@@ -536,10 +441,6 @@ def _render_controls(family, dmin, dmax):
                 st.caption("Only for BTC price = Overlay.")
 
     with cols[6]:
-        with st.popover(f"Line style\n\n**{_style_summary(family)}**"):
-            _render_line_style(family)
-
-    with cols[7]:
         with st.popover(f"Tooltip\n\n**{st.session_state[TIP_STORE]}**"):
             st.caption("TOOLTIP")
             st.segmented_control("Tooltip position", TIP_MODES, key=TIP_KEY,
@@ -613,7 +514,8 @@ def render_metric_page(family: MetricFamily):
                          complement_color=sr.complement_color,
                          negative_color=sr.negative_color,
                          unit=sr.unit, pair=sr.pair, compact=sr.compact,
-                         gradient=sr.gradient, value_labels=sr.value_labels))
+                         gradient=sr.gradient, value_labels=sr.value_labels,
+                         stack_index=sr.stack_index, stack_cols=sr.stack_cols))
         if not sr.smoothing:
             continue
         for p in periods:
@@ -671,4 +573,5 @@ def render_metric_page(family: MetricFamily):
                   f"dash_v2_{k}", tooltip=st.session_state[TIP_STORE],
                   metric_range=family.metric_range, complement=family.complement,
                   view=(f"{date_from:%Y-%m-%d}", f"{date_to:%Y-%m-%d}"),
-                  unit_switch=family.unit_switch, unit_label=family.unit_label)
+                  unit_switch=family.unit_switch, unit_label=family.unit_label,
+                  stack_units=family.stack_units)

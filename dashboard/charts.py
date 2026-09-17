@@ -34,12 +34,14 @@ class Line:
     compact: bool = False                # angka ringkas K/M/B
     gradient: list | None = None         # warna garis per titik menurut nilai [[nilai, hex], ...]
     value_labels: list | None = None     # nama kelas per rentang [[batas atas, nama], ...]
+    stack_index: int | None = None       # kind "stack": urutan band dari bawah (0 = paling muda)
+    stack_cols: dict | None = None       # kind "stack": kolom per bobot {"Realized Cap": col, ...}
 
 
 def render(df, lines, price_line, extra_lines, height, metric_mode, price_mode, key,
            tooltip="Cursor", metric_range=None, complement=None, view=None,
-           unit_switch=None, unit_label=""):
+           unit_switch=None, unit_label="", stack_units=None):
     """Legend dan sorot diproses di browser; key dipakai untuk menyimpan pilihan."""
     lw_chart.render(df, lines, price_line, extra_lines, height,
                     metric_mode, price_mode, key, tooltip, metric_range, complement, view,
-                    unit_switch, unit_label)
+                    unit_switch, unit_label, stack_units)
