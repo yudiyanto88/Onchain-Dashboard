@@ -61,15 +61,49 @@ def load_price_levels():
     dasar = aviv['btc_price'] / aviv['aviv_ratio']
     aviv['AVIV Mean'] = dasar * aviv['aviv_mean']
     aviv['AVIV Upper'] = dasar * (aviv['aviv_mean'] + 0.5 * (aviv['aviv_upper_1sd'] - aviv['aviv_mean']))
-    # Rata-rata historis AVIV baru terbentuk dari segelintir hari di awal data: 84 hari
-    # pertama (17 Jul–9 Okt 2010) AVIV Mean jatuh sampai ±300x di bawah harga dan menarik
-    # sumbu Log ke 0.0002. Hari-hari sebelum rasio AVIV Mean/harga pertama kali wajar
-    # (0,2–5) disembunyikan; level sesudahnya tidak berubah.
-    wajar = (aviv['AVIV Mean'] / aviv['btc_price']).between(0.2, 5)
-    if wajar.any():
-        awal = aviv.loc[wajar, 'Date'].iloc[0]
-        aviv.loc[aviv['Date'] < awal, ['AVIV Mean', 'AVIV Upper']] = float('nan')
+    aviv.loc[aviv['Date'] < _aviv_awal(aviv), ['AVIV Mean', 'AVIV Upper']] = float('nan')
     return df.merge(aviv[['Date', 'AVIV Mean', 'AVIV Upper']], on='Date', how='left')
+
+
+def _aviv_awal(aviv):
+    """Tanggal pertama AVIV layak ditampilkan.
+
+    Rata-rata historis AVIV baru terbentuk dari segelintir hari di awal data: 84 hari
+    pertama (17 Jul–9 Okt 2010) AVIV Mean jatuh sampai ±300x di bawah harga dan menarik
+    sumbu Log ke 0.0002. Hari-hari sebelum rasio AVIV Mean/harga pertama kali wajar
+    (0,2–5) disembunyikan; nilai sesudahnya tidak berubah.
+    """
+    mean_harga = aviv['btc_price'] / aviv['aviv_ratio'] * aviv['aviv_mean']
+    wajar = (mean_harga / aviv['btc_price']).between(0.2, 5)
+    return aviv.loc[wajar, 'Date'].iloc[0] if wajar.any() else aviv['Date'].min()
+
+
+@st.cache_data(ttl=3600)
+def load_aviv():
+    """AVIV Ratio dan band simpangan bakunya dari data_aviv.csv (satuan rasio, bukan harga).
+
+    Band dihitung dari mean dan +1σ, bukan dibaca dari kolom band lain: isinya identik
+    (selisih < 1e-14) dan AVIV Upper framework v2 (+0,5σ) memang tidak ada di CSV.
+    Rasio ≥ Upper persis sama dengan harga ≥ AVIV Upper di halaman Price Levels.
+    """
+    df = _prepare(pd.read_csv("data_aviv.csv").rename(columns={'date': 'Date'}))
+    sd = df['aviv_upper_1sd'] - df['aviv_mean']
+    df['BTC Price'] = df['btc_price']
+    df['AVIV Ratio'] = df['aviv_ratio']
+    df['AVIV Mean'] = df['aviv_mean']
+    df['AVIV Upper'] = df['aviv_mean'] + 0.5 * sd
+    df['AVIV +1σ'] = df['aviv_mean'] + sd
+    df['AVIV +2σ'] = df['aviv_mean'] + 2 * sd
+    # Band bawah negatif sampai Jun/Okt 2014 (σ awal sangat lebar): rasio tidak pernah
+    # negatif, dan sumbu Log tidak bisa menggambarnya, jadi dikosongkan.
+    df['AVIV −1σ'] = (df['aviv_mean'] - sd).where(lambda s: s > 0)
+    df['AVIV −2σ'] = (df['aviv_mean'] - 2 * sd).where(lambda s: s > 0)
+    # Jarak rasio dari mean dalam satuan σ: 0 = Mean, +0,5 = Upper.
+    df['AVIV Deviation'] = (df['aviv_ratio'] - df['aviv_mean']) / sd
+    kolom = ['AVIV Ratio', 'AVIV Mean', 'AVIV Upper', 'AVIV +1σ', 'AVIV +2σ',
+             'AVIV −1σ', 'AVIV −2σ', 'AVIV Deviation']
+    df.loc[df['Date'] < _aviv_awal(df), kolom] = float('nan')
+    return df[['Date', 'BTC Price'] + kolom]
 
 
 @st.cache_data(ttl=3600)

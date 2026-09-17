@@ -77,6 +77,7 @@ class MetricFamily:
     # Nama kotak kontrol untuk pane tambahan paling bawah (seri pane="extra"),
     # misalnya "Z-Score" atau nanti "Net flow". Kotaknya hanya muncul kalau ada seri itu.
     extra_label: str = "Bottom pane"
+    extra_default: bool = False   # True = pane tambahan menyala sejak awal (AVIV Deviation)
     # Keadaan awal kotak BTC price ("Overlay" / "Separate pane" / "Hidden").
     # Nilainya sama dengan pilihan di metric_page.
     btc_mode_default: str = "Overlay"
@@ -196,6 +197,48 @@ PRICE_LEVELS = MetricFamily(
                short="50W", precision=0, hidden_default=True),
         Series("200 WMA", "200 WMA", color="#d3d1c7", axis="right", dim=0.22,
                short="200W", precision=0, hidden_default=True),
+    ],
+)
+
+
+AVIV = MetricFamily(
+    key="aviv",
+    title="AVIV",
+    subtitle="AVIV Ratio",
+    group="Valuation",
+    url_path="aviv",
+    loader=data.load_aviv,
+    # Dipilih user 17 Sep 2026 dari pratinjau data mingguan: warna B (rasio navy seperti metrik
+    # dasar di halaman lain, band violet seperti AVIV di Price Levels), pane Deviation menyala
+    # sejak awal, sumbu AVIV Log. BTC di pane sendiri seperti halaman Valuation lain.
+    # Mean dan Upper (+0,5σ) = batas Z4/Z5 framework v2 dalam satuan rasio; keduanya garis
+    # data (bergerak), bukan garis ambang tetap.
+    btc_mode_default="Separate pane",
+    metric_scale_default="Log",
+    price_scale_default="Log",
+    extra_label="Deviation",
+    extra_default=True,
+    series=[
+        # Semua garis berskala sama, jadi saat BTC di pane sendiri pindah ke sumbu kanan
+        # (aturan user 15 Sep 2026). Uji jarak Lab: rasio–Mean 45 normal / 16 buta warna,
+        # Mean–Upper 17 / 16 (sengaja sekeluarga, sama seperti Price Levels).
+        Series("AVIV Ratio", "AVIV Ratio", color="#0070a6", axis="left", separate_axis="right",
+               dim=0.49, short="AVIV", precision=3),
+        # Band tidak ikut smoothing: rata-rata historisnya sudah bergerak sangat lambat.
+        Series("AVIV Mean", "AVIV Mean", color="#7b65d2", axis="left", separate_axis="right",
+               dim=0.42, short="Mean", precision=3, smoothing=False),
+        Series("AVIV Upper (+0.5σ)", "AVIV Upper", color="#a58df0", axis="left",
+               separate_axis="right", dim=0.30, short="Upper", precision=3, smoothing=False),
+        # Band konteks satu kelompok legend (kotak kecil +1σ · +2σ · −1σ · −2σ), mati sejak awal.
+        # Abu gelap, dibedakan dari violet lewat warna (jarak ke Mean 58 / 47).
+        *[Series(f"σ Bands ({nama})", f"AVIV {nama}", color="#6e7681", axis="left",
+                 separate_axis="right", dim=0.42, short="σ", precision=3, smoothing=False,
+                 group="σ Bands", hidden_default=True)
+          for nama in ["+1σ", "+2σ", "−1σ", "−2σ"]],
+        # Jarak rasio dari Mean dalam σ: batang navy seperti Z-Score ikut MVRV (redup 1.44:1).
+        Series("Deviation (σ)", "AVIV Deviation", color="#0070a6", axis="left", dim=0.45,
+               kind="histogram", smoothing=False, short="Dev", alpha=0.80, pane="extra",
+               precision=2),
     ],
 )
 
@@ -401,5 +444,5 @@ FEAR_GREED = MetricFamily(
 
 # Urutan di sini = urutan menu sidebar; kelompok muncul menurut halaman pertamanya.
 # Halaman pertama jadi halaman bawaan (alamat localhost:8503/).
-FAMILIES = {f.title: f for f in [MARKET_VALUATION, PRICE_LEVELS, SOPR, NUPL, SUPPLY_IN_PROFIT,
+FAMILIES = {f.title: f for f in [MARKET_VALUATION, PRICE_LEVELS, AVIV, SOPR, NUPL, SUPPLY_IN_PROFIT,
                                    FUNDING_OI, FEAR_GREED]}

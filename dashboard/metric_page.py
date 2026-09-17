@@ -290,7 +290,7 @@ def _init_state(family, dmin, dmax):
         f"{k}_scale_metric": family.metric_scale_default,
         f"{k}_btc": family.btc_mode_default,
         f"{k}_axis_btc": BTC_AXIS,
-        f"{k}_extra": Z_HIDDEN,
+        f"{k}_extra": Z_BOTTOM if family.extra_default else Z_HIDDEN,
         TIP_STORE: TIP_DEFAULT,
         f"{k}_height": 720,
     }
