@@ -224,6 +224,31 @@ def load_derivatives():
 
 
 @st.cache_data(ttl=3600)
+def load_exchange():
+    """Saldo BTC di bursa dan arus masuk/keluar harian (data_exchange.csv).
+
+    net_flow positif = BTC masuk bursa (data_dictionary). Selisih saldo harian sama dengan
+    net_flow (dicek 17 Sep 2026). Disetujui user 17 Sep 2026 dari pratinjau:
+    - Harga BTC dari data_mvrv.csv: btc_price di file ini beda sumber di 2026 (sampai 16 %).
+    - Semua nilai sebelum 1 Jan 2012 dikosongkan: 2011 berisi pemindahan dompet bursa
+      (+442k, −410k, +600k, −405k BTC sehari, saldo bolak-balik ke 0) yang menggepengkan sumbu.
+    - Hari inflow = outflow = 0 sejak 2012 adalah data kosong yang diisi nol (8 hari, semuanya
+      2026), jadi arusnya dikosongkan (celah di chart); saldo hari itu tetap.
+    """
+    df = _prepare(pd.read_csv("data_exchange.csv").rename(columns={
+        'date': 'Date', 'total_balance': 'Exchange Balance',
+        'net_flow': 'Net Flow', 'inflow': 'Inflow', 'outflow': 'Outflow'}))
+    kolom = ['Exchange Balance', 'Net Flow', 'Inflow', 'Outflow']
+    df.loc[df['Date'] < pd.Timestamp('2012-01-01'), kolom] = float('nan')
+    kosong = (df['Inflow'] == 0) & (df['Outflow'] == 0)
+    df.loc[kosong, ['Net Flow', 'Inflow', 'Outflow']] = float('nan')
+    harga = _prepare(pd.read_csv("data_mvrv.csv", usecols=['date', 'btc_price'])
+                     .rename(columns={'date': 'Date', 'btc_price': 'BTC Price'}))
+    df = df[['Date'] + kolom].merge(harga, on='Date', how='left')
+    return df[df['Date'] >= df.loc[df['BTC Price'].notna(), 'Date'].min()]
+
+
+@st.cache_data(ttl=3600)
 def load_fear_greed():
     """Crypto Fear & Greed Index (data_fg.csv; sumber Alternative.me lewat ChartInspect).
 

@@ -412,16 +412,50 @@ RHODL_RATIO = MetricFamily(
     # Demand Impulse, Aged Cohort Turnover, dan pita state ditahan (handoff 3.27) — kalau
     # dilanjutkan, ditambahkan ke halaman ini. Judul menyebut rumusnya supaya tidak tertukar
     # dengan RHODL Ratio gaya Glassnode (data_rhodl.csv, 1d-1w / 1y-2y).
-    # Harga BTC Overlay satu pane dengan rasio, skala Auto keduanya (permintaan user 17 Sep 2026).
+    # Harga BTC Overlay satu pane dengan rasio (permintaan user 17 Sep 2026).
+    # Skala harga BTC Log sejak awal (permintaan user 17 Sep 2026, sebelumnya Auto).
     btc_mode_default="Overlay",
     metric_scale_default="Auto",
-    price_scale_default="Auto",
+    price_scale_default="Log",
     series=[
         # Navy seperti metrik dasar di halaman lain. Overlay: rasio sumbu kiri, harga kanan;
         # kalau BTC dipindah ke pane sendiri, rasio pindah ke sumbu kanan.
         Series("RHODL Ratio", "RHODL Ratio", color="#0070a6", axis="left", separate_axis="right",
                dim=0.49, short="RHODL", precision=2),
     ],
+)
+
+
+EXCHANGE_FLOW = MetricFamily(
+    key="exchange_flow",
+    title="Exchange Flow",
+    subtitle="Exchange Balance & Net Flow",
+    group="Exchange",
+    url_path="exchange-flow",
+    loader=data.load_exchange,
+    # Disetujui user 17 Sep 2026 dari pratinjau (susunan A): harga BTC di pane sendiri, saldo
+    # bursa di pane tengah, net flow batang di pane bawah yang menyala sejak awal. Tidak dipakai
+    # framework v2 dan belum ada KB, jadi tanpa garis ambang.
+    btc_mode_default="Separate pane",
+    metric_scale_default="Auto",
+    price_scale_default="Log",
+    series=[
+        # Navy = warna dasar metrik utama di semua halaman (keputusan user 17 Sep 2026; sempat
+        # cornflower #5b8def, yang terlalu mirip violet AVIV dan lebih terang dari rust/teal).
+        Series("Exchange Balance", "Exchange Balance", color="#0070a6", axis="left",
+               separate_axis="right", dim=0.49, short="Balance", precision=0, compact=True),
+        # Warna menurut tanda seperti funding: masuk bursa (positif) teal, keluar (negatif) rust.
+        # Sempat dibalik menurut arti; diganti user 17 Sep 2026 supaya batang di atas nol tidak
+        # merah (terkecoh). Sebelum 2012 dan 8 hari kosong 2026 tidak digambar.
+        # Sumbu kanan, sejajar sumbu harga dan saldo di atasnya (permintaan user 17 Sep 2026).
+        Series("Net Flow", "Net Flow", color="#0b8e89", negative_color="#bf5546", axis="right",
+               dim=0.45, kind="histogram", smoothing=False, alpha=0.80, short="Net",
+               pane="extra", precision=0, compact=True),
+    ],
+    # Tanpa garis Zero: garis acuan hanya bisa di pane tengah (akan menarik sumbu saldo ke 0);
+    # batang net flow sudah tumbuh dari nol.
+    extra_label="Net Flow",
+    extra_default=True,
 )
 
 
@@ -511,5 +545,5 @@ FEAR_GREED = MetricFamily(
 # Urutan di sini = urutan menu sidebar; kelompok muncul menurut halaman pertamanya.
 # Halaman pertama jadi halaman bawaan (alamat localhost:8503/).
 FAMILIES = {f.title: f for f in [MARKET_VALUATION, PRICE_LEVELS, AVIV, SOPR, NUPL, SUPPLY_IN_PROFIT,
-                                   HODL_WAVES, RHODL_RATIO,
+                                   HODL_WAVES, RHODL_RATIO, EXCHANGE_FLOW,
                                    FUNDING_OI, FEAR_GREED]}

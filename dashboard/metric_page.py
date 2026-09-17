@@ -499,7 +499,8 @@ def render_metric_page(family: MetricFamily):
             # disembunyikan — supaya sumbu pane metrik tidak ikut menghitungnya.
             if not pane_extra:
                 continue
-            extra.append(Line(sr.label, sr.col, sr.color, "left", width=LINE_WIDTH,
+            # Sisi sumbu dari registry (bawaan kiri; Net Flow di kanan).
+            extra.append(Line(sr.label, sr.col, sr.color, sr.axis, width=LINE_WIDTH,
                               group=sr.group or sr.label, dim=sr.dim, kind=sr.kind,
                               short=sr.short, alpha=sr.alpha,
                               hidden_default=sr.hidden_default, precision=sr.precision,
