@@ -278,6 +278,43 @@ AVIV = MetricFamily(
 )
 
 
+REALIZED_CAP = MetricFamily(
+    key="realized_cap",
+    title="Realized Cap",
+    subtitle="Realized Cap",
+    group="Valuation",
+    url_path="realized-cap",
+    loader=data.load_realized_cap,
+    # Disetujui user 17 Sep 2026 dari pratinjau: total navy, LTH teal, STH rust; skala metrik Log;
+    # saklar USD | % (bawaan USD); batang perubahan 30 hari seperti LTH/STH Supply. Kelompok
+    # Valuation (penyebut MVRV; Realized Price = Realized Cap / supply). Tidak dipakai framework v2.
+    btc_mode_default="Separate pane",
+    metric_scale_default="Log",
+    price_scale_default="Log",
+    unit_switch=("USD", "%"),
+    series=[
+        Series("Realized Cap", "Realized Cap", color="#0070a6", axis="left", separate_axis="right",
+               dim=0.49, short="RC", precision=0, unit="USD", compact=True),
+        Series("LTH Realized Cap", "LTH Realized Cap", color="#0b8e89", axis="left",
+               separate_axis="right", dim=0.39, short="LTH", precision=0, unit="USD", compact=True),
+        Series("STH Realized Cap", "STH Realized Cap", color="#bf5546", axis="left",
+               separate_axis="right", dim=0.44, short="STH", precision=0, unit="USD", compact=True),
+        # Porsi terhadap total (garis total tidak punya versi %: selalu 100).
+        Series("LTH Realized Cap (%)", "LTH Realized Cap %", color="#0b8e89", axis="left",
+               separate_axis="right", dim=0.39, short="LTH %", precision=1, unit="%",
+               pair="LTH Realized Cap"),
+        Series("STH Realized Cap (%)", "STH Realized Cap %", color="#bf5546", axis="left",
+               separate_axis="right", dim=0.44, short="STH %", precision=1, unit="%",
+               pair="STH Realized Cap"),
+        # Modal masuk/keluar: di pane harga di belakang BTC (sumbu kiri); Overlay/Hidden -> pane
+        # bawah sumbu kanan. Naik teal, turun rust. Selalu persen.
+        Series("Realized Cap 30d Change (%)", "Realized Cap 30d Change", color="#0b8e89",
+               negative_color="#bf5546", axis="left", dim=0.45, kind="histogram",
+               smoothing=False, alpha=0.60, short="RC 30d", pane="price", precision=1),
+    ],
+)
+
+
 SOPR = MetricFamily(
     key="sopr",
     title="SOPR",
@@ -607,6 +644,6 @@ FEAR_GREED = MetricFamily(
 
 # Urutan di sini = urutan menu sidebar; kelompok muncul menurut halaman pertamanya.
 # Halaman pertama jadi halaman bawaan (alamat localhost:8503/).
-FAMILIES = {f.title: f for f in [MARKET_VALUATION, PRICE_LEVELS, AVIV, SOPR, NUPL, SUPPLY_IN_PROFIT,
+FAMILIES = {f.title: f for f in [MARKET_VALUATION, PRICE_LEVELS, AVIV, REALIZED_CAP, SOPR, NUPL, SUPPLY_IN_PROFIT,
                                    HODL_WAVES, RHODL_RATIO, HOLDER_SUPPLY, EXCHANGE_FLOW,
                                    FUNDING_OI, FEAR_GREED]}

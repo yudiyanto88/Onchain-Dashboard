@@ -195,7 +195,8 @@ function angka(v, p, bulatDari) {
 function angkaRingkas(v) {
   if (v === null || v === undefined || !isFinite(v)) return '';
   const a = Math.abs(v);
-  const [bagi, akhir] = a >= 1e9 ? [1e9, 'B'] : a >= 1e6 ? [1e6, 'M'] : a >= 1e3 ? [1e3, 'K'] : [1, ''];
+  const [bagi, akhir] = a >= 1e12 ? [1e12, 'T'] : a >= 1e9 ? [1e9, 'B'] : a >= 1e6 ? [1e6, 'M']
+    : a >= 1e3 ? [1e3, 'K'] : [1, ''];
   return Number((v / bagi).toFixed(2)).toLocaleString('en-US') + akhir;
 }
 function formatSeri(spec) {

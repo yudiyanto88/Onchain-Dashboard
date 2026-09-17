@@ -267,6 +267,28 @@ def load_fear_greed():
 
 
 @st.cache_data(ttl=3600)
+def load_realized_cap():
+    """Realized cap total, LTH, STH (data_realized_cap.csv, USD), persen per kohort, dan
+    perubahan realized cap total 30 hari kalender (%).
+
+    LTH + STH = total (selisih <= 0,01 %, dicek 17 Sep 2026). Harga BTC di file ini identik
+    dengan data_mvrv.csv. Lonjakan LTH +7,2 % 26 Apr 2026 wajar (koin 22 Nov 2025 genap 155 hari).
+    Perubahan 30 hari 2011-2013 sangat besar (sampai +413 %) karena modal masih kecil; sengaja
+    tidak dikosongkan (keputusan user 17 Sep 2026: cukup di-zoom).
+    """
+    df = _prepare(pd.read_csv("data_realized_cap.csv").rename(columns={
+        'date': 'Date', 'btc_price': 'BTC Price', 'realized_cap_usd': 'Realized Cap',
+        'lth_realized_cap_usd': 'LTH Realized Cap', 'sth_realized_cap_usd': 'STH Realized Cap'}))
+    total = df['Realized Cap'].where(df['Realized Cap'] > 0)
+    df['LTH Realized Cap %'] = df['LTH Realized Cap'] / total * 100
+    df['STH Realized Cap %'] = df['STH Realized Cap'] / total * 100
+    rc = df.set_index('Date')['Realized Cap']
+    df['Realized Cap 30d Change'] = ((rc / rc.shift(freq='30D').reindex(rc.index) - 1) * 100).to_numpy()
+    return df[['Date', 'BTC Price', 'Realized Cap', 'LTH Realized Cap', 'STH Realized Cap',
+               'LTH Realized Cap %', 'STH Realized Cap %', 'Realized Cap 30d Change']]
+
+
+@st.cache_data(ttl=3600)
 def load_holder_supply():
     """Jumlah supply LTH dan STH (data_supply.csv), dalam BTC dan persen supply beredar.
 

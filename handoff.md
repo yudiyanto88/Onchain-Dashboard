@@ -17,7 +17,7 @@ Baca dokumen ini dan `CLAUDE.md` sebelum mulai. Semua yang ditandai **ditahan/di
 
 ## 1. Status dan langkah berikutnya
 
-- **Live (12 halaman, 6 kelompok):** Valuation (MVRV · Price Levels · AVIV) · Profitability (SOPR · NUPL · Supply in Profit) · Holder Behavior (HODL Waves · RHODL Ratio · LTH/STH Supply) · Exchange (Exchange Flow) · Derivatives (Funding Rates & Open Interest) · Sentiment & Macro (Fear & Greed). Semua halaman: slider rentang, nyaman di HP, kontrol diingat per halaman, tombol Style di chart.
+- **Live (13 halaman, 6 kelompok):** Valuation (MVRV · Price Levels · AVIV · Realized Cap) · Profitability (SOPR · NUPL · Supply in Profit) · Holder Behavior (HODL Waves · RHODL Ratio · LTH/STH Supply) · Exchange (Exchange Flow) · Derivatives (Funding Rates & Open Interest) · Sentiment & Macro (Fear & Greed). Semua halaman: slider rentang, nyaman di HP, kontrol diingat per halaman, tombol Style di chart.
 - **Langkah pertama sesi baru:**
   1. Cek server `dashboard-v2-uji` (bagian 2), buka halaman, lihat keadaannya sebelum mengubah apa pun.
   2. Tanyakan apakah Streamlit Cloud perlu **Reboot app** sesudah push terakhir (`dashboard/` berubah).
@@ -51,6 +51,7 @@ Semua: BTC oranye `#F7931A` (kecuali HODL Waves), key localStorage `dash_v2_<key
 | **MVRV** `/` (key `market_valuation`) | `load_mvrv` — `data_mvrv.csv`; Rolling Z-Score 1y/2y/4y dihitung | BTC Separate pane, metrik & harga Log; LTH MVRV sumbu kanan; ref Neutral 1.0; pane bawah **Z-Score** (Hidden, sumbu kanan): Z-Score navy 80 % + Rolling hijau `#97c459` 55 % (2y/4y mati awal) | LTH MVRV bisa puluhan (2011: 374). Z-Score full-history untuk aturan, rolling untuk mata (KB MVRV). Tanpa pita "extreme" berambang tetap |
 | **Price Levels** `/price-levels` | `load_price_levels` — `data_price_level.csv` + AVIV Mean/Upper dari `data_aviv.csv` | Overlay, satu sumbu kanan, skala Auto. STH RP, Realized Price, LTH RP, **True Market Mean sky `#8fd3ff`**, AVIV Mean `#7b65d2`, AVIV Upper `#a58df0`, CVDD `#a8963f`; mati awal: MVRV 0σ, 200 DMA, 50 WMA, 200 WMA (abu). Pane bawah **Price / CVDD** (Hidden, `extra_scale="Log"`, sumbu kanan, olive); **Price / RP** navy mati awal | Price/CVDD dipakai framework v2 K4 (#4 < 1,10; flag ≤ 1,0), garis ambang tidak dipasang; di bawah 1,0 hanya 14 Jan 2015 & 21 Nov 2022 (KB: 9 & 21 Nov 2022, beda karena tidak entity-adjusted); CVDD = 0 s/d 16 Jul 2010 → rasio kosong. Price/RP untuk divergence KB §4.3. AVIV dihitung ulang `btc_price/aviv_ratio × band` (kolom `price_at_aviv_*` salah basis ±9–10 %). 84 hari pertama AVIV disembunyikan (`_aviv_awal`) |
 | **AVIV** `/aviv` | `load_aviv` — `data_aviv.csv` (satuan rasio) | Separate pane, Log/Log; AVIV Ratio navy, Mean violet, Upper (+0.5σ) violet muda, sumbu kanan; kelompok **σ Bands** (+1σ +2σ −1σ −2σ, abu, mati awal); pane bawah **Deviation (σ)** menyala awal (`extra_default`), sumbu kanan | Rasio ≥ Upper ⇔ harga ≥ AVIV Upper (1.279 hari sejak 2011). Band bawah negatif s/d 2014 dikosongkan |
+| **Realized Cap** `/realized-cap` (key `realized_cap`) | `load_realized_cap` — `data_realized_cap.csv` (% dan 30d change dihitung) | Separate pane, metrik & harga Log; total navy, LTH teal, STH rust (compact 1.07T); saklar **USD \| %** (bawaan USD; % tanpa garis total); **Realized Cap 30d Change (%)** batang di pane harga sumbu kiri, Overlay/Hidden → pane bawah kanan (pola LTH/STH Supply) | Kelompok Valuation (penyebut MVRV; RP = RC ÷ supply). 30d change 2011–2013 sampai +413 % → batang sesudahnya gepeng, **sengaja tidak dikosongkan** (user: cukup di-zoom). Harga file identik `data_mvrv`. Tidak dipakai framework |
 | **SOPR** `/sopr` | `load_sopr` — `data_momentum.csv` | Separate pane, Log/Log; LTH-SOPR sumbu kanan; Break-even 1.0 di semua sumbu; pane **SOPR Gap** (Hidden, sumbu kanan) | **Gap = SMA90(STH-SOPR) − SMA60 dari SMA90 itu (KB §12)** — `alert_check.py` memakai SMA60 − SMA90 (bagian 6). SOPR 3 desimal, gap 5, LTH ≥ 100 tanpa desimal |
 | **NUPL** `/nupl` | `load_nupl` — `data_momentum.csv` | Separate pane, metrik Auto, harga Log; ketiga garis sumbu kanan; Break-even 0; pane **NUPL Gap** (LTH − STH, Hidden, sumbu kanan) | Ratio LTH/STH sengaja tidak dimuat (melompat saat STH ≈ 0). Sumbu tidak dipaku −1..1 |
 | **Supply in Profit** `/supply-in-profit` | `load_supply` — `data_supply.csv` | Separate pane, sumbu 0–100 kanan; saklar **Profit / Loss** di chart (boleh dua-duanya/mati); warna Loss saat keduanya: `#839df0` `#dc9390` `#38d1b4` | Loss = 100 − Profit (kembaran di browser). 1 desimal |
@@ -82,7 +83,7 @@ Semua: BTC oranye `#F7931A` (kecuali HODL Waves), key localStorage `dash_v2_<key
 - Jenis seri: garis, histogram (`negative_color` dua warna), gradasi per titik (`gradient`), area bertumpuk (`kind="stack"`, `stack_index`, `stack_cols` + `stack_units`), kembaran Loss (`complement`).
 - Legend berkelompok (garis utama + kotak angka periode/anggota), `hidden_default` (sekali, dicatat di `seen`), Highlight multi (redup kontras 1,70:1; disembunyikan kalau hanya BTC), tarik chart menggeser sumbu garis yang disorot, klik dua kali reset.
 - Saklar di chart: Profit/Loss, satuan (`unit_switch`/`unit`/`pair`/`compact`), bobot tumpukan (`stack_units`). Tersimpan di localStorage.
-- Format angka per seri: `precision`, `whole_from`, `compact`; garis acuan mewarisi format metrik di sumbunya. Data dikirim dengan desimal `max(4, precision+1)`.
+- Format angka per seri: `precision`, `whole_from`, `compact` (K/M/B/T); garis acuan mewarisi format metrik di sumbunya. Data dikirim dengan desimal `max(4, precision+1)`.
 - Tooltip Fixed/Cursor/Off (satu pilihan untuk semua halaman, `tooltip_pref`), periode smoothing jadi kolom, `value_labels`.
 - **Tombol Style** (panel `#gaya`, pojok kanan atas): bentuk Solid/Dotted/Dashed/Step/Band + tebal per periode smoothing, tanpa memuat ulang chart, tersimpan `state.gaya`; hanya muncul kalau ada smoothing. Python memberi gaya bawaan berurutan Dotted → Step → Band (`smoothing_style_default` per halaman). Step jadi putus panjang kalau < 6 px per bar.
 - Layar penuh tombol **Full** di chart (Fullscreen API; iPhone: kelas `penuh-semu`), tombol **Scale** hanya perangkat sentuh (`vertTouchDrag`, tidak disimpan). Sidebar `initial_sidebar_state="auto"`.
@@ -149,7 +150,7 @@ Semua file punya `date`; sebagian besar punya `btc_price`. Bukan untuk halaman: 
 | `data_derivatives.csv` | funding_rate, total_oi, `oi_<13 bursa>` (BTC) | dipakai (Funding & OI) |
 | `data_fg.csv` | Fear & Greed (tanpa harga) | dipakai (Fear & Greed) |
 | `data_pl.csv` | realized profit/loss BTC, rpl_ratio, sth/lth_pl_ratio, rrp, rrl, relative_realized_pl | ⚠️ ratio rusak (bagian 6) |
-| `data_realized_cap.csv` | realized_cap_usd, lth/sth_realized_cap_usd | kandidat |
+| `data_realized_cap.csv` | realized_cap_usd, lth/sth_realized_cap_usd | dipakai (Realized Cap) |
 | `data_rhodl.csv` | rhodl_ratio, realized_cap_1w, realized_cap_1_2y | kandidat |
 | `data_cdd.csv` | cdd, vdd_30d_ma, vdd_365d_ma, vdd_multiple (tanpa harga) | ditunda (bagian 6) |
 | `data_exchange.csv` | total_balance, net_flow, inflow, outflow | dipakai (Exchange Flow) |
@@ -160,7 +161,7 @@ Semua file punya `date`; sebagian besar punya `btc_price`. Bukan untuk halaman: 
 | `data_sentiment.csv` | trend_*, wiki_* | skip (Google) |
 
 **Hasil cek kualitas kandidat (17 Sep; jangan diulang kecuali data berubah):**
-- **Realized Cap:** bersih (LTH + STH = total ≤ 0,01 %); loncatan LTH +7,2 % 26 Apr 2026 wajar (koin 22 Nov 2025 genap 155 hari). Isinya ≈ RP × supply, mirip Price Levels.
+- **Realized Cap (dipakai):** bersih (LTH + STH = total ≤ 0,01 %); loncatan LTH +7,2 % 26 Apr 2026 wajar (koin 22 Nov 2025 genap 155 hari). Isinya ≈ RP × supply, mirip Price Levels.
 - **Exchange (dipakai):** +43,8k BTC masuk 8 Sep 2026 dan saldo tetap di level baru (3,36M → 3,40M) — transaksi besar atau dompet bursa baru di sumber; dibiarkan. Net = in − out persis. ⚠️ 8 hari 2026 inflow = outflow = 0 (data kosong diisi nol: 8 Apr, 18–19 Apr, 7 & 10 Mei, 12 & 28 Jul, 5 Agt). ⚠️ `btc_price` beda sumber di 2026 (maks 16 %) → pakai harga `data_mvrv`. Lompatan −100k BTC 28 Jul 2021.
 - **RHODL (`data_rhodl.csv`):** = persen RC 1d–1w ÷ 1y–2y, tanpa pengali umur pasar Glassnode; puncak 443 (2011), p99 sejak 2012 = 37. Didominasi penyebut.
 - **Apparent Demand:** hari pertama −952k (artefak), lonjakan +325k 22 Nov 2025; dua kali diuji sebagai sinyal → REJECT (data_dictionary).
