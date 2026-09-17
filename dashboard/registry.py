@@ -43,7 +43,7 @@ class Series:
     smoothing_precision: int | None = None  # desimal garis smoothing kalau beda (F&G: 0 vs 1)
     # Nama kelas di tooltip ("69 · Greed"): daftar [batas atas inklusif, nama], urut naik.
     value_labels: list | None = None
-    # Area bertumpuk (kind="stack", RHODL Waves): urutan band dari bawah dan kolom per bobot.
+    # Area bertumpuk (kind="stack", HODL Waves): urutan band dari bawah dan kolom per bobot.
     stack_index: int | None = None
     stack_cols: dict | None = None
 
@@ -83,6 +83,10 @@ class MetricFamily:
     extra_default: bool = False   # True = pane tambahan menyala sejak awal (AVIV Deviation)
     # Saklar bobot area bertumpuk di dalam chart, mis. ("Realized Cap", "Supply"); pilih satu.
     stack_units: tuple[str, ...] | None = None
+    # Warna garis harga BTC kalau bukan oranye bawaan (HODL Waves: putih) dan opasitas redupnya
+    # (dihitung supaya kontras redup 1,70:1 terhadap latar chart, seperti garis lain).
+    btc_color: str | None = None
+    btc_dim: float = 0.28
     # Keadaan awal kotak BTC price ("Overlay" / "Separate pane" / "Hidden").
     # Nilainya sama dengan pilihan di metric_page.
     btc_mode_default: str = "Overlay"
@@ -364,17 +368,21 @@ SUPPLY_IN_PROFIT = MetricFamily(
 )
 
 
-RHODL_WAVES = MetricFamily(
-    key="rhodl_waves",
-    title="RHODL Waves",
-    subtitle="RHODL Waves",
+HODL_WAVES = MetricFamily(
+    key="hodl_waves",
+    title="HODL Waves",
+    subtitle="HODL Waves",
     group="Holder Behavior",
-    url_path="rhodl-waves",
+    url_path="hodl-waves",
     loader=data.load_hodl_waves,
     # Dipilih user 17 Sep 2026 dari pratinjau: area bertumpuk 12 band umur, warna spektrum
     # (muda merah -> tua ungu), band muda di bawah, saklar bobot Realized Cap | Supply di chart
     # (bawaan Realized Cap = RHODL Waves; Supply = HODL Waves). Tidak dipakai framework v2.
-    btc_mode_default="Separate pane",
+    # Nama "HODL Waves" (sempat "RHODL Waves"), harga BTC Overlay di atas band dengan garis
+    # putih seperti ChartInspect; RHODL Ratio pindah ke halaman sendiri (keputusan user 17 Sep).
+    btc_mode_default="Overlay",
+    btc_color="#ffffff",
+    btc_dim=0.17,
     metric_scale_default="Auto",
     price_scale_default="Log",
     metric_range=(0, 100),
@@ -388,6 +396,31 @@ RHODL_WAVES = MetricFamily(
         for i, ((_, nama), warna) in enumerate(zip(data.HODL_BANDS, [
             "#d73027", "#f46d43", "#fdae61", "#fee08b", "#d9ef8b", "#a6d96a",
             "#66bd63", "#1a9850", "#35978f", "#2166ac", "#5e4fa2", "#9e7bd6"]))
+    ],
+)
+
+
+RHODL_RATIO = MetricFamily(
+    key="rhodl_ratio",
+    title="RHODL Ratio",
+    subtitle="RHODL Ratio (6m–2y ÷ 1d–3m)",
+    group="Holder Behavior",
+    url_path="rhodl-ratio",
+    loader=data.load_rhodl_ratio,
+    # Dari analisa Cohort State Plane (research/analyze_cohort_state_plane.py). Halaman sendiri
+    # atas permintaan user 17 Sep 2026 (dipisah dari HODL Waves). Sementara hanya rasio ini;
+    # Demand Impulse, Aged Cohort Turnover, dan pita state ditahan (handoff 3.27) — kalau
+    # dilanjutkan, ditambahkan ke halaman ini. Judul menyebut rumusnya supaya tidak tertukar
+    # dengan RHODL Ratio gaya Glassnode (data_rhodl.csv, 1d-1w / 1y-2y).
+    # Harga BTC Overlay satu pane dengan rasio, skala Auto keduanya (permintaan user 17 Sep 2026).
+    btc_mode_default="Overlay",
+    metric_scale_default="Auto",
+    price_scale_default="Auto",
+    series=[
+        # Navy seperti metrik dasar di halaman lain. Overlay: rasio sumbu kiri, harga kanan;
+        # kalau BTC dipindah ke pane sendiri, rasio pindah ke sumbu kanan.
+        Series("RHODL Ratio", "RHODL Ratio", color="#0070a6", axis="left", separate_axis="right",
+               dim=0.49, short="RHODL", precision=2),
     ],
 )
 
@@ -478,5 +511,5 @@ FEAR_GREED = MetricFamily(
 # Urutan di sini = urutan menu sidebar; kelompok muncul menurut halaman pertamanya.
 # Halaman pertama jadi halaman bawaan (alamat localhost:8503/).
 FAMILIES = {f.title: f for f in [MARKET_VALUATION, PRICE_LEVELS, AVIV, SOPR, NUPL, SUPPLY_IN_PROFIT,
-                                   RHODL_WAVES,
+                                   HODL_WAVES, RHODL_RATIO,
                                    FUNDING_OI, FEAR_GREED]}

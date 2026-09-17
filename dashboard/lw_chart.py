@@ -513,12 +513,13 @@ loadLib(0).then(() => {
     return points;
   }
 
-  // Area bertumpuk (kind "stack", RHODL Waves; 17 Sep 2026): tiap band digambar sebagai area
+  // Area bertumpuk (kind "stack", HODL Waves; 17 Sep 2026): tiap band digambar sebagai area
   // dari garis kumulatifnya ke dasar pane. Band paling tua (kumulatif 100) dibuat duluan dan
-  // band paling muda terakhir, supaya area yang lebih kecil tergambar di atasnya.
+  // band paling muda terakhir, supaya area yang lebih kecil tergambar di atasnya. Semua band
+  // dibuat sebelum seri lain, supaya garis (harga BTC Overlay di HODL Waves) tergambar di atas area.
   const tumpukan = spec => spec.kind === 'stack';
-  const urutanBuat = S.filter(sp => !tumpukan(sp))
-    .concat(S.filter(tumpukan).sort((a, b) => b.stack_index - a.stack_index));
+  const urutanBuat = S.filter(tumpukan).sort((a, b) => b.stack_index - a.stack_index)
+    .concat(S.filter(sp => !tumpukan(sp)));
   const handles = [];
   for (const spec of urutanBuat) {
     const values = D.cols[spec.col];
@@ -539,11 +540,13 @@ loadLib(0).then(() => {
     if (rentangTetap(spec)) {
       umum.autoscaleInfoProvider = rentangTetap(spec);
       // Angka di luar rentang (ruang tepi sumbu: 110, 120, -10) tidak ditulis — persen supply
-      // tidak pernah di sana, jadi label itu hanya membingungkan.
+      // tidak pernah di sana, jadi label itu hanya membingungkan. Angka bulat di sumbu ditulis
+      // tanpa desimal (100, 90 — bukan 100.0; 17 Sep 2026); nilai pecahan tetap memakai precision.
       const [bawah, atas] = C.metricRange;
       const tulis = umum.priceFormat.formatter;
       umum.priceFormat = Object.assign({}, umum.priceFormat, {
-        formatter: v => (v < bawah - 1e-9 || v > atas + 1e-9) ? '' : tulis(v),
+        formatter: v => (v < bawah - 1e-9 || v > atas + 1e-9) ? ''
+          : Math.abs(v - Math.round(v)) < 1e-9 ? String(Math.round(v)) : tulis(v),
       });
     }
     // Batang digambar dari garis nol, jadi nilai negatif turun ke bawah sendiri.
@@ -760,7 +763,9 @@ loadLib(0).then(() => {
     return h ? h.spec.stack_index : -1;
   };
   const groups = [...new Set(legendItems.map(h => h.spec.group))]
-    .sort((a, b) => ((a === 'BTC Price') - (b === 'BTC Price')) || (indeksTumpuk(a) - indeksTumpuk(b)));
+    // Band bertumpuk duluan (muda -> tua), lalu kelompok lain dalam urutan aslinya (sort stabil).
+    .sort((a, b) => ((a === 'BTC Price') - (b === 'BTC Price'))
+      || ((indeksTumpuk(a) < 0 ? 1000 : indeksTumpuk(a)) - (indeksTumpuk(b) < 0 ? 1000 : indeksTumpuk(b))));
   // Beberapa garis bisa disorot sekaligus. Penyimpanan lama berisi satu nama
   // (highlight: 'MVRV' atau 'none'), jadi diubah ke daftar bila masih format lama.
   const saved = readState();
@@ -1735,6 +1740,17 @@ loadLib(0).then(() => {
   gayaBtn.innerHTML = IKON_STYLE + 'Style';
   gayaBtn.title = 'Line style of smoothing lines';
   fsSep.after(gayaBtn);
+  // Halaman tanpa garis smoothing (mis. HODL Waves, atau Smoothing Off) tidak butuh tombol Style.
+  if (periodeGaya.length === 0) gayaBtn.style.display = 'none';
+  // Kelompok Highlight disembunyikan kalau tidak ada yang bisa disorot selain harga BTC
+  // (HODL Waves: band tidak punya tombol sorot, tinggal None dan BTC). Pemisah di depan
+  // Style/Full ikut disembunyikan supaya tidak ada dua garis pemisah berdempetan.
+  if (!hlButtons.some(({ group }) => group !== 'none' && group !== 'BTC Price')) {
+    for (const { button } of hlButtons) button.style.display = 'none';
+    const labelSorot = [...hlEl.querySelectorAll('.hllabel')].find(el => el.textContent === 'Highlight');
+    if (labelSorot) labelSorot.style.display = 'none';
+    fsSep.style.display = 'none';
+  }
 
   function isiPanelGaya() {
     gayaEl.innerHTML = '<div class="gjudul">LINE STYLE</div>';

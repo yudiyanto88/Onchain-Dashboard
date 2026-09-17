@@ -101,6 +101,22 @@ def load_hodl_waves():
 
 
 @st.cache_data(ttl=3600)
+def load_rhodl_ratio():
+    """RHODL Ratio versi analisa Cohort State Plane (research/analyze_cohort_state_plane.py).
+
+    Realized cap (6m-12m + 1y-2y) / (1d-1w + 1w-1m + 1m-3m). BUKAN rhodl_ratio di data_rhodl.csv
+    (1d-1w / 1y-2y). Cocok persis dengan research/findings/_cohort_state_plane.csv (dicek
+    17 Sep 2026). 86% variansnya dari penyebut: angka tinggi bisa berarti modal segar hilang ATAU
+    kohort lama menahan (memori rhodl-didominasi-penyebut) — jangan dibaca sendirian.
+    """
+    df = _prepare(pd.read_csv("data_hodl_waves.csv").rename(columns={'date': 'Date', 'btc_price': 'BTC Price'}))
+    df = df[df['Date'] >= df.loc[df['BTC Price'].notna(), 'Date'].min()]
+    rc = lambda band: df[f"realized_cap_{band}"]
+    df['RHODL Ratio'] = (rc('6m-12m') + rc('1y-2y')) / (rc('1d-1w') + rc('1w-1m') + rc('1m-3m'))
+    return df[['Date', 'BTC Price', 'RHODL Ratio']]
+
+
+@st.cache_data(ttl=3600)
 def load_aviv():
     """AVIV Ratio dan band simpangan bakunya dari data_aviv.csv (satuan rasio, bukan harga).
 

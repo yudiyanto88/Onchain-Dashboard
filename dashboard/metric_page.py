@@ -558,16 +558,20 @@ def render_metric_page(family: MetricFamily):
                                 axis, width=1, style=2, precision=presisi, whole_from=bulat))
 
     # Harga BTC tanpa desimal (78,905), di sumbu, label nilai terakhir, dan tooltip.
+    # Warna harga bisa diganti per halaman (HODL Waves: putih, supaya tidak tenggelam di band
+    # jingga); opasitas redupnya ikut warna supaya kontras redup tetap 1,70:1.
+    btc_color = family.btc_color or BTC_COLOR
+    btc_dim = family.btc_dim if family.btc_color else BTC_DIM
     price_line = None
     if btc_mode == PANE:
-        price_line = Line("BTC Price", "BTC Price", BTC_COLOR, "right", width=LINE_WIDTH,
-                          group="BTC Price", dim=BTC_DIM, precision=BTC_PRECISION)
+        price_line = Line("BTC Price", "BTC Price", btc_color, "right", width=LINE_WIDTH,
+                          group="BTC Price", dim=btc_dim, precision=BTC_PRECISION)
     elif btc_mode == OVERLAY:
         # Sumbu harga bisa dipilih (bawaan: kanan). Sumbu yang hanya berisi harga memakai
         # skala harga; kalau harga berbagi sumbu dengan metrik, skala metrik yang dipakai.
-        plan.append(Line("BTC Price", "BTC Price", BTC_COLOR,
+        plan.append(Line("BTC Price", "BTC Price", btc_color,
                          st.session_state[f"{k}_axis_btc"], width=LINE_WIDTH,
-                         group="BTC Price", dim=BTC_DIM, precision=BTC_PRECISION))
+                         group="BTC Price", dim=btc_dim, precision=BTC_PRECISION))
 
     charts.render(df, plan, price_line, extra, total_h, metric_mode, price_mode,
                   f"dash_v2_{k}", tooltip=st.session_state[TIP_STORE],
