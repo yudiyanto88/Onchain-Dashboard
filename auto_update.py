@@ -485,6 +485,189 @@ except Exception as e:
     print(f"❌ Error Pipeline 17 Apparent Demand: {e}")
 
 # ==========================================
+# 19. PIPELINE: US 2-YEAR TREASURY YIELD (MACRO)
+# ==========================================
+print("\n[19/19] Menarik data US 2-Year Treasury Yield...")
+try:
+    res_t2y = requests.get("https://chartinspect.com/api/charts/economic/indicators?indicator=2y-treasury&timeframe=all")
+    raw_t2y = res_t2y.json().get('data', [])
+    df_t2y = pd.DataFrame(raw_t2y)
+
+    if not df_t2y.empty:
+        # 'time' adalah Unix timestamp (detik); 'value' adalah yield dalam persen
+        df_t2y['date'] = pd.to_datetime(df_t2y['time'], unit='s', utc=True).dt.strftime('%Y-%m-%d')
+        df_t2y = df_t2y.rename(columns={'value': 'treasury_2y_yield'})[['date', 'treasury_2y_yield']]
+        df_t2y = df_t2y.dropna(subset=['date']).drop_duplicates(subset=['date'], keep='last')
+        df_t2y = df_t2y.sort_values('date').reset_index(drop=True)
+        df_t2y.to_csv("data_treasury_2y.csv", index=False)
+        print("✅ data_treasury_2y.csv berhasil diperbarui.")
+        print(df_t2y.tail(3).to_string(index=False))
+    else:
+        print("❌ GAGAL: Data Treasury 2Y kosong atau gagal ditarik.")
+except Exception as e:
+    print(f"❌ Error Pipeline 19 Treasury 2Y: {e}")
+
+# ==========================================
+# 20. PIPELINE: RELATIVE UNREALIZED P/L BY COHORT
+# ==========================================
+print("\n[20/20] Menarik data Relative Unrealized P/L by Cohort...")
+try:
+    df_rupl_cohort = fetch_data(
+        "https://chartinspect.com/api/onchain/relative-unrealized-pl-by-cohort?timeframe=all&isProUser=false",
+        ['date', 'btc_price', 'sth_rup', 'sth_rul', 'sth_nupl', 'lth_rup', 'lth_rul', 'lth_nupl']
+    )
+
+    if not df_rupl_cohort.empty:
+        df_rupl_cohort = df_rupl_cohort.sort_values('date').reset_index(drop=True)
+        df_rupl_cohort.to_csv("data_relative_unrealized_pl_by_cohort.csv", index=False)
+        print("✅ data_relative_unrealized_pl_by_cohort.csv berhasil diperbarui.")
+        print(df_rupl_cohort[['date', 'sth_rup', 'sth_rul', 'lth_rup', 'lth_rul']].tail(3).to_string(index=False))
+    else:
+        print("❌ GAGAL: Data Relative Unrealized P/L by Cohort kosong atau gagal ditarik.")
+except Exception as e:
+    print(f"❌ Error Pipeline 20 Relative Unrealized P/L by Cohort: {e}")
+
+# ==========================================
+# 21. PIPELINE: MEDIAN MVRV
+# ==========================================
+# Sumber ganda: histori (>=30 hari lalu, batasan tier free ChartInspect) pakai
+# endpoint resmi (source='official'). Hari ini & gap yang belum ke-cover endpoint
+# resmi dihitung dari URPD di Pipeline 22 (source='urpd_formula'). Begitu endpoint
+# resmi akhirnya nyampe ke tanggal yang tadinya urpd_formula, baris itu DIVERIFIKASI
+# (dibandingkan) dulu sebelum ditimpa angka resmi.
+print("\n[21/22] Menarik data Median MVRV...")
+try:
+    df_median_official = fetch_data(
+        "https://chartinspect.com/api/onchain/median-mvrv?timeframe=all&isProUser=false",
+        ['date', 'btc_price', 'median_realized_price', 'median_mvrv']
+    )
+
+    if not df_median_official.empty:
+        df_median_official = df_median_official.sort_values('date').reset_index(drop=True)
+        df_median_official['source'] = 'official'
+        official_dates = set(df_median_official['date'])
+
+        if os.path.exists("data_median_mvrv.csv"):
+            df_mm_prev = pd.read_csv("data_median_mvrv.csv")
+        else:
+            df_mm_prev = pd.DataFrame(columns=['date', 'btc_price', 'median_realized_price', 'median_mvrv', 'source'])
+        if 'source' not in df_mm_prev.columns:
+            df_mm_prev['source'] = 'official'  # file lama sebelum kolom source ada
+        df_mm_prev['date'] = df_mm_prev['date'].astype(str)
+
+        df_prev_urpd_rows = df_mm_prev[df_mm_prev['source'] == 'urpd_formula']
+
+        # --- VERIFIKASI: tanggal yang tadinya urpd_formula, sekarang official-nya udah ada ---
+        overlap = df_prev_urpd_rows[df_prev_urpd_rows['date'].isin(official_dates)]
+        if not overlap.empty:
+            print(f"🔍 Verifikasi {len(overlap)} baris urpd_formula vs official (baru tersedia):")
+            for _, r in overlap.iterrows():
+                official_row = df_median_official[df_median_official['date'] == r['date']].iloc[0]
+                diff_pct = abs(r['median_mvrv'] - official_row['median_mvrv']) / official_row['median_mvrv'] * 100
+                print(f"   {r['date']}: urpd_formula={r['median_mvrv']:.4f} vs official={official_row['median_mvrv']:.4f} "
+                      f"(selisih {diff_pct:.2f}%)")
+
+        # Baris urpd_formula yang tanggalnya BELUM ada di official tetap dipertahankan (gap)
+        df_gap_rows = df_prev_urpd_rows[~df_prev_urpd_rows['date'].isin(official_dates)]
+
+        df_median_mvrv = pd.concat([df_median_official, df_gap_rows], ignore_index=True)
+        df_median_mvrv = df_median_mvrv.sort_values('date').reset_index(drop=True)
+        df_median_mvrv.to_csv("data_median_mvrv.csv", index=False)
+        print("✅ data_median_mvrv.csv berhasil diperbarui.")
+        print(df_median_mvrv[['date', 'btc_price', 'median_realized_price', 'median_mvrv', 'source']].tail(5).to_string(index=False))
+    else:
+        print("❌ GAGAL: Data Median MVRV kosong atau gagal ditarik.")
+except Exception as e:
+    print(f"❌ Error Pipeline 21 Median MVRV: {e}")
+
+# ==========================================
+# 22. PIPELINE: URPD SNAPSHOT (UTXO REALIZED PRICE DISTRIBUTION)
+# ==========================================
+# CATATAN: endpoint /api/onchain/urpd TIDAK punya historis — selalu balikin snapshot
+# hari-ini persis (parameter date/timestamp/isProUser diabaikan). Beda dari endpoint
+# lain di file ini, jadi histori data_urpd.csv cuma numpuk maju dari titik pertama
+# script ini dijalankan, TIDAK bisa backfill ke masa lalu.
+print("\n[22/22] Menarik snapshot URPD (UTXO Realized Price Distribution)...")
+try:
+    res_urpd = requests.get("https://chartinspect.com/api/onchain/urpd?timeframe=all&isProUser=false")
+    raw_urpd = res_urpd.json().get('data', [])
+
+    if raw_urpd:
+        today_str = datetime.now().strftime('%Y-%m-%d')
+        df_urpd_today = pd.DataFrame(raw_urpd)[
+            ['bucket_min', 'bucket_max', 'price_bucket', 'btc_amount',
+             'percentage', 'cumulative_pct', 'in_profit', 'avg_age_days', 'utxo_count']
+        ]
+        df_urpd_today.insert(0, 'date', today_str)
+
+        if os.path.exists("data_urpd.csv"):
+            df_urpd_existing = pd.read_csv("data_urpd.csv")
+            df_urpd_existing = df_urpd_existing[df_urpd_existing['date'] != today_str]
+            df_urpd_all = pd.concat([df_urpd_existing, df_urpd_today], ignore_index=True)
+        else:
+            df_urpd_all = df_urpd_today
+
+        df_urpd_all = df_urpd_all.sort_values(['date', 'bucket_min']).reset_index(drop=True)
+        df_urpd_all.to_csv("data_urpd.csv", index=False)
+        print(f"✅ data_urpd.csv berhasil diperbarui (snapshot {today_str}, {len(df_urpd_today)} bucket). Total baris: {len(df_urpd_all)}")
+
+        # --- Gap-fill Median MVRV real-time dari URPD hari ini ---
+        # Endpoint resmi median-mvrv (Pipeline 21) lag ~30 hari. Tapi URPD adalah data
+        # MENTAH sumber Median MVRV — jadi bisa dihitung EXACT (bukan proxy) langsung dari
+        # snapshot hari ini: cari titik cumulative_pct = 50% (interpolasi linear di dalam
+        # bucket), itu Median Realized Price. Median MVRV = btc_price / Median Realized Price.
+        try:
+            def _median_realized_price_from_urpd(buckets):
+                prev_cum = 0.0
+                for b in buckets:
+                    cum = b['cumulative_pct']
+                    if cum >= 50:
+                        span = cum - prev_cum
+                        frac = (50 - prev_cum) / span if span > 0 else 0
+                        return b['bucket_min'] + frac * (b['bucket_max'] - b['bucket_min'])
+                    prev_cum = cum
+                return buckets[-1]['bucket_max']
+
+            df_price_latest = pd.read_csv("data_price_level.csv")
+            df_price_latest['date'] = pd.to_datetime(df_price_latest['date'], errors='coerce').dt.strftime('%Y-%m-%d')
+            today_price_row = df_price_latest[df_price_latest['date'] == today_str]
+
+            if not today_price_row.empty:
+                today_btc_price = float(today_price_row.iloc[-1]['btc_price'])
+                median_rp_today = _median_realized_price_from_urpd(raw_urpd)
+                median_mvrv_today = today_btc_price / median_rp_today
+
+                df_mm = pd.read_csv("data_median_mvrv.csv") if os.path.exists("data_median_mvrv.csv") \
+                    else pd.DataFrame(columns=['date', 'btc_price', 'median_realized_price', 'median_mvrv', 'source'])
+                if 'source' not in df_mm.columns:
+                    df_mm['source'] = 'official'
+                df_mm['date'] = df_mm['date'].astype(str)
+
+                if today_str not in df_mm['date'].values:
+                    df_new_row = pd.DataFrame([{
+                        'date': today_str,
+                        'btc_price': today_btc_price,
+                        'median_realized_price': round(median_rp_today, 2),
+                        'median_mvrv': round(median_mvrv_today, 4),
+                        'source': 'urpd_formula',
+                    }])
+                    df_mm = pd.concat([df_mm, df_new_row], ignore_index=True)
+                    df_mm = df_mm.sort_values('date').reset_index(drop=True)
+                    df_mm.to_csv("data_median_mvrv.csv", index=False)
+                    print(f"✅ Median MVRV {today_str} dihitung real-time dari URPD (gap-fill): "
+                          f"{round(median_mvrv_today, 4)} (median RP ${median_rp_today:,.2f})")
+                else:
+                    print(f"ℹ️ data_median_mvrv.csv sudah punya baris {today_str}, skip gap-fill.")
+            else:
+                print("⚠️ btc_price hari ini belum ada di data_price_level.csv, skip gap-fill Median MVRV.")
+        except Exception as e:
+            print(f"❌ Error gap-fill Median MVRV dari URPD: {e}")
+    else:
+        print("❌ GAGAL: Data URPD kosong atau gagal ditarik.")
+except Exception as e:
+    print(f"❌ Error Pipeline 22 URPD Snapshot: {e}")
+
+# ==========================================
 # 18. MASTER PIPELINE: ALL METRICS AGGREGATOR (NEW)
 # ==========================================
 print("\n[18/18] 🌌 Mengkompilasi Semua File CSV ke dalam 1 Master Dataset...")
@@ -495,7 +678,8 @@ try:
         "data_derivatives.csv", "data_sentiment.csv", "data_supply.csv",
         "data_mvrv.csv", "data_fg.csv", "data_exchange.csv", "data_rhodl.csv",
         "data_hodl_waves.csv", "data_realized_cap.csv", "data_cdd.csv", "data_lth_flow.csv",
-        "data_aviv.csv", "data_apparent_demand.csv"
+        "data_aviv.csv", "data_apparent_demand.csv", "data_treasury_2y.csv",
+        "data_relative_unrealized_pl_by_cohort.csv", "data_median_mvrv.csv"
     ]
     
     df_master = None
