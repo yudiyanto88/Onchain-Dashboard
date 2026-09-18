@@ -354,6 +354,36 @@ SOPR = MetricFamily(
 )
 
 
+UNREALIZED_PL = MetricFamily(
+    key="unrealized_pl",
+    title="Unrealized P/L",
+    subtitle="Relative Unrealized Profit & Loss by Cohort",
+    group="Profitability",
+    url_path="unrealized-pl",
+    loader=data.load_unrealized_pl,
+    # Disetujui user 18 Sep 2026 dari pratinjau: empat garis semua positif (seperti ChartInspect),
+    # sisi rugi memakai warna terang kohortnya (pola Supply in Profit). Tanpa garis NUPL: NUPL
+    # dibaca di halaman NUPL saja, satu sumber (lihat docstring load_unrealized_pl). Tidak dipakai
+    # framework v2, jadi tanpa garis ambang.
+    # LTH di sumbu kiri, STH di sumbu kanan: STH jauh lebih kecil (0,015 vs 0,370), jadi kalau
+    # satu sumbu garis STH menempel nol. Harga BTC karena itu di pane sendiri (dicoba Overlay
+    # 18 Sep 2026: harga menumpang salah satu sumbu metrik dan menggepengkannya).
+    btc_mode_default="Separate pane",
+    metric_scale_default="Auto",
+    price_scale_default="Log",
+    series=[
+        Series("LTH Unrealized Profit", "LTH Unrealized Profit", color="#0b8e89", axis="left",
+               dim=0.39, short="LTH P", precision=3),
+        Series("STH Unrealized Profit", "STH Unrealized Profit", color="#bf5546", axis="right",
+               dim=0.44, short="STH P", precision=3),
+        Series("LTH Unrealized Loss", "LTH Unrealized Loss", color="#38d1b4", axis="left",
+               dim=0.25, short="LTH L", precision=3),
+        Series("STH Unrealized Loss", "STH Unrealized Loss", color="#dc9390", axis="right",
+               dim=0.29, short="STH L", precision=3),
+    ],
+)
+
+
 NUPL = MetricFamily(
     key="nupl",
     title="NUPL",
@@ -644,6 +674,6 @@ FEAR_GREED = MetricFamily(
 
 # Urutan di sini = urutan menu sidebar; kelompok muncul menurut halaman pertamanya.
 # Halaman pertama jadi halaman bawaan (alamat localhost:8503/).
-FAMILIES = {f.title: f for f in [MARKET_VALUATION, PRICE_LEVELS, AVIV, REALIZED_CAP, SOPR, NUPL, SUPPLY_IN_PROFIT,
+FAMILIES = {f.title: f for f in [MARKET_VALUATION, PRICE_LEVELS, AVIV, REALIZED_CAP, SOPR, NUPL, UNREALIZED_PL, SUPPLY_IN_PROFIT,
                                    HODL_WAVES, RHODL_RATIO, HOLDER_SUPPLY, EXCHANGE_FLOW,
                                    FUNDING_OI, FEAR_GREED]}

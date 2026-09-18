@@ -714,3 +714,31 @@ Konfigurasi di `.claude/launch.json`: `dashboard-lama` (8501, `archive/app_v1.py
 4. Untuk urusan tampilan apa pun, buat widget pratinjau dengan data asli lebih dulu, lalu tunggu pilihan user. Untuk warna garis baru, jalankan uji palet di bagian 9 sebelum menunjukkan pratinjau.
 5. Sesudah mengubah apa pun di `dashboard/`, **restart server** — modul yang sudah dimuat tidak dibaca ulang.
 6. Kalau ada keluhan tampilan yang terdengar kecil ("kurang rata", "kebesaran"), **ukur dulu di halaman hidup** lewat `getBoundingClientRect` dan `getComputedStyle`, jangan menebak dari kode. Semua perbaikan tata letak 13 Sep ketemu dengan cara itu, dan dua tebakan pertama meleset.
+
+---
+
+## Dipindah dari handoff ringkas (17 Sep 2026, sore)
+
+Rincian di bawah dipindah dari `handoff.md` supaya dokumen ringkasnya tetap di bawah 35 KB. Statusnya tidak berubah.
+
+### Cohort State (ditahan user 17 Sep 2026)
+
+- **Cohort State (DITAHAN user 17 Sep — "ada yang perlu dipastikan dulu"):** analisa `research/analyze_cohort_state_plane.py` + `plot_cohort_state_plane.py` + `findings/_cohort_state_plane.csv` (s/d 7 Sep).
+  - Demand Impulse (DI) = RC 1d–3m ÷ SMA90 − 1 → persentil 1.460 hari (min 60 %); cukup `data_hodl_waves.csv`.
+  - Aged Cohort Turnover (ACT) = BTC dibelanjakan kohort 6m–2y (profit + loss BTC band 5 & 6 endpoint `realized-profit-by-age`; band_5 = 6m–12m, band_6 = 1y–2y, terverifikasi) ÷ BTC dipegang kohort ((supply 6m–12m + 1y–2y)/100 × (lth_supply_btc + sth_supply_btc)), SMA30 → persentil 4 tahun.
+  - State: histeresis per sumbu (≥ 60 tinggi, ≤ 40 rendah, pindah setelah 10 hari), empat kombinasi DORMANSI/SEPI · DISTRIBUSI/LEPAS TANPA BID · TRANSFER/TANGAN BERGANTI · AKUMULASI/MODAL MASUK PASOKAN TERKUNCI. 60 episode sejak Mar 2013, median 76 hari.
+  - **Penghalang:** data ACT tidak ada di CSV repo (analisa lama membaca `rpba.pkl` di scratchpad sesi lain, s/d 9 Sep). Butuh pipeline baru di `auto_update.py` yang menyimpan `data_profit_by_age.csv` (profit/loss BTC 12 band) — **izin user ditahan**. Workflow sudah `git add .`.
+  - Jawaban user: bentuk state (pita tipis B vs latar pane A) ditahan; persentil disembunyikan dulu; nama state Inggris (Quiet · Selling, no bid · Changing hands · Inflow, supply locked) keep dulu; letak: digabung ke halaman **RHODL Ratio**. Warna pratinjau: Quiet `#6e7681`, Selling `#bf5546`, Changing `#a8963f` (bukan mustard — dekat oranye BTC bagi buta warna), Inflow `#3f6fd8`, DI `#5b8def`, ACT `#e0705c`.
+  - Catatan tafsir: state terlambat ≥ 10 hari; persentil bergeser kalau data direvisi. Bukan bagian framework v2.
+
+### CDD/VDD (ditunda)
+
+- **CDD/VDD (ditunda user, belum butuh):** `vdd_multiple` CSV = VDD harian ÷ MA365 (berisik; p99 12,3, maks 59,9). Rumus Glassnode `vdd_30d_ma / vdd_365d_ma` halus (p99 6,5; puncak 2013 8,4 · 2017 5,2 · 2021 4,5 · 2024 4,4). Usulan waktu itu: rumus 30d/365d, ref 1,0, CDD batang navy, VDD violet, harga dari `data_mvrv.csv`. Research menolak "VDD multiple < 1" sebagai filter.
+
+### Catatan kualitas data yang sudah pindah ke baris halaman (bagian 3 handoff)
+
+- **Realized Cap:** bersih (LTH + STH = total ≤ 0,01 %); loncatan LTH +7,2 % 26 Apr 2026 wajar (koin 22 Nov 2025 genap 155 hari). Isinya ≈ RP × supply, mirip Price Levels.
+- **Exchange:** +43,8k BTC masuk 8 Sep 2026, saldo tetap di level baru (3,36M → 3,40M) — transaksi besar atau dompet bursa baru di sumber. Net = in − out persis. 8 hari 2026 inflow = outflow = 0 (8 Apr, 18–19 Apr, 7 & 10 Mei, 12 & 28 Jul, 5 Agt). `btc_price` file ini beda sumber di 2026 (maks 16 %). Lompatan −100k BTC 28 Jul 2021.
+- **LTH/STH Supply:** LTH + STH = 20,09 juta BTC (17 Sep 2026). Lompatan pindah dompet: −280k 4 Des 2018 → +289k 8 Mei 2019; −536k 22 Nov 2025 → +598k 26 Apr 2026 (batang 30d −1,03 juta Nov 2025, +1,13 juta Apr 2026). Revisi riwayat < 0,1 %.
+- **Price/CVDD:** di bawah 1,0 hanya 14 Jan 2015 & 21 Nov 2022 (KB Glassnode: 9 & 21 Nov 2022 — beda karena ChartInspect tidak entity-adjusted). CVDD = 0 sampai 16 Jul 2010, jadi rasionya kosong.
+- **Realized Cap 30d change:** 2011–2013 sampai +413 %.

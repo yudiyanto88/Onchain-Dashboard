@@ -266,6 +266,53 @@ def load_fear_greed():
     return df.merge(harga, on='Date', how='left')
 
 
+# Band umur yang dihitung sebagai LTH (batas kohort 155 hari jatuh di dalam band 3m-6m;
+# band itu dimasukkan ke STH supaya tidak dipotong sembarangan).
+LTH_BANDS = ("6m-12m", "1y-2y", "2y-3y", "3y-5y", "5y-7y", "7y-10y", "10y+")
+
+
+@st.cache_data(ttl=3600)
+def load_unrealized_pl():
+    """Unrealized profit dan loss per kohort, dihitung sendiri dari band umur.
+
+    Tiap band HODL Waves punya nilai pasar (porsi supply x market cap) dan nilai beli
+    (porsi realized cap x realized cap). Selisihnya masuk sisi untung atau sisi rugi, lalu
+    dijumlahkan per kohort dan dibagi market cap — satuannya sama dengan "relative unrealized
+    profit/loss" ChartInspect.
+
+    Kenapa dihitung sendiri (keputusan user 18 Sep 2026): endpoint
+    relative-unrealized-pl-by-cohort (data_relative_unrealized_pl_by_cohort.csv, pipeline 20
+    auto_update.py) tidak bisa direkonsiliasi dengan realized cap ChartInspect sendiri — sisi
+    ruginya jauh lebih besar (LTH 0,501 vs 0,156 pada 18 Agt 2026) sementara sisi untungnya sama,
+    sehingga NUPL-nya berlawanan tanda dengan halaman NUPL. Versi ini selalu konsisten: untung −
+    rugi = NUPL dari MVRV persis (dicek seluruh 5.900 hari), dan datanya tidak tertinggal 30 hari.
+
+    Batas metode: rincian hanya sampai 12 band, jadi koin rugi di dalam band yang rata-rata untung
+    tidak terhitung. Kedua sisi mengecil dalam jumlah yang sama; nilai bersihnya tetap tepat.
+    """
+    h = _prepare(pd.read_csv("data_hodl_waves.csv").rename(columns={'date': 'Date'}))
+    rc = _prepare(pd.read_csv("data_realized_cap.csv").rename(columns={
+        'date': 'Date', 'btc_price': 'BTC Price', 'realized_cap_usd': 'Realized Cap'}))
+    sp = _prepare(pd.read_csv("data_supply.csv").rename(columns={'date': 'Date'}))
+    df = (h.merge(rc[['Date', 'BTC Price', 'Realized Cap']], on='Date')
+           .merge(sp[['Date', 'lth_supply_btc', 'sth_supply_btc']], on='Date'))
+    market = (df['lth_supply_btc'] + df['sth_supply_btc']) * df['BTC Price']
+    nol = market * 0
+    hasil = {(kohort, sisi): nol.copy() for kohort in ('LTH', 'STH')
+             for sisi in ('Unrealized Profit', 'Unrealized Loss')}
+    for akhiran, _ in HODL_BANDS:
+        selisih = (df[f"supply_{akhiran}"] / 100 * market
+                   - df[f"realized_cap_{akhiran}"] / 100 * df['Realized Cap'])
+        kohort = 'LTH' if akhiran in LTH_BANDS else 'STH'
+        hasil[(kohort, 'Unrealized Profit')] += selisih.clip(lower=0)
+        hasil[(kohort, 'Unrealized Loss')] += (-selisih).clip(lower=0)
+    for (kohort, sisi), nilai in hasil.items():
+        df[f"{kohort} {sisi}"] = nilai / market
+    kolom = [f"{k} {s}" for k in ('LTH', 'STH')
+             for s in ('Unrealized Profit', 'Unrealized Loss')]
+    return df[['Date', 'BTC Price'] + kolom]
+
+
 @st.cache_data(ttl=3600)
 def load_realized_cap():
     """Realized cap total, LTH, STH (data_realized_cap.csv, USD), persen per kohort, dan
