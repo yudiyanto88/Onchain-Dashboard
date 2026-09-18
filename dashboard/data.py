@@ -36,7 +36,29 @@ def load_mvrv():
     for tahun, hari in ROLLING_WINDOWS.items():
         jendela = df['MVRV'].rolling(hari)
         df[f'MVRV Z-Score {tahun}'] = (df['MVRV'] - jendela.mean()) / jendela.std()
-    return df
+    return df.merge(_median_mvrv()[['Date', 'Median MVRV']], on='Date', how='left')
+
+
+@st.cache_data(ttl=3600)
+def _median_mvrv():
+    """Median MVRV dan Median Realized Price dari data_median_mvrv.csv.
+
+    Median = harga beli koin di tengah sebaran, bukan rata-rata: puncak siklusnya
+    lebih tinggi dari MVRV biasa (2013: 11,3 vs 4,95) karena rata-rata tertarik oleh
+    koin lama berharga sangat rendah.
+
+    Dua catatan data (18 Sep 2026): baris resmi berhenti 18 Agt 2026 lalu melompat ke
+    18 Sep 2026 (30 hari kosong, garis putus di chart), dan baris terakhir itu berkolom
+    source = 'urpd_formula' — dihitung sendiri dari URPD, bukan angka resmi ChartInspect.
+    Keduanya ditampilkan apa adanya (keputusan user 18 Sep 2026): tidak diisi, tidak dibuang.
+    """
+    df = pd.read_csv("data_median_mvrv.csv")
+    df.rename(columns={
+        'date': 'Date',
+        'median_mvrv': 'Median MVRV',
+        'median_realized_price': 'Median RP',
+    }, inplace=True)
+    return _prepare(df)[['Date', 'Median MVRV', 'Median RP']]
 
 
 @st.cache_data(ttl=3600)
@@ -66,7 +88,8 @@ def load_price_levels():
     # Rasio untuk pane bawah. CVDD bernilai 0 sampai 16 Jul 2010: rasionya dikosongkan.
     df['Price / CVDD'] = df['BTC Price'] / df['CVDD'].where(df['CVDD'] > 0)
     df['Price / RP'] = df['BTC Price'] / df['RP'].where(df['RP'] > 0)
-    return df.merge(aviv[['Date', 'AVIV Mean', 'AVIV Upper']], on='Date', how='left')
+    df = df.merge(aviv[['Date', 'AVIV Mean', 'AVIV Upper']], on='Date', how='left')
+    return df.merge(_median_mvrv()[['Date', 'Median RP']], on='Date', how='left')
 
 
 def _aviv_awal(aviv):

@@ -132,6 +132,16 @@ MARKET_VALUATION = MetricFamily(
         # jadi saat sumbu kanan kosong ia dipindah ke sana supaya punya skala sendiri.
         Series("LTH MVRV", "LTH MVRV", color="#0b8e89", axis="left", dim=0.39,
                separate_axis="right"),
+        # Median MVRV: harga beli koin di tengah sebaran (data_median_mvrv.csv), jadi
+        # puncak siklusnya di atas MVRV rata-rata dan dasarnya tetap di sekitar 1.
+        # Biru langit dipilih user 18 Sep 2026 dari pratinjau; nadanya diturunkan di hari yang
+        # sama karena #8fd3ff (terang 11,02:1 terhadap latar chart) mengalahkan navy MVRV.
+        # #6fb6de terang 8,03:1, jarak Lab ke garis terdekat 28 normal, 28 saat
+        # deuteranopia/protanopia — masih jauh di atas patokan buta warna (14).
+        # Sumbu kiri bersama MVRV dan STH: skala Log bawaan menampung puncak 2011 (73,8).
+        # Bukan bagian framework v2 — tidak ada garis ambang.
+        Series("Median MVRV", "Median MVRV", color="#6fb6de", axis="left", dim=0.27,
+               short="Median"),
         # Z-Score digambar sebagai batang dari garis nol, bukan garis: bentuknya
         # langsung membedakannya dari tiga rasio di atas. Tidak ikut smoothing —
         # yang rolling sudah merupakan penghalusan, dan yang full-history bergerak
@@ -192,11 +202,21 @@ PRICE_LEVELS = MetricFamily(
         Series("LTH RP", "LTH RP", color="#0b8e89", axis="right", dim=0.39,
                short="LTH", precision=0),
         # True Market Mean (Cointime): dasar AVIV — AVIV Mean/Upper = TMM x rata-rata rasio AVIV.
-        # Menyala sejak awal, biru langit (pilihan user 17 Sep 2026 dari pratinjau; violet sudah
-        # dipakai AVIV). Terdekat: 0σ 31 normal, AVIV Upper 23 buta warna. Redup 1,70:1 di 0.23.
-        # Tidak dipakai framework v2.
-        Series("True Market Mean", "True Market Mean", color="#8fd3ff", axis="right", dim=0.23,
+        # Menyala sejak awal. Biru langit dilepas 18 Sep 2026: warna itu dipakai Median MVRV di
+        # halaman MVRV, dan user minta satu metrik = satu warna di semua halaman (pola kohort
+        # navy/rust/teal), jadi biru langit ikut Median RP dan TMM pindah ke hijau zamrud.
+        # Jarak hijau zamrud: 33 normal (terdekat LTH RP teal), 17 deuteranopia (STH RP),
+        # 18 protanopia (CVDD). Redup 1,70:1 pada dim 0.32. Tidak dipakai framework v2.
+        Series("True Market Mean", "True Market Mean", color="#3fa96b", axis="right", dim=0.32,
                short="TMM", precision=0),
+        # Median Realized Price: pasangan harga dari Median MVRV di halaman MVRV.
+        # Median RP memakai biru langit yang sama dengan Median MVRV di halaman MVRV
+        # (permintaan user 18 Sep 2026): satu metrik dikenali dari warnanya di halaman mana pun,
+        # seperti kohort navy/rust/teal. Warna ini ditukar dengan True Market Mean, yang pindah
+        # ke hijau zamrud. Jarak #6fb6de sesudah tukar: 25 normal (abu 0σ), 18 deuteranopia,
+        # 22 protanopia. Redup 1,70:1 pada dim 0.27.
+        Series("Median RP", "Median RP", color="#6fb6de", axis="right", dim=0.27,
+               short="Med RP", precision=0),
         # AVIV Mean dan Upper satu pasang batas zona: satu keluarga violet, dibedakan terang.
         # Uji jarak Lab (patokan longgar handoff bagian 9): terdekat RP–AVIV Mean 16 saat
         # buta warna; Mean–Upper sengaja mirip (17 normal). Terang dijaga setara kohort.
