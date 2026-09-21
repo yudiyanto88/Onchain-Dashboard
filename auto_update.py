@@ -689,6 +689,29 @@ except Exception as e:
     print(f"❌ Error Pipeline 24 VIX: {e} — data_vix.csv tidak diubah")
 
 # ==========================================
+# 25. PIPELINE: US TREASURY YIELD 2Y & 10Y (FRED)
+# ==========================================
+# FRED DGS2/DGS10 harian (persen), tanpa API key. Kalender pasar obligasi AS: Columbus Day dan
+# Veterans Day kosong, Good Friday ada nilainya; dibiarkan apa adanya. data_treasury_2y.csv
+# (Pipeline 19) = DGS2 versi bulanan (cek 21 Sep 2026: rata-rata bulanan beda maks 0,005).
+# Seluruh sejarah ditarik ulang tiap jalan; gagal = file lama tidak diubah.
+print("\n[25] Menarik US Treasury Yield 2Y & 10Y dari FRED...")
+try:
+    df_yields = None
+    for kolom, seri in {'us2y': 'DGS2', 'us10y': 'DGS10'}.items():
+        # Tanpa User-Agent 'Mozilla/5.0': FRED membiarkannya timeout (dicek 22 Sep 2026);
+        # User-Agent bawaan Python diterima.
+        df_y = pd.read_csv(f"https://fred.stlouisfed.org/graph/fredgraph.csv?id={seri}")
+        df_y = pd.DataFrame({'date': df_y.iloc[:, 0],
+                             kolom: pd.to_numeric(df_y[seri], errors='coerce')}).dropna()
+        if df_y.empty:
+            raise ValueError(f"{seri} kosong")
+        df_yields = df_y if df_yields is None else df_yields.merge(df_y, on='date', how='outer')
+    simpan(df_yields, "data_yields.csv")
+except Exception as e:
+    print(f"❌ Error Pipeline 25 Treasury Yield: {e} — data_yields.csv tidak diubah")
+
+# ==========================================
 # 18. MASTER PIPELINE: ALL METRICS AGGREGATOR (NEW)
 # ==========================================
 print("\n[Master] 🌌 Mengkompilasi Semua File CSV ke dalam 1 Master Dataset...")
@@ -701,7 +724,7 @@ try:
         "data_hodl_waves.csv", "data_realized_cap.csv", "data_cdd.csv", "data_lth_flow.csv",
         "data_aviv.csv", "data_apparent_demand.csv", "data_treasury_2y.csv",
         "data_relative_unrealized_pl_by_cohort.csv", "data_median_mvrv.csv",
-        "data_tradfi.csv", "data_vix.csv"
+        "data_tradfi.csv", "data_vix.csv", "data_yields.csv"
     ]
     
     df_master = None

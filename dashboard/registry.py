@@ -722,6 +722,34 @@ VIX = MetricFamily(
 )
 
 
+TREASURY_YIELDS = MetricFamily(
+    key="treasury_yields",
+    title="US Treasury Yields",
+    subtitle="US Treasury Yields (2Y & 10Y)",
+    group="Sentiment & Macro",
+    url_path="treasury-yields",
+    loader=data.load_yields,
+    # Pilihan user 21 Sep 2026 dari pratinjau: 2Y + 10Y + pane spread; tampilan awal 2Y saja
+    # (10Y mati di legend, pane spread Hidden). Overlay seperti VIX: yield sumbu kiri, BTC kanan
+    # Log. 10Y violet: jarak ke oranye BTC 126, ke navy 45, buta warna min 34.
+    # Data FRED DGS2/DGS10 lewat Pipeline 25 auto_update.py.
+    btc_mode_default="Overlay",
+    metric_scale_default="Auto",
+    price_scale_default="Log",
+    series=[
+        Series("US 2Y Yield (%)", "US 2Y", color="#0070a6", axis="left", dim=0.49, short="2Y"),
+        Series("US 10Y Yield (%)", "US 10Y", color="#7b65d2", axis="left", dim=0.45, short="10Y",
+               hidden_default=True),
+        # Batang teal saat 10Y di atas 2Y, rust saat terbalik (negatif). Tanpa garis Zero:
+        # garis acuan hanya bisa di pane tengah; batang sudah tumbuh dari nol.
+        Series("10Y - 2Y Spread (pp)", "10Y-2Y", color="#0b8e89", negative_color="#bf5546",
+               axis="right", dim=0.45, kind="histogram", smoothing=False, alpha=0.80,
+               short="Spread", pane="extra"),
+    ],
+    extra_label="10Y - 2Y",
+)
+
+
 # Urutan di sini = urutan menu sidebar; kelompok muncul menurut halaman pertamanya.
 # Halaman pertama jadi halaman bawaan (alamat localhost:8503/).
 BTC_TRADFI = MetricFamily(
@@ -761,4 +789,4 @@ BTC_TRADFI = MetricFamily(
 
 FAMILIES = {f.title: f for f in [MARKET_VALUATION, PRICE_LEVELS, AVIV, REALIZED_CAP, SOPR, NUPL, UNREALIZED_PL, SUPPLY_IN_PROFIT,
                                    HODL_WAVES, RHODL_RATIO, HOLDER_SUPPLY, EXCHANGE_FLOW,
-                                   FUNDING_OI, FEAR_GREED, BTC_TRADFI, VIX]}
+                                   FUNDING_OI, FEAR_GREED, BTC_TRADFI, VIX, TREASURY_YIELDS]}

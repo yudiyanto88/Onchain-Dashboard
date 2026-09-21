@@ -329,6 +329,23 @@ def load_vix():
     return harga.merge(vix, on='Date', how='left')
 
 
+@st.cache_data(ttl=3600)
+def load_yields():
+    """US Treasury yield 2Y & 10Y (data_yields.csv, Pipeline 25 dari FRED) + spread 10Y - 2Y.
+
+    Hanya hari pasar obligasi AS; akhir pekan dan libur kosong (tidak di-ffill). Harga BTC dari
+    data_mvrv.csv. Cek data 21 Sep 2026: tanpa nilai <= 0; nilai sama >= 5 hari (28 kali) hanya
+    di masa suku bunga ~0 % (2011-2013, 2020-2021) = pasar diam, bukan data macet.
+    Bukan bagian framework v2.
+    """
+    harga = _prepare(pd.read_csv("data_mvrv.csv", usecols=['date', 'btc_price'])
+                     .rename(columns={'date': 'Date', 'btc_price': 'BTC Price'}))
+    y = _prepare(pd.read_csv("data_yields.csv").rename(
+        columns={'date': 'Date', 'us2y': 'US 2Y', 'us10y': 'US 10Y'}))
+    y['10Y-2Y'] = y['US 10Y'] - y['US 2Y']
+    return harga.merge(y, on='Date', how='left')
+
+
 # Band umur yang dihitung sebagai LTH (batas kohort 155 hari jatuh di dalam band 3m-6m;
 # band itu dimasukkan ke STH supaya tidak dipotong sembarangan).
 LTH_BANDS = ("6m-12m", "1y-2y", "2y-3y", "3y-5y", "5y-7y", "7y-10y", "10y+")
