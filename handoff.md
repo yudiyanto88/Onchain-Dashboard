@@ -20,8 +20,7 @@ Baca dokumen ini dan `CLAUDE.md` sebelum mulai. Semua yang ditandai **ditahan/di
 - **Live (15 halaman, 6 kelompok):** Valuation (MVRV · Price Levels · AVIV · Realized Cap) · Profitability (SOPR · NUPL · Unrealized P/L · Supply in Profit) · Holder Behavior (HODL Waves · RHODL Ratio · LTH/STH Supply) · Exchange (Exchange Flow) · Derivatives (Funding Rates & Open Interest) · Sentiment & Macro (Fear & Greed · BTC vs Stocks & Gold). Semua halaman: slider rentang, nyaman di HP, kontrol diingat per halaman, tombol Style di chart.
 - **Langkah pertama sesi baru:**
   1. Cek server `dashboard-v2-uji` (bagian 2), buka halaman, lihat keadaannya sebelum mengubah apa pun.
-  2. Tanyakan apakah Streamlit Cloud perlu **Reboot app** sesudah push terakhir (`dashboard/` berubah).
-  3. Tanyakan apakah **Cohort State** (bagian 6) sudah boleh dilanjutkan, lalu **halaman berikutnya** (kandidat dan hasil cek data di bagian 7 — jangan dicek ulang; rencana VIX / Dollar & Yields di bagian 6).
+  2. Tanyakan apakah **Cohort State** (bagian 6) sudah boleh dilanjutkan, lalu **halaman berikutnya** (kandidat dan hasil cek data di bagian 7 — jangan dicek ulang; rencana VIX / Dollar & Yields di bagian 6).
 - **Menambah halaman:** satu `MetricFamily` di `dashboard/registry.py` (+ loader di `data.py`). Urutan kerja yang disukai user: cek kualitas data (nilai macet, lonjakan, satuan, cakupan, revisi) → pratinjau widget dengan data asli + uji palet (bagian 8) → tunggu pilihan user → kerjakan di localhost → user bilang valid → merge dari GitHub → commit → push.
 
 ---
@@ -38,7 +37,7 @@ Baca dokumen ini dan `CLAUDE.md` sebelum mulai. Semua yang ditandai **ditahan/di
 - **Selera tampilan:** kontrol ringkas, lambang ketimbang kata, ukuran seragam, kedudukan lurus dengan elemen sekitar.
 - **Localhost uji: http://localhost:8503** (server `dashboard-v2-uji` di `.claude/launch.json`); "nyalakan localhost" = server ini. **Wajib restart sesudah mengubah `dashboard/`** — tanpa itu kode baru tidak terbaca. Cek dulu `curl http://localhost:8503/_stcore/health`: server bisa tetap hidup sesudah sesi Claude Code ditutup, dan sisa sesi lama hanya bisa dimatikan dengan izin user (`preview_stop` tidak mempan, `Stop-Period`-style `Stop-Process` ditolak pengaman). User juga bisa menjalankan sendiri: `streamlit run app.py --server.port 8503`.
 - **Handoff:** jangan diedit tanpa persetujuan; daftarkan usulan poin dulu (kecuali user sudah minta dicatat).
-- **Git:** commit hanya file dashboard yang relevan + handoff, dan hanya kalau user minta. Repo punya banyak perubahan user yang belum di-commit (`CLAUDE.md`, `references/`, `research/`) — jangan ikut. Sebelum push **merge dulu dari GitHub** (`git fetch`; `git diff --name-only HEAD...origin/main` — kalau hanya `data_*.csv` dan `alerts/logs/`, aman). Sesudah push yang mengubah `dashboard/`, ingatkan **Manage app → ⋮ → Reboot app** bila versi online error (Streamlit Cloud tidak membaca ulang modul).
+- **Git:** commit hanya file dashboard yang relevan + handoff, dan hanya kalau user minta. Repo punya banyak perubahan user yang belum di-commit (`CLAUDE.md`, `references/`, `research/`) — jangan ikut. Sebelum push **merge dulu dari GitHub** (`git fetch`; `git diff --name-only HEAD...origin/main` — kalau hanya `data_*.csv` dan `alerts/logs/`, aman). **Jangan tanya atau mengingatkan soal Reboot app Streamlit Cloud** (permintaan user 21 Sep) — user mengurusnya sendiri. Latar: Streamlit Cloud tidak membaca ulang modul, jadi versi online bisa error sesudah push yang mengubah `dashboard/` sampai di-Reboot.
 
 ---
 
