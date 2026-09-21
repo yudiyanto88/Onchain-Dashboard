@@ -512,6 +512,10 @@ loadLib(0).then(() => {
   };
   // Opasitas dasar batang: alpha_together saat semua satuan menyala (batang S&P diredupkan
   // supaya garis Gold terbaca), selain itu alpha biasa.
+  // Seri kembaran tanpa legend (show_when "together", Gold garis) dan induknya: seri legend
+  // dengan kolom yang sama (Gold batang).
+  const kembaran = spec => spec.show_when === 'together' && !spec.group;
+  const indukDari = spec => S.find(x => x.col === spec.col && x.group);
   const alphaDasar = spec => spec.alpha_together && semuaNyala() ? spec.alpha_together
     : (spec.alpha < 1 ? spec.alpha : 1);
   // Garis bergradasi (spec.gradient = [[nilai, hex], ...], Fear & Greed; 16 Sep 2026): warna
@@ -563,9 +567,9 @@ loadLib(0).then(() => {
     const umum = {
       color: baseColor(spec),
       priceScaleId: spec.pane === 'price' ? (spec.axis || 'right') : spec.axis,
-      title: spec.group ? spec.name : (spec.twin || ''),
+      title: spec.group ? spec.name : (kembaran(spec) ? indukDari(spec).name : ''),
       priceLineVisible: false,
-      lastValueVisible: !!spec.group || !!spec.twin,
+      lastValueVisible: !!spec.group || kembaran(spec),
       priceFormat: formatSeri(spec),
     };
     if (rentangTetap(spec)) {
@@ -1290,14 +1294,14 @@ loadLib(0).then(() => {
       for (const { wadah, anggota } of wadahKelompok.values()) {
         wadah.style.display = anggota.some(h => satuanLegend(h.spec)) ? '' : 'none';
       }
-      // Seri kembaran (spec.twin, tanpa legend): nyala/mati dan redup sorot ikut seri induknya.
+      // Seri kembaran (tanpa legend): nyala/mati dan redup sorot ikut seri induknya.
       for (const h of handles) {
-        if (!h.spec.twin) continue;
-        const induk = handles.find(x => x.spec.name === h.spec.twin);
+        if (!kembaran(h.spec)) continue;
+        const induk = handles.find(x => x.spec === indukDari(h.spec));
         const redup = !!induk && state.highlights.length > 0
           && !state.highlights.includes(induk.spec.group);
         h.line.applyOptions({
-          visible: !state.hidden.includes(h.spec.twin) && satuanTampil(h.spec),
+          visible: !!induk && !state.hidden.includes(induk.spec.name) && satuanTampil(h.spec),
           color: redup ? dimmed(h.spec.color, h.spec.dim) : h.spec.color,
         });
         // Contoh warna di legend induk: garis kembaran saat ia yang tampil, batang saat tidak.
@@ -1431,7 +1435,7 @@ loadLib(0).then(() => {
     // Seri legend yang sedang digantikan kembarannya (Gold batang -> garis): contoh warna
     // di tooltip mengikuti garis yang benar-benar tampil.
     const kembar = spec.show_when && !satuanTampil(spec)
-      ? handles.find(h => h.spec.twin === spec.name) : null;
+      ? handles.find(h => kembaran(h.spec) && h.spec.col === spec.col) : null;
     if (kembar) spec = kembar.spec;
     if (duaWarna(spec)) {
       const minus = baseColor(Object.assign({}, spec, { color: spec.negative_color }));

@@ -50,12 +50,11 @@ class Series:
     stack_cols: dict | None = None
     # Seri bersatuan yang hanya tampil pada keadaan saklar tertentu: "alone" = satuannya satu-
     # satunya yang menyala, "together" = semua satuan menyala (BTC vs Stocks & Gold: Gold
-    # batang saat sendirian, garis saat bersama S&P 500).
+    # batang saat sendirian, garis saat bersama S&P 500). Seri "together" tanpa group = kembaran
+    # tanpa legend; nyala/mati dan sorotnya ikut seri legend dengan kolom yang sama.
     show_when: str | None = None
     # Opasitas batang saat semua satuan menyala (S&P 500 diredupkan supaya garis Gold terbaca).
     alpha_together: float | None = None
-    # Seri kembaran tanpa legend: nyala/mati dan sorotnya ikut seri bernama ini.
-    twin: str | None = None
 
 
 @dataclass
@@ -109,9 +108,9 @@ class MetricFamily:
     # Saklar satuan di dalam chart, mis. ("BTC", "USD"); seri bertanda Series.unit ikut saklar.
     unit_switch: tuple[str, ...] | None = None
     unit_label: str = ""          # keterangan kecil sebelum saklar ("OI")
-    # Kotak Window menggantikan kotak Smoothing (BTC vs Stocks & Gold): pilihan jendela rolling
-    # dalam hari; loader dipanggil dengan jendela terpilih. None = kotak Smoothing biasa.
-    window_days: tuple[int, ...] | None = None
+    # Kotak Window menggantikan kotak Smoothing (BTC vs Stocks & Gold): label tombol -> jendela
+    # rolling dalam hari; loader dipanggil dengan jendela terpilih. None = kotak Smoothing biasa.
+    window_days: dict[str, int] | None = None
     window_default: int = 365
     smoothing_default: list[int] = field(default_factory=list)   # periode menyala sejak awal
     # Gaya bawaan per periode, mis. {30: "Band"}; periode lain ikut urutan Dotted/Step/Band.
@@ -734,12 +733,10 @@ BTC_TRADFI = MetricFamily(
         # Olive seperti CVDD (Price Levels): jarak ke oranye BTC 43 normal, 28 deuteranopia,
         # 17 protanopia; dipilih user 21 Sep 2026. Redup 1,70:1 pada dim 0.32.
         Series("Gold Z-Score (line)", "Gold Z", color="#a8963f", axis="left", dim=0.32,
-               smoothing=False, group=None, unit="Gold", show_when="together",
-               twin="BTC / Gold Z-Score"),
+               smoothing=False, unit="Gold", show_when="together"),
     ],
     unit_switch=("S&P 500", "Gold"),
-    window_days=(180, 365, 730, 1460),
-    window_default=365,
+    window_days={"6m": 180, "1y": 365, "2y": 730, "4y": 1460},
 )
 
 

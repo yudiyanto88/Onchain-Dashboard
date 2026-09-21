@@ -290,10 +290,6 @@ def load_fear_greed():
     return df.merge(harga, on='Date', how='left')
 
 
-# Pembanding pasar tradisional di data_tradfi.csv: kolom -> nama di dashboard.
-TRADFI_BENCH = {"spx": "S&P 500", "xau": "Gold"}
-
-
 @st.cache_data(ttl=3600)
 def load_btc_tradfi(window=365):
     """Z-Score log(BTC / pembanding) untuk S&P 500 dan emas, jendela `window` hari.
@@ -310,12 +306,12 @@ def load_btc_tradfi(window=365):
     tradfi = _prepare(pd.read_csv("data_tradfi.csv").rename(columns={'date': 'Date'}))
     df = harga.merge(tradfi, on='Date', how='left')
     df = df[df['Date'] >= tradfi['Date'].min()].copy()
-    for kolom, nama in TRADFI_BENCH.items():
+    for kolom, nama in (("spx", "S&P 500"), ("xau", "Gold")):
         pembanding = df[kolom].ffill()
         rasio = np.log(df['BTC Price'] / pembanding)
         jendela = rasio.rolling(int(window))
         df[f'{nama} Z'] = (rasio - jendela.mean()) / jendela.std()
-    return df.drop(columns=list(TRADFI_BENCH))
+    return df.drop(columns=["spx", "xau"])
 
 
 # Band umur yang dihitung sebagai LTH (batas kohort 155 hari jatuh di dalam band 3m-6m;
