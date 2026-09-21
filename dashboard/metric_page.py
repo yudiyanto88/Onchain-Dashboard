@@ -580,7 +580,9 @@ def render_metric_page(family: MetricFamily):
                          unit=sr.unit, pair=sr.pair, compact=sr.compact,
                          gradient=sr.gradient, value_labels=sr.value_labels,
                          stack_index=sr.stack_index, stack_cols=sr.stack_cols,
-                         show_when=sr.show_when, alpha_together=sr.alpha_together))
+                         show_when=sr.show_when, alpha_together=sr.alpha_together,
+                         fill_with=sr.fill_with, fill_colors=sr.fill_colors,
+                         fill_alpha=sr.fill_alpha))
         if not sr.smoothing:
             continue
         for p in periods:

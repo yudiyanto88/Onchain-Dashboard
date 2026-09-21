@@ -598,6 +598,31 @@ loadLib(0).then(() => {
           : Math.abs(v - Math.round(v)) < 1e-9 ? String(Math.round(v)) : tulis(v),
       });
     }
+    // Arsiran di antara dua garis (spec.fill_with; Futures Basis vs 2Y, 22 Sep 2026).
+    // lightweight-charts tidak bisa mengisi di antara dua garis, jadi: area pertama mengikuti
+    // garis yang lebih tinggi dengan warna per titik (fill_colors[0] saat garis ini di atas,
+    // [1] saat di bawah), area kedua mengikuti garis yang lebih rendah berwarna latar chart dan
+    // menutup isian di bawahnya. Keduanya dibuat sebelum garis ini, jadi tergambar di bawahnya.
+    // ponytail: area penutup ikut menutup grid di bawah garis yang lebih rendah (grid samar);
+    // custom series poligon kalau itu mengganggu.
+    let isi = null;
+    if (spec.fill_with && D.cols[spec.fill_with]) {
+      const lain = D.cols[spec.fill_with], atas = [], bawah = [];
+      for (let i = 0; i < D.t.length; i++) {
+        const a = values[i], b = lain[i];
+        if (a === null || b === null) continue;
+        atas.push({ time: D.t[i], value: Math.max(a, b), diAtas: a >= b });
+        bawah.push({ time: D.t[i], value: Math.min(a, b) });
+      }
+      const opsi = { priceScaleId: umum.priceScaleId, priceFormat: umum.priceFormat,
+        priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false,
+        lineColor: 'rgba(0,0,0,0)', lineWidth: 1 };
+      isi = { atas: panes[spec.pane].addAreaSeries(Object.assign({}, opsi)),
+              tutup: panes[spec.pane].addAreaSeries(Object.assign({}, opsi,
+                { topColor: '#131722', bottomColor: '#131722' })),
+              titik: atas, redup: null };
+      isi.tutup.setData(bawah);
+    }
     // Batang digambar dari garis nol, jadi nilai negatif turun ke bawah sendiri.
     const line = tumpukan(spec)
       ? panes[spec.pane].addAreaSeries(Object.assign({}, umum, {
@@ -617,7 +642,7 @@ loadLib(0).then(() => {
           crosshairMarkerVisible: !!spec.group,
         }, umum));
     if (!tumpukan(spec)) line.setData(points);   // area bertumpuk diisi tumpuk() di apply()
-    const handle = { spec, line };
+    const handle = { spec, line, isi };
     if (warnaPerTitik(spec)) { handle.titik = points; handle.redup = false; }
     // Kembaran Loss: bentuk garis sama, lahir tersembunyi; nyala/warnanya diatur apply().
     if (bisaDibalik(spec)) {
@@ -1271,6 +1296,22 @@ loadLib(0).then(() => {
         handle.line.applyOptions({ topColor: c, bottomColor: c, lineColor: c });
       }
       if (garisNol(spec)) handle.line.applyOptions(warnaGarisNol(spec, faded));
+      if (handle.isi) {
+        // Arsiran tampil hanya kalau kedua garisnya menyala; redup ikut garis ini.
+        const pasangan = S.find(x => x.col === spec.fill_with && x.group);
+        const tampil = !hidden && !(pasangan && state.hidden.includes(pasangan.name));
+        handle.isi.atas.applyOptions({ visible: tampil });
+        handle.isi.tutup.applyOptions({ visible: tampil });
+        if (handle.isi.redup !== faded) {
+          handle.isi.redup = faded;
+          const a = spec.fill_alpha * (faded ? spec.dim : 1);
+          const [plus, minus] = spec.fill_colors.map(c => dimmed(c, a));
+          handle.isi.atas.setData(handle.isi.titik.map(p => {
+            const c = p.diAtas ? plus : minus;
+            return { time: p.time, value: p.value, topColor: c, bottomColor: c };
+          }));
+        }
+      }
       // Histogram dua warna: warna ada di tiap titik, jadi diwarnai ulang hanya saat
       // keadaan redupnya berubah.
       const bersama = !!spec.alpha_together && semuaNyala();

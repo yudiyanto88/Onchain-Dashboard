@@ -38,6 +38,9 @@ class Line:
     stack_cols: dict | None = None       # kind "stack": kolom per bobot {"Realized Cap": col, ...}
     show_when: str | None = None         # "alone" / "together" menurut saklar satuan
     alpha_together: float | None = None  # opasitas batang saat semua satuan menyala
+    fill_with: str | None = None         # arsiran ke garis berkolom ini (lihat Series)
+    fill_colors: tuple | None = None
+    fill_alpha: float = 0.35
 
 
 def render(df, lines, price_line, extra_lines, height, metric_mode, price_mode, key,

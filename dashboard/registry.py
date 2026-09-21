@@ -55,6 +55,11 @@ class Series:
     show_when: str | None = None
     # Opasitas batang saat semua satuan menyala (S&P 500 diredupkan supaya garis Gold terbaca).
     alpha_together: float | None = None
+    # Arsiran di antara garis ini dan garis berkolom fill_with (Futures Basis vs 2Y): warna
+    # fill_colors[0] saat garis ini di atas, fill_colors[1] saat di bawah, opasitas fill_alpha.
+    fill_with: str | None = None
+    fill_colors: tuple[str, str] | None = None
+    fill_alpha: float = 0.35
 
 
 @dataclass
@@ -674,23 +679,24 @@ FUTURES_BASIS = MetricFamily(
     loader=data.load_futures_basis,
     # Pilihan user 22 Sep 2026 dari pratinjau (acuan: chart Glassnode "Crypto has yielded less
     # than Treasuries"): basis navy, 2Y abu sebagai patokan (pengecualian satu-metrik-satu-warna:
-    # 2Y navy di halaman US Treasury Yields), BTC Overlay kanan Log. Arsiran di antara dua garis
-    # tidak bisa digambar lightweight-charts, jadi selisihnya di pane bawah sebagai area
-    # (kind "baseline"): teal saat crypto memberi yield lebih besar, rust saat di bawah Treasury.
+    # 2Y navy di halaman US Treasury Yields), BTC Overlay kanan Log. Arsiran di antara basis dan
+    # 2Y: teal saat crypto memberi yield lebih besar, rust saat di bawah Treasury. Selisihnya
+    # juga ada di pane bawah (kind "baseline"), Hidden awal.
     btc_mode_default="Overlay",
     metric_scale_default="Auto",
     price_scale_default="Log",
     series=[
+        # Arsiran teal/rust di antara basis dan 2Y seperti chart Glassnode (pilihan user
+        # 22 Sep 2026, cara "tumpuk area" di lw_chart).
         Series("BTC 3M Annualized Basis (%)", "Basis 3M", color="#0070a6", axis="left", dim=0.49,
-               short="Basis"),
+               short="Basis", fill_with="US 2Y", fill_colors=("#0b8e89", "#bf5546")),
         Series("US 2Y Yield (%)", "US 2Y", color="#8b949e", axis="left", dim=0.45, short="2Y",
                smoothing=False),
         Series("Basis - 2Y (pp)", "Basis - 2Y", color="#0b8e89", negative_color="#bf5546",
                axis="right", dim=0.45, kind="baseline", smoothing=False, alpha=0.45,
                short="Spread", pane="extra"),
     ],
-    extra_label="Basis - 2Y",
-    extra_default=True,
+    extra_label="Basis - 2Y",   # Hidden awal: arsiran di pane atas sudah menunjukkan selisihnya
 )
 
 
