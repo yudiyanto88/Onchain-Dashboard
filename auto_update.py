@@ -31,10 +31,19 @@ def fetch_data(url, columns_to_keep=None):
         print(f"Error fetching {url}: {e}")
         return pd.DataFrame()
 
+
+def simpan(df, file, kolom_log=None):
+    """Urutkan menurut tanggal, tulis CSV, cetak 3 baris terakhir. Mengembalikan df terurut."""
+    df = df.sort_values('date').reset_index(drop=True)
+    df.to_csv(file, index=False)
+    print(f"✅ {file} berhasil diperbarui.")
+    print((df[kolom_log] if kolom_log else df).tail(3).to_string(index=False))
+    return df
+
 # ==========================================
 # 1. PIPELINE: PRICE LEVELS & MOVING AVERAGES
 # ==========================================
-print("\n[1/15] Menarik data Price Levels...")
+print("\n[1] Menarik data Price Levels...")
 # 🟢 FIX: Tambahkan 'active_realized_price' dan 'mvrv_avg_price' ke dalam whitelist kolom hulu (akan di-rename ke 'MVRV 0σ' sebelum disimpan)
 df_price = fetch_data("https://chartinspect.com/api/onchain/onchain-price-levels?timeframe=all&isProUser=false", 
                       ['date', 'btc_price', 'sth_cost_basis', 'lth_cost_basis', 'realized_price', 'cvdd', 'active_realized_price', 'mvrv_avg_price'])
@@ -42,7 +51,6 @@ df_tmm = fetch_data("https://chartinspect.com/api/onchain/true-market-mean?timef
 
 if not df_price.empty and not df_tmm.empty:
     df_master_price = pd.merge(df_price, df_tmm, on='date', how='outer')
-    df_master_price['date'] = pd.to_datetime(df_master_price['date']).dt.strftime('%Y-%m-%d')
     df_master_price = df_master_price.sort_values('date').reset_index(drop=True)
     
     # Kalkulasi Moving Averages
@@ -53,14 +61,12 @@ if not df_price.empty and not df_tmm.empty:
     # Rename kolom API ke nama display sebelum disimpan ke CSV
     df_master_price.rename(columns={'mvrv_avg_price': 'MVRV 0σ'}, inplace=True)
 
-    df_master_price.to_csv("data_price_level.csv", index=False)
-    print("✅ data_price_level.csv berhasil diperbarui.")
-    print(df_master_price.tail(3).to_string(index=False))
+    simpan(df_master_price, "data_price_level.csv")
 
 # ==========================================
 # 2. PIPELINE: MOMENTUM & P/L
 # ==========================================
-print("\n[2/15] Menarik data Momentum & P/L...")
+print("\n[2] Menarik data Momentum & P/L...")
 df_sopr = fetch_data("https://chartinspect.com/api/onchain/sopr?timeframe=all&isProUser=false", ['date', 'btc_price', 'asopr'])
 df_lth_sopr = fetch_data("https://chartinspect.com/api/onchain/lth-sopr?timeframe=all&isProUser=false", ['date', 'lth_sopr'])
 df_sth_sopr = fetch_data("https://chartinspect.com/api/onchain/sth-sopr?timeframe=all&isProUser=false", ['date', 'sth_sopr'])
@@ -90,16 +96,12 @@ for d in dfs[1:]:
         df_master_mom = pd.merge(df_master_mom, d, on='date', how='outer')
 
 if not df_master_mom.empty:
-    df_master_mom['date'] = pd.to_datetime(df_master_mom['date']).dt.strftime('%Y-%m-%d')
-    df_master_mom = df_master_mom.sort_values('date').reset_index(drop=True)
-    df_master_mom.to_csv("data_momentum.csv", index=False)
-    print("✅ data_momentum.csv berhasil diperbarui.")
-    print(df_master_mom[['date', 'btc_price', 'asopr', 'net_realized_pl_usd']].tail(3).to_string(index=False))
+    simpan(df_master_mom, "data_momentum.csv", ['date', 'btc_price', 'asopr', 'net_realized_pl_usd'])
 
 # ==========================================
 # 3. PIPELINE: DERIVATIVES
 # ==========================================
-print("\n[3/15] Menarik data Derivatives...")
+print("\n[3] Menarik data Derivatives...")
 # Kolom OI per bursa dari API futures-open-interest (satuan BTC). Disimpan supaya
 # perubahan OI bisa dihitung tanpa lompatan saat bursa baru masuk cakupan.
 OI_EXCHANGES = ['cme', 'binance', 'bybit', 'hyperliquid', 'bitget', 'okx', 'deribit',
@@ -110,53 +112,38 @@ df_oi = fetch_data("https://chartinspect.com/api/charts/derivatives/futures-open
 
 if not df_funding.empty and not df_oi.empty:
     df_oi_clean = df_oi.rename(columns={ex: f'oi_{ex}' for ex in OI_EXCHANGES})
-    df_master_deriv = pd.merge(df_funding, df_oi_clean, on='date', how='outer')
-    df_master_deriv['date'] = pd.to_datetime(df_master_deriv['date']).dt.strftime('%Y-%m-%d')
-    df_master_deriv = df_master_deriv.sort_values('date').reset_index(drop=True)
-    df_master_deriv.to_csv("data_derivatives.csv", index=False)
-    print("✅ data_derivatives.csv berhasil diperbarui.")
-    print(df_master_deriv.tail(3).to_string(index=False))
+    simpan(pd.merge(df_funding, df_oi_clean, on='date', how='outer'), "data_derivatives.csv")
 
 # ==========================================
 # 4. PIPELINE: SOCIAL SENTIMENT
 # ==========================================
-print("\n[4/15] Menarik data Social Sentiment...")
+print("\n[4] Menarik data Social Sentiment...")
 df_gtrend = fetch_data("https://chartinspect.com/api/charts/onchain/google-trends?timeframe=all&isProUser=false", 
                        ['date', 'btc_price', 'trend_bitcoin', 'trend_crypto', 'trend_ethereum', 'trend_nft'])
 df_wiki = fetch_data("https://chartinspect.com/api/charts/onchain/wikipedia-pageviews?timeframe=all&isProUser=false", 
                      ['date', 'wiki_bitcoin', 'wiki_cryptocurrency', 'wiki_ethereum', 'wiki_blockchain'])
 
 if not df_gtrend.empty and not df_wiki.empty:
-    df_wiki_clean = df_wiki.drop(columns=['btc_price'], errors='ignore')
-    df_master_sentiment = pd.merge(df_gtrend, df_wiki_clean, on='date', how='outer')
-    df_master_sentiment['date'] = pd.to_datetime(df_master_sentiment['date']).dt.strftime('%Y-%m-%d')
-    df_master_sentiment = df_master_sentiment.sort_values('date').reset_index(drop=True)
-    df_master_sentiment.to_csv("data_sentiment.csv", index=False)
-    print("✅ data_sentiment.csv berhasil diperbarui.")
-    print(df_master_sentiment[['date', 'trend_bitcoin', 'wiki_bitcoin']].tail(3).to_string(index=False))
+    simpan(pd.merge(df_gtrend, df_wiki, on='date', how='outer'), "data_sentiment.csv",
+           ['date', 'trend_bitcoin', 'wiki_bitcoin'])
 
 # ==========================================
 # 5. PIPELINE: SUPPLY DYNAMICS
 # ==========================================
-print("\n[5/15] Menarik data Supply Dynamics...")
+print("\n[5] Menarik data Supply Dynamics...")
 df_sth_lth = fetch_data("https://chartinspect.com/api/onchain/sth-lth?timeframe=all&isProUser=false", 
                        ['date', 'btc_price', 'lth_supply_btc', 'sth_supply_btc', 'pct_lth_in_profit', 'pct_sth_in_profit', 'pct_lth_in_loss', 'pct_sth_in_loss'])
 df_profit_loss = fetch_data("https://chartinspect.com/api/onchain/profit-loss?timeframe=all&isProUser=false", 
                             ['date', 'percent_btc_in_profit', 'percent_btc_in_loss'])
 
 if not df_sth_lth.empty and not df_profit_loss.empty:
-    df_profit_loss_clean = df_profit_loss[['date', 'percent_btc_in_profit', 'percent_btc_in_loss']]
-    df_supply = pd.merge(df_sth_lth, df_profit_loss_clean, on='date', how='outer')
-    df_supply['date'] = pd.to_datetime(df_supply['date']).dt.strftime('%Y-%m-%d')
-    df_supply = df_supply.sort_values('date').reset_index(drop=True)
-    df_supply.to_csv("data_supply.csv", index=False)
-    print("✅ data_supply.csv berhasil diperbarui.")
-    print(df_supply[['date', 'lth_supply_btc', 'sth_supply_btc']].tail(3).to_string(index=False))
+    simpan(pd.merge(df_sth_lth, df_profit_loss, on='date', how='outer'), "data_supply.csv",
+           ['date', 'lth_supply_btc', 'sth_supply_btc'])
 
 # ==========================================
 # 6. PIPELINE: MARKET VALUATION
 # ==========================================
-print("\n[6/15] Menarik data Market Valuation...")
+print("\n[6] Menarik data Market Valuation...")
 df_mvrv = fetch_data("https://chartinspect.com/api/onchain/mvrv?timeframe=all&isProUser=false",
                      ['date', 'btc_price', 'mvrv', 'sth_mvrv', 'lth_mvrv'])
 df_mvrv_z = fetch_data("https://chartinspect.com/api/onchain/mvrv-z-score?timeframe=all&isProUser=false",
@@ -164,53 +151,37 @@ df_mvrv_z = fetch_data("https://chartinspect.com/api/onchain/mvrv-z-score?timefr
 
 if not df_mvrv.empty:
     df_mvrv.rename(columns={'mvrv': 'mvrv_ratio'}, inplace=True)
-    df_mvrv['date'] = pd.to_datetime(df_mvrv['date']).dt.strftime('%Y-%m-%d')
-    df_mvrv = df_mvrv.sort_values('date').reset_index(drop=True)
-
     if not df_mvrv_z.empty:
-        df_mvrv_z['date'] = pd.to_datetime(df_mvrv_z['date']).dt.strftime('%Y-%m-%d')
         df_mvrv = pd.merge(df_mvrv, df_mvrv_z, on='date', how='left')
-
-    df_mvrv.to_csv("data_mvrv.csv", index=False)
-    print("✅ data_mvrv.csv berhasil diperbarui.")
-    print(df_mvrv.tail(3).to_string(index=False))
+    simpan(df_mvrv, "data_mvrv.csv")
     
 # ==========================================
 # 7. PIPELINE: FEAR & GREED
 # ==========================================
-print("\n[7/15] Menarik data Fear & Greed...")
+print("\n[7] Menarik data Fear & Greed...")
 df_fg = fetch_data("https://chartinspect.com/api/charts/crypto/fear-greed-index?timeframe=all&isProUser=false")
 if not df_fg.empty:
     df_fg['date'] = pd.to_datetime(df_fg['timestamp'], unit='s').dt.strftime('%Y-%m-%d')
     df_fg.rename(columns={'value': 'Fear & Greed'}, inplace=True)
-    df_fg_clean = df_fg[['date', 'Fear & Greed']].sort_values('date').reset_index(drop=True)
-    df_fg_clean.to_csv("data_fg.csv", index=False)
-    print("✅ data_fg.csv berhasil diperbarui.")
-    print(df_fg_clean.tail(3).to_string(index=False))
+    simpan(df_fg[['date', 'Fear & Greed']], "data_fg.csv")
 
 # ==========================================
 # 8. PIPELINE: EXCHANGE FLOWS
 # ==========================================
-print("\n[8/15] Menarik data Exchange Flow...")
+print("\n[8] Menarik data Exchange Flow...")
 df_ex = fetch_data("https://chartinspect.com/api/charts/exchange-etf/exchange-flows?timeframe=all", 
                    ['date', 'btc_price', 'total_balance', 'net_flow', 'inflow', 'outflow'])
 if not df_ex.empty:
-    df_ex['date'] = pd.to_datetime(df_ex['date'], format='mixed', errors='coerce').dt.strftime('%Y-%m-%d')
-    df_ex = df_ex.sort_values('date').reset_index(drop=True)
-    df_ex.to_csv("data_exchange.csv", index=False)
-    print("✅ data_exchange.csv berhasil diperbarui.")
-    print(df_ex[['date', 'total_balance', 'net_flow']].tail(3).to_string(index=False))
+    simpan(df_ex, "data_exchange.csv", ['date', 'total_balance', 'net_flow'])
 
 # ==========================================
 # 9. PIPELINE: CUMULATIVE P/L PRICE & RATIO
 # ==========================================
-print("\n[9/15] Mengkalkulasi Cumulative P/L Price...")
+print("\n[9] Mengkalkulasi Cumulative P/L Price...")
 try:
-    df_age_raw = fetch_data("https://chartinspect.com/api/onchain/realized-profit-by-age?timeframe=all&isProUser=false")
-    
-    if not df_age_raw.empty:
-        df_age_raw['date'] = pd.to_datetime(df_age_raw['date'], utc=True, errors='coerce').dt.strftime('%Y-%m-%d')
-        df_age_raw = df_age_raw.sort_values('date').reset_index(drop=True)
+    # Endpoint yang sama sudah ditarik di Pipeline 2 (df_age); cumsum butuh urutan tanggal.
+    if not df_age.empty:
+        df_age_raw = df_age.sort_values('date').reset_index(drop=True)
         
         # 🟢 FIX MUTLAK: LTH murni adalah 155+ Hari (Bands 5 sampai 11)
         lth_prof_raw = df_age_raw[[f'band_{i}_profit_usd' for i in range(5, 12)]].sum(axis=1)
@@ -239,9 +210,8 @@ try:
             df_cum_final = df_cum[['date', 'cum_pl_price', 'pl_price_ratio']]
 
             # 🟢 REKAP DATA MUTLAK: Amankan struktur file data_price_level.csv
-            df_p_rekap = pd.read_csv("data_price_level.csv")
-            df_p_rekap['date'] = pd.to_datetime(df_p_rekap['date'], errors='coerce').dt.strftime('%Y-%m-%d')
-            
+            df_p_rekap = df_p
+
             cols_to_drop = [c for c in ['cum_pl_price', 'pl_price_ratio'] if c in df_p_rekap.columns]
             if cols_to_drop:
                 df_p_rekap.drop(columns=cols_to_drop, inplace=True)
@@ -259,24 +229,16 @@ except Exception as e:
 # ==========================================
 # 10. PIPELINE: RHODL RATIO
 # ==========================================
-print("\n[10/15] Menarik data RHODL Ratio...")
-df_rhodl = fetch_data("https://chartinspect.com/api/onchain/rhodl?historical=true&timeframe=all&isProUser=false")
+print("\n[10] Menarik data RHODL Ratio...")
+df_rhodl = fetch_data("https://chartinspect.com/api/onchain/rhodl?historical=true&timeframe=all&isProUser=false",
+                      ['date', 'btc_price', 'rhodl_ratio', 'realized_cap_1w', 'realized_cap_1_2y'])
 if not df_rhodl.empty:
-    cols_rhodl = ['date', 'btc_price', 'rhodl_ratio', 'realized_cap_1w', 'realized_cap_1_2y']
-    available_cols = [c for c in cols_rhodl if c in df_rhodl.columns]
-    
-    df_rhodl_clean = df_rhodl[available_cols].copy()
-    df_rhodl_clean['date'] = pd.to_datetime(df_rhodl_clean['date']).dt.strftime('%Y-%m-%d')
-    df_rhodl_clean = df_rhodl_clean.sort_values('date').reset_index(drop=True)
-    df_rhodl_clean.to_csv("data_rhodl.csv", index=False)
-    
-    print("✅ data_rhodl.csv berhasil diperbarui.")
-    print(df_rhodl_clean[['date', 'rhodl_ratio']].tail(3).to_string(index=False))
+    simpan(df_rhodl, "data_rhodl.csv", ['date', 'rhodl_ratio'])
 
 # ==========================================
 # 11. PIPELINE: HODL WAVES (SPECIAL PARSING)
 # ==========================================
-print("\n[11/15] Menarik data HODL Waves...")
+print("\n[11] Menarik data HODL Waves...")
 try:
     url_hw = "https://chartinspect.com/api/onchain/hodl-waves?timeframe=all&waveType=standard&historical=true&resolution=auto&maxPoints=2000&isProUser=false"
     res_hw = requests.get(url_hw)
@@ -298,12 +260,7 @@ try:
         
         df_hw = pd.DataFrame(rows_hw)
         df_hw = df_hw.dropna(subset=['date']).drop_duplicates(subset=['date'], keep='last')
-        df_hw['date'] = pd.to_datetime(df_hw['date']).dt.strftime('%Y-%m-%d')
-        df_hw = df_hw.sort_values('date').reset_index(drop=True)
-        
-        df_hw.to_csv("data_hodl_waves.csv", index=False)
-        print("✅ data_hodl_waves.csv berhasil diperbarui.")
-        print(df_hw[['date', 'supply_1y-2y', 'realized_cap_1y-2y']].tail(3).to_string(index=False))
+        simpan(df_hw, "data_hodl_waves.csv", ['date', 'supply_1y-2y', 'realized_cap_1y-2y'])
     else:
         print("❌ GAGAL: Endpoint HODL Waves mengembalikan array kosong.")
 except Exception as e:
@@ -312,18 +269,14 @@ except Exception as e:
 # ==========================================
 # 12. PIPELINE: REALIZED CAP
 # ==========================================
-print("\n[12/15] Menarik data Realized Cap...")
+print("\n[12] Menarik data Realized Cap...")
 try:
     url_rcap = "https://chartinspect.com/api/onchain/realized-cap?timeframe=all&isProUser=false"
     cols_rcap = ['date', 'btc_price', 'realized_cap_usd', 'lth_realized_cap_usd', 'sth_realized_cap_usd']
     df_rcap = fetch_data(url_rcap, cols_rcap)
     
     if not df_rcap.empty:
-        df_rcap['date'] = pd.to_datetime(df_rcap['date']).dt.strftime('%Y-%m-%d')
-        df_rcap = df_rcap.sort_values('date').reset_index(drop=True)
-        df_rcap.to_csv("data_realized_cap.csv", index=False)
-        print("✅ data_realized_cap.csv berhasil diperbarui.")
-        print(df_rcap[['date', 'realized_cap_usd']].tail(3).to_string(index=False))
+        simpan(df_rcap, "data_realized_cap.csv", ['date', 'realized_cap_usd'])
     else:
         print("❌ GAGAL: Data Realized Cap kosong atau gagal ditarik.")
 except Exception as e:
@@ -332,18 +285,14 @@ except Exception as e:
 # ==========================================
 # 13. PIPELINE: COIN DAYS DESTROYED (CDD)
 # ==========================================
-print("\n[13/15] Menarik data Coin Days Destroyed (CDD)...")
+print("\n[13] Menarik data Coin Days Destroyed (CDD)...")
 try:
     url_cdd = "https://chartinspect.com/api/onchain/cdd?timeframe=all&isProUser=false"
     cols_cdd = ['date', 'cdd', 'vdd_30d_ma', 'vdd_365d_ma', 'vdd_multiple']
     df_cdd = fetch_data(url_cdd, cols_cdd)
     
     if not df_cdd.empty:
-        df_cdd['date'] = pd.to_datetime(df_cdd['date']).dt.strftime('%Y-%m-%d')
-        df_cdd = df_cdd.sort_values('date').reset_index(drop=True)
-        df_cdd.to_csv("data_cdd.csv", index=False)
-        print("✅ data_cdd.csv berhasil diperbarui.")
-        print(df_cdd[['date', 'cdd', 'vdd_multiple']].tail(3).to_string(index=False))
+        simpan(df_cdd, "data_cdd.csv", ['date', 'cdd', 'vdd_multiple'])
     else:
         print("❌ GAGAL: Data CDD kosong atau gagal ditarik.")
 except Exception as e:
@@ -352,7 +301,7 @@ except Exception as e:
 # ==========================================
 # 14. PIPELINE: LTH P/L PRICE FLOW
 # ==========================================
-print("\n[14/15] Mengkalkulasi LTH P/L Price Flow...")
+print("\n[14] Mengkalkulasi LTH P/L Price Flow...")
 try:
     df_p = pd.read_csv("data_price_level.csv")
     df_p['date'] = pd.to_datetime(df_p['date'], errors='coerce').dt.strftime('%Y-%m-%d')
@@ -376,7 +325,7 @@ except Exception as e:
 # ==========================================
 # 15. PIPELINE: REALIZED PROFIT/LOSS IN BTC + P/L RATIOS
 # ==========================================
-print("\n[15/16] Menarik data Realized Profit/Loss (BTC) + P/L Ratios...")
+print("\n[15] Menarik data Realized Profit/Loss (BTC) + P/L Ratios...")
 try:
     df_rpl = fetch_data(
         "https://chartinspect.com/api/onchain/realized-profit-loss?timeframe=all&isProUser=false",
@@ -436,7 +385,7 @@ except Exception as e:
 # ==========================================
 # 16. PIPELINE: AVIV RATIO & BANDS
 # ==========================================
-print("\n[16/17] Menarik data AVIV Ratio & Bands...")
+print("\n[16] Menarik data AVIV Ratio & Bands...")
 try:
     df_aviv = fetch_data(
         "https://chartinspect.com/api/onchain/aviv-bands?timeframe=all&isProUser=false",
@@ -447,10 +396,7 @@ try:
     )
 
     if not df_aviv.empty:
-        df_aviv = df_aviv.sort_values('date').reset_index(drop=True)
-        df_aviv.to_csv("data_aviv.csv", index=False)
-        print("✅ data_aviv.csv berhasil diperbarui.")
-        print(df_aviv[['date', 'btc_price', 'aviv_ratio', 'aviv_mean']].tail(3).to_string(index=False))
+        simpan(df_aviv, "data_aviv.csv", ['date', 'btc_price', 'aviv_ratio', 'aviv_mean'])
     else:
         print("❌ GAGAL: Data AVIV Bands kosong atau gagal ditarik.")
 except Exception as e:
@@ -467,7 +413,7 @@ except Exception as e:
 # ==========================================
 # 17. PIPELINE: APPARENT DEMAND
 # ==========================================
-print("\n[17/18] Menarik data Apparent Demand...")
+print("\n[17] Menarik data Apparent Demand...")
 try:
     df_demand = fetch_data(
         "https://chartinspect.com/api/onchain/apparent-demand?timeframe=all&isProUser=false",
@@ -475,10 +421,7 @@ try:
     )
 
     if not df_demand.empty:
-        df_demand = df_demand.sort_values('date').reset_index(drop=True)
-        df_demand.to_csv("data_apparent_demand.csv", index=False)
-        print("✅ data_apparent_demand.csv berhasil diperbarui.")
-        print(df_demand[['date', 'apparent_demand']].tail(3).to_string(index=False))
+        simpan(df_demand, "data_apparent_demand.csv", ['date', 'apparent_demand'])
     else:
         print("❌ GAGAL: Data Apparent Demand kosong atau gagal ditarik.")
 except Exception as e:
@@ -487,21 +430,16 @@ except Exception as e:
 # ==========================================
 # 19. PIPELINE: US 2-YEAR TREASURY YIELD (MACRO)
 # ==========================================
-print("\n[19/19] Menarik data US 2-Year Treasury Yield...")
+print("\n[19] Menarik data US 2-Year Treasury Yield...")
 try:
-    res_t2y = requests.get("https://chartinspect.com/api/charts/economic/indicators?indicator=2y-treasury&timeframe=all")
-    raw_t2y = res_t2y.json().get('data', [])
-    df_t2y = pd.DataFrame(raw_t2y)
+    df_t2y = fetch_data("https://chartinspect.com/api/charts/economic/indicators?indicator=2y-treasury&timeframe=all")
 
     if not df_t2y.empty:
         # 'time' adalah Unix timestamp (detik); 'value' adalah yield dalam persen
         df_t2y['date'] = pd.to_datetime(df_t2y['time'], unit='s', utc=True).dt.strftime('%Y-%m-%d')
         df_t2y = df_t2y.rename(columns={'value': 'treasury_2y_yield'})[['date', 'treasury_2y_yield']]
         df_t2y = df_t2y.dropna(subset=['date']).drop_duplicates(subset=['date'], keep='last')
-        df_t2y = df_t2y.sort_values('date').reset_index(drop=True)
-        df_t2y.to_csv("data_treasury_2y.csv", index=False)
-        print("✅ data_treasury_2y.csv berhasil diperbarui.")
-        print(df_t2y.tail(3).to_string(index=False))
+        simpan(df_t2y, "data_treasury_2y.csv")
     else:
         print("❌ GAGAL: Data Treasury 2Y kosong atau gagal ditarik.")
 except Exception as e:
@@ -510,7 +448,7 @@ except Exception as e:
 # ==========================================
 # 20. PIPELINE: RELATIVE UNREALIZED P/L BY COHORT
 # ==========================================
-print("\n[20/20] Menarik data Relative Unrealized P/L by Cohort...")
+print("\n[20] Menarik data Relative Unrealized P/L by Cohort...")
 try:
     df_rupl_cohort = fetch_data(
         "https://chartinspect.com/api/onchain/relative-unrealized-pl-by-cohort?timeframe=all&isProUser=false",
@@ -518,10 +456,8 @@ try:
     )
 
     if not df_rupl_cohort.empty:
-        df_rupl_cohort = df_rupl_cohort.sort_values('date').reset_index(drop=True)
-        df_rupl_cohort.to_csv("data_relative_unrealized_pl_by_cohort.csv", index=False)
-        print("✅ data_relative_unrealized_pl_by_cohort.csv berhasil diperbarui.")
-        print(df_rupl_cohort[['date', 'sth_rup', 'sth_rul', 'lth_rup', 'lth_rul']].tail(3).to_string(index=False))
+        simpan(df_rupl_cohort, "data_relative_unrealized_pl_by_cohort.csv",
+               ['date', 'sth_rup', 'sth_rul', 'lth_rup', 'lth_rul'])
     else:
         print("❌ GAGAL: Data Relative Unrealized P/L by Cohort kosong atau gagal ditarik.")
 except Exception as e:
@@ -535,7 +471,19 @@ except Exception as e:
 # resmi dihitung dari URPD di Pipeline 22 (source='urpd_formula'). Begitu endpoint
 # resmi akhirnya nyampe ke tanggal yang tadinya urpd_formula, baris itu DIVERIFIKASI
 # (dibandingkan) dulu sebelum ditimpa angka resmi.
-print("\n[21/22] Menarik data Median MVRV...")
+def baca_median_mvrv():
+    """data_median_mvrv.csv yang ada (atau tabel kosong), tanggal sebagai teks."""
+    if os.path.exists("data_median_mvrv.csv"):
+        df = pd.read_csv("data_median_mvrv.csv")
+    else:
+        df = pd.DataFrame(columns=['date', 'btc_price', 'median_realized_price', 'median_mvrv', 'source'])
+    if 'source' not in df.columns:
+        df['source'] = 'official'  # file lama sebelum kolom source ada
+    df['date'] = df['date'].astype(str)
+    return df
+
+
+print("\n[21] Menarik data Median MVRV...")
 try:
     df_median_official = fetch_data(
         "https://chartinspect.com/api/onchain/median-mvrv?timeframe=all&isProUser=false",
@@ -547,13 +495,7 @@ try:
         df_median_official['source'] = 'official'
         official_dates = set(df_median_official['date'])
 
-        if os.path.exists("data_median_mvrv.csv"):
-            df_mm_prev = pd.read_csv("data_median_mvrv.csv")
-        else:
-            df_mm_prev = pd.DataFrame(columns=['date', 'btc_price', 'median_realized_price', 'median_mvrv', 'source'])
-        if 'source' not in df_mm_prev.columns:
-            df_mm_prev['source'] = 'official'  # file lama sebelum kolom source ada
-        df_mm_prev['date'] = df_mm_prev['date'].astype(str)
+        df_mm_prev = baca_median_mvrv()
 
         df_prev_urpd_rows = df_mm_prev[df_mm_prev['source'] == 'urpd_formula']
 
@@ -587,7 +529,7 @@ except Exception as e:
 # hari-ini persis (parameter date/timestamp/isProUser diabaikan). Beda dari endpoint
 # lain di file ini, jadi histori data_urpd.csv cuma numpuk maju dari titik pertama
 # script ini dijalankan, TIDAK bisa backfill ke masa lalu.
-print("\n[22/22] Menarik snapshot URPD (UTXO Realized Price Distribution)...")
+print("\n[22] Menarik snapshot URPD (UTXO Realized Price Distribution)...")
 try:
     res_urpd = requests.get("https://chartinspect.com/api/onchain/urpd?timeframe=all&isProUser=false")
     raw_urpd = res_urpd.json().get('data', [])
@@ -637,11 +579,7 @@ try:
                 median_rp_today = _median_realized_price_from_urpd(raw_urpd)
                 median_mvrv_today = today_btc_price / median_rp_today
 
-                df_mm = pd.read_csv("data_median_mvrv.csv") if os.path.exists("data_median_mvrv.csv") \
-                    else pd.DataFrame(columns=['date', 'btc_price', 'median_realized_price', 'median_mvrv', 'source'])
-                if 'source' not in df_mm.columns:
-                    df_mm['source'] = 'official'
-                df_mm['date'] = df_mm['date'].astype(str)
+                df_mm = baca_median_mvrv()
 
                 if today_str not in df_mm['date'].values:
                     df_new_row = pd.DataFrame([{
@@ -683,7 +621,7 @@ TRADFI_TICKERS = {
     'spx': '^GSPC',   # S&P 500
     'xau': 'GC=F',    # Emas, futures bulan terdekat (pendekatan harga spot)
 }
-print("\n[23/23] Menarik harga pasar tradisional dari Yahoo Finance...")
+print("\n[23] Menarik harga pasar tradisional dari Yahoo Finance...")
 try:
     tradfi_file = "data_tradfi.csv"
     if os.path.exists(tradfi_file):
@@ -729,7 +667,7 @@ except Exception as e:
 # ==========================================
 # 18. MASTER PIPELINE: ALL METRICS AGGREGATOR (NEW)
 # ==========================================
-print("\n[18/18] 🌌 Mengkompilasi Semua File CSV ke dalam 1 Master Dataset...")
+print("\n[Master] 🌌 Mengkompilasi Semua File CSV ke dalam 1 Master Dataset...")
 try:
     # Daftar semua file CSV target hulu hasil rekapitulasi individu
     csv_files = [
