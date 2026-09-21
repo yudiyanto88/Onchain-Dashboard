@@ -183,6 +183,8 @@ def _init_state(family, dmin, dmax):
         f"{k}_extra": Z_BOTTOM if family.extra_default else Z_HIDDEN,
         f"{k}_height": 720,
     }
+    if family.window_days:
+        defaults[f"{k}_window"] = family.window_default
     # Ingatan per halaman (permintaan user 17 Sep 2026, pilihan a: selama tab browser terbuka).
     # Pindah halaman lewat st.navigation membuat Streamlit membuang nilai widget halaman lain
     # (bagian 10 handoff), jadi nilai terakhir tiap kontrol disalin ke gudang biasa
@@ -382,8 +384,12 @@ def _render_controls(family, dmin, dmax):
                               label_visibility="collapsed")
 
     with cols[1]:
-        with st.popover(f"Smoothing\n\n**{_smooth_summary(family)}**"):
-            _render_smoothing(family)
+        if family.window_days:
+            with st.popover(f"Window\n\n**{_window(family)}d**"):
+                _render_window(family)
+        else:
+            with st.popover(f"Smoothing\n\n**{_smooth_summary(family)}**"):
+                _render_smoothing(family)
 
     with cols[2]:
         with st.popover(f"Scale\n\n**{scale_txt}**"):
@@ -427,8 +433,9 @@ def _render_controls(family, dmin, dmax):
             # membuat bagian ini tiga kali lebih tinggi daripada isinya, dan popover jadi
             # lebih tinggi daripada chart saat halaman punya banyak garis.
             for s in family.series:
-                if s.pane != "main" or s.kind == "stack":
-                    continue   # pane tambahan punya sumbunya sendiri; band bertumpuk ikut satu sumbu
+                if s.pane != "main" or s.kind == "stack" or s.twin:
+                    continue   # pane tambahan punya sumbunya sendiri; band bertumpuk ikut satu sumbu;
+                               # kembaran (twin) memakai kolom dan sumbu induknya
                 # segmented_control, bukan st.radio, supaya bentuknya sama dengan kontrol lain.
                 _axis_control(s.label, f"{k}_axis_{s.col}", s.axis)
             # Harga BTC juga bisa dipindah sumbu. Berguna untuk halaman yang metriknya
@@ -450,8 +457,61 @@ def _render_controls(family, dmin, dmax):
                                  label_visibility="collapsed")
 
 
+def _window(family):
+    """Jendela rolling terpilih (hari). Dibaca sebelum loader, jadi sebelum _init_state:
+    ambil dari session, lalu ingatan halaman, lalu bawaan."""
+    k = family.key
+    return int(st.session_state.get(f"{k}_window")
+               or st.session_state.get(f"{k}_mem", {}).get(f"{k}_window")
+               or family.window_default)
+
+
+def _window_label(days):
+    """Label tombol preset: 365 -> 1y, 180 -> 6m (4 tombol sebaris, "180d" tidak muat)."""
+    if days % 365 == 0:
+        return f"{days // 365}y"
+    if days < 365 and days % 30 == 0:
+        return f"{days // 30}m"
+    return f"{days}d"
+
+
+def _render_window(family):
+    """Isi kotak Window: preset jendela + isian hari sendiri (gaya kotak Smoothing)."""
+    k = family.key
+    aktif = _window(family)
+    st.markdown(f"<div class='pop-head'><span>ROLLING WINDOW</span>"
+                f"<span class='pop-val'>{aktif}d</span></div>", unsafe_allow_html=True)
+
+    def pilih(days):
+        st.session_state[f"{k}_window"] = int(days)
+
+    # Kisi 3 kolom seperti kotak Smoothing: empat tombol sebaris terlalu sempit (popover
+    # ~190 px, "6m" terpotong). Isian hari dan tombol Set mengisi sisa baris terakhir.
+    def pasang():
+        val = st.session_state[f"{k}_new_window"]
+        if val:
+            pilih(val)
+
+    isi = [("preset", d) for d in family.window_days] + [("input", None), ("set", None)]
+    for mulai in range(0, len(isi), 3):
+        cells = st.columns(3, gap="small", vertical_alignment="center")
+        for cell, (jenis, days) in zip(cells, isi[mulai:mulai + 3]):
+            with cell:
+                if jenis == "preset":
+                    st.button(_window_label(days), key=f"{k}_w_{days}", use_container_width=True,
+                              type="primary" if days == aktif else "secondary",
+                              on_click=pilih, args=(days,))
+                elif jenis == "input":
+                    st.number_input("Days", min_value=30, max_value=3000, value=None,
+                                    placeholder=str(aktif), key=f"{k}_new_window",
+                                    label_visibility="collapsed")
+                else:
+                    st.button("Set", key=f"{k}_set_window", use_container_width=True,
+                              on_click=pasang)
+
+
 def render_metric_page(family: MetricFamily):
-    df_raw = family.loader()
+    df_raw = family.loader(_window(family)) if family.window_days else family.loader()
     if df_raw.empty:
         st.error(f"Could not load data for {family.title}.")
         return
@@ -522,14 +582,18 @@ def render_metric_page(family: MetricFamily):
             continue
         axis = st.session_state[f"{k}_axis_{sr.col}"]
         plan.append(Line(sr.label, sr.col, sr.color, axis, width=LINE_WIDTH,
-                         group=sr.group or sr.label, dim=sr.dim, kind=sr.kind,
+                         # Seri kembaran (twin) tidak punya legend sendiri.
+                         group=None if sr.twin else (sr.group or sr.label),
+                         dim=sr.dim, kind=sr.kind,
                          short=sr.short, alpha=sr.alpha, precision=sr.precision,
                          hidden_default=sr.hidden_default, whole_from=sr.whole_from,
                          complement_color=sr.complement_color,
                          negative_color=sr.negative_color,
                          unit=sr.unit, pair=sr.pair, compact=sr.compact,
                          gradient=sr.gradient, value_labels=sr.value_labels,
-                         stack_index=sr.stack_index, stack_cols=sr.stack_cols))
+                         stack_index=sr.stack_index, stack_cols=sr.stack_cols,
+                         show_when=sr.show_when, alpha_together=sr.alpha_together,
+                         twin=sr.twin))
         if not sr.smoothing:
             continue
         for p in periods:

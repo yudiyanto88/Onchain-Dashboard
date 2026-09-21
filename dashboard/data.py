@@ -5,6 +5,7 @@ tidak ikut terpengaruh saat file ini berubah.
 """
 from datetime import timedelta
 
+import numpy as np
 import pandas as pd
 import streamlit as st
 
@@ -287,6 +288,34 @@ def load_fear_greed():
     harga = _prepare(pd.read_csv("data_mvrv.csv", usecols=['date', 'btc_price'])
                      .rename(columns={'date': 'Date', 'btc_price': 'BTC Price'}))
     return df.merge(harga, on='Date', how='left')
+
+
+# Pembanding pasar tradisional di data_tradfi.csv: kolom -> nama di dashboard.
+TRADFI_BENCH = {"spx": "S&P 500", "xau": "Gold"}
+
+
+@st.cache_data(ttl=3600)
+def load_btc_tradfi(window=365):
+    """Z-Score log(BTC / pembanding) untuk S&P 500 dan emas, jendela `window` hari.
+
+    Jendela dipilih di kotak Window halaman (bawaan 365 hari). Sama dengan
+    research/analyze_btc_spx_zscore.py: Z = (log rasio - SMA jendela) / SD jendela,
+    jendela dalam hari kalender BTC. data_tradfi.csv hanya berisi hari bursa;
+    akhir pekan dan libur diisi harga penutupan terakhir (ffill) sebelum rasio dihitung.
+    Hasil riset (21 Sep 2026): Z rendah bukan sinyal beli yang berdiri sendiri — jendela
+    1 tahun tanpa divergence diikuti penurunan median -39 %. Bukan bagian framework v2.
+    """
+    harga = _prepare(pd.read_csv("data_mvrv.csv", usecols=['date', 'btc_price'])
+                     .rename(columns={'date': 'Date', 'btc_price': 'BTC Price'}))
+    tradfi = _prepare(pd.read_csv("data_tradfi.csv").rename(columns={'date': 'Date'}))
+    df = harga.merge(tradfi, on='Date', how='left')
+    df = df[df['Date'] >= tradfi['Date'].min()].copy()
+    for kolom, nama in TRADFI_BENCH.items():
+        pembanding = df[kolom].ffill()
+        rasio = np.log(df['BTC Price'] / pembanding)
+        jendela = rasio.rolling(int(window))
+        df[f'{nama} Z'] = (rasio - jendela.mean()) / jendela.std()
+    return df.drop(columns=list(TRADFI_BENCH))
 
 
 # Band umur yang dihitung sebagai LTH (batas kohort 155 hari jatuh di dalam band 3m-6m;

@@ -36,6 +36,9 @@ class Line:
     value_labels: list | None = None     # nama kelas per rentang [[batas atas, nama], ...]
     stack_index: int | None = None       # kind "stack": urutan band dari bawah (0 = paling muda)
     stack_cols: dict | None = None       # kind "stack": kolom per bobot {"Realized Cap": col, ...}
+    show_when: str | None = None         # "alone" / "together" menurut saklar satuan
+    alpha_together: float | None = None  # opasitas batang saat semua satuan menyala
+    twin: str | None = None              # seri kembaran tanpa legend, ikut seri bernama ini
 
 
 def render(df, lines, price_line, extra_lines, height, metric_mode, price_mode, key,

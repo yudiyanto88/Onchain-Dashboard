@@ -48,6 +48,14 @@ class Series:
     # Area bertumpuk (kind="stack", HODL Waves): urutan band dari bawah dan kolom per bobot.
     stack_index: int | None = None
     stack_cols: dict | None = None
+    # Seri bersatuan yang hanya tampil pada keadaan saklar tertentu: "alone" = satuannya satu-
+    # satunya yang menyala, "together" = semua satuan menyala (BTC vs Stocks & Gold: Gold
+    # batang saat sendirian, garis saat bersama S&P 500).
+    show_when: str | None = None
+    # Opasitas batang saat semua satuan menyala (S&P 500 diredupkan supaya garis Gold terbaca).
+    alpha_together: float | None = None
+    # Seri kembaran tanpa legend: nyala/mati dan sorotnya ikut seri bernama ini.
+    twin: str | None = None
 
 
 @dataclass
@@ -101,6 +109,10 @@ class MetricFamily:
     # Saklar satuan di dalam chart, mis. ("BTC", "USD"); seri bertanda Series.unit ikut saklar.
     unit_switch: tuple[str, ...] | None = None
     unit_label: str = ""          # keterangan kecil sebelum saklar ("OI")
+    # Kotak Window menggantikan kotak Smoothing (BTC vs Stocks & Gold): pilihan jendela rolling
+    # dalam hari; loader dipanggil dengan jendela terpilih. None = kotak Smoothing biasa.
+    window_days: tuple[int, ...] | None = None
+    window_default: int = 365
     smoothing_default: list[int] = field(default_factory=list)   # periode menyala sejak awal
     # Gaya bawaan per periode, mis. {30: "Band"}; periode lain ikut urutan Dotted/Step/Band.
     smoothing_style_default: dict[int, str] = field(default_factory=dict)
@@ -694,6 +706,43 @@ FEAR_GREED = MetricFamily(
 
 # Urutan di sini = urutan menu sidebar; kelompok muncul menurut halaman pertamanya.
 # Halaman pertama jadi halaman bawaan (alamat localhost:8503/).
+BTC_TRADFI = MetricFamily(
+    key="btc_tradfi",
+    title="BTC vs Stocks & Gold",
+    subtitle="BTC Relative Strength vs S&P 500 & Gold",
+    group="Sentiment & Macro",
+    url_path="btc-stocks-gold",
+    loader=data.load_btc_tradfi,
+    # Permintaan user 21 Sep 2026 dari gambar riset: Z-Score log(BTC / pembanding) sebagai
+    # batang dua warna, harga BTC menumpang (Overlay, sumbu kanan Log). Di atas nol rust, di
+    # bawah nol teal (gambar riset: merah atas, hijau bawah). Saklar S&P 500 | Gold di chart,
+    # boleh dua-duanya: saat bersama, batang S&P diredupkan ke 35 % dan Gold jadi garis olive
+    # (pilihan user dari pratinjau). Jendela rolling dipilih di kotak Window (bawaan 365 hari),
+    # menggantikan Smoothing. Garis ambang ±2 dan titik sinyal sengaja tidak dipasang: riset
+    # menyimpulkan sinyalnya masih hipotesis, dan dashboard tidak memasang ambang.
+    # Data S&P/emas: Pipeline 23 auto_update.py (Yahoo), hanya hari bursa, di-ffill di loader.
+    btc_mode_default="Overlay",
+    metric_scale_default="Auto",
+    price_scale_default="Log",
+    series=[
+        Series("BTC / S&P 500 Z-Score", "S&P 500 Z", color="#bf5546", negative_color="#0b8e89",
+               axis="left", dim=0.45, kind="histogram", smoothing=False, alpha=0.80,
+               alpha_together=0.35, short="S&P", unit="S&P 500"),
+        Series("BTC / Gold Z-Score", "Gold Z", color="#bf5546", negative_color="#0b8e89",
+               axis="left", dim=0.45, kind="histogram", smoothing=False, alpha=0.80,
+               short="Gold", unit="Gold", show_when="alone"),
+        # Olive seperti CVDD (Price Levels): jarak ke oranye BTC 43 normal, 28 deuteranopia,
+        # 17 protanopia; dipilih user 21 Sep 2026. Redup 1,70:1 pada dim 0.32.
+        Series("Gold Z-Score (line)", "Gold Z", color="#a8963f", axis="left", dim=0.32,
+               smoothing=False, group=None, unit="Gold", show_when="together",
+               twin="BTC / Gold Z-Score"),
+    ],
+    unit_switch=("S&P 500", "Gold"),
+    window_days=(180, 365, 730, 1460),
+    window_default=365,
+)
+
+
 FAMILIES = {f.title: f for f in [MARKET_VALUATION, PRICE_LEVELS, AVIV, REALIZED_CAP, SOPR, NUPL, UNREALIZED_PL, SUPPLY_IN_PROFIT,
                                    HODL_WAVES, RHODL_RATIO, HOLDER_SUPPLY, EXCHANGE_FLOW,
-                                   FUNDING_OI, FEAR_GREED]}
+                                   FUNDING_OI, FEAR_GREED, BTC_TRADFI]}

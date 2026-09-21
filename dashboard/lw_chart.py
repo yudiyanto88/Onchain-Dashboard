@@ -165,6 +165,17 @@ function dimmed(color, alpha) {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
+// Warna padat hasil campuran dengan latar chart (#131722), setara `alpha` tapi tanpa tembus
+// pandang. Dipakai batang yang sangat rapat: dengan rgba, batang yang jatuh di piksel yang
+// sama saling menumpuk sehingga pada Range All tampak hampir pekat walau alpha 0.35.
+function campurLatar(color, alpha) {
+  if (!color.startsWith('#')) return color;
+  const latar = [0x13, 0x17, 0x22];
+  const c = [1, 3, 5].map((i, k) => Math.round(parseInt(color.slice(i, i + 2), 16) * alpha
+    + latar[k] * (1 - alpha)));
+  return `rgb(${c[0]},${c[1]},${c[2]})`;
+}
+
 // Format angka per seri (precision dari registry), dipakai sumbu, label nilai terakhir,
 // dan tooltip. Harga (precision 0) tanpa desimal dengan pemisah ribuan; harga di bawah
 // 100 tetap diberi desimal supaya harga BTC 2010 ($0.05) tidak terbaca "0".
@@ -491,6 +502,18 @@ loadLib(0).then(() => {
   // spec.color, negatif spec.negative_color. Warna per titik mengalahkan warna seri, jadi
   // saat seri diredupkan (Highlight) titiknya diwarnai ulang lewat warnaiTitik(..., true).
   const duaWarna = spec => spec.kind === 'histogram' && !!spec.negative_color;
+  // Semua saklar satuan menyala (BTC vs Stocks & Gold: S&P 500 dan Gold bersama).
+  // warnaiTitik sudah dipanggil saat seri dibuat, sebelum state dan saklar satuan ada, jadi
+  // sampai saklar siap (siapSatuan) jawabannya false; apply() mewarnai ulang sesudahnya.
+  let siapSatuan = false;
+  const semuaNyala = () => {
+    const daftar = C.unitSwitch || [];
+    return siapSatuan && daftar.length > 1 && daftar.every(u => state.unitOn[u]);
+  };
+  // Opasitas dasar batang: alpha_together saat semua satuan menyala (batang S&P diredupkan
+  // supaya garis Gold terbaca), selain itu alpha biasa.
+  const alphaDasar = spec => spec.alpha_together && semuaNyala() ? spec.alpha_together
+    : (spec.alpha < 1 ? spec.alpha : 1);
   // Garis bergradasi (spec.gradient = [[nilai, hex], ...], Fear & Greed; 16 Sep 2026): warna
   // tiap titik diinterpolasi linear antar-titik henti.
   const bergradasi = spec => Array.isArray(spec.gradient) && spec.gradient.length > 1;
@@ -509,12 +532,14 @@ loadLib(0).then(() => {
   const cssGradasi = spec => 'linear-gradient(90deg, '
     + spec.gradient.map(([v, hex]) => `${hex} ${v}%`).join(', ') + ')';
   function warnaiTitik(spec, points, redup) {
-    const alpha = redup ? spec.dim * (spec.alpha < 1 ? spec.alpha : 1) : (spec.alpha < 1 ? spec.alpha : 1);
+    const alpha = redup ? spec.dim * alphaDasar(spec) : alphaDasar(spec);
     if (bergradasi(spec)) {
       for (const p of points) p.color = warnaGradasi(spec, p.value, alpha);
       return points;
     }
-    const plus = dimmed(spec.color, alpha), minus = dimmed(spec.negative_color, alpha);
+    // Saat diredupkan karena semua satuan menyala (alpha_together), warnanya dibuat padat.
+    const warna = spec.alpha_together && semuaNyala() ? campurLatar : dimmed;
+    const plus = warna(spec.color, alpha), minus = warna(spec.negative_color, alpha);
     for (const p of points) p.color = p.value < 0 ? minus : plus;
     return points;
   }
@@ -538,9 +563,9 @@ loadLib(0).then(() => {
     const umum = {
       color: baseColor(spec),
       priceScaleId: spec.pane === 'price' ? (spec.axis || 'right') : spec.axis,
-      title: spec.group ? spec.name : '',
+      title: spec.group ? spec.name : (spec.twin || ''),
       priceLineVisible: false,
-      lastValueVisible: !!spec.group,
+      lastValueVisible: !!spec.group || !!spec.twin,
       priceFormat: formatSeri(spec),
     };
     if (rentangTetap(spec)) {
@@ -821,10 +846,21 @@ loadLib(0).then(() => {
   const nyalaAwal = Object.fromEntries(SATUAN.map((u, i) => [u, i === 0]));
   state.unitOn = Object.assign({}, nyalaAwal,
     state.unitOn && typeof state.unitOn === 'object' ? state.unitOn : {});
+  siapSatuan = true;
   const satuanPertama = () => SATUAN.find(u => state.unitOn[u]) || null;
   // Seri digambar menurut saklar satuan (pane bawah: hanya satuan pertama yang menyala).
-  const satuanTampil = spec => !spec.unit
-    || (spec.pane === 'extra' ? spec.unit === satuanPertama() : !!state.unitOn[spec.unit]);
+  const satuanTampil = spec => {
+    if (!spec.unit) return true;
+    if (spec.pane === 'extra') return spec.unit === satuanPertama();
+    if (!state.unitOn[spec.unit]) return false;
+    // show_when: "alone" = hanya saat tidak semua satuan menyala, "together" = saat semuanya.
+    if (spec.show_when === 'together') return semuaNyala();
+    if (spec.show_when === 'alone') return !semuaNyala();
+    return true;
+  };
+  // Legend dan tombol sorot: kelompok tetap tampil selama satuannya menyala, walau seri
+  // legend-nya sedang digantikan kembarannya (Gold batang -> Gold garis saat bersama S&P).
+  const satuanLegend = spec => spec.show_when ? !!state.unitOn[spec.unit] : satuanTampil(spec);
   // Baris tooltip menurut saklar satuan (pane bawah: semua satuan yang menyala).
   const satuanTooltip = spec => !spec.unit || !!state.unitOn[spec.unit];
   const wadahKelompok = new Map();
@@ -1190,7 +1226,7 @@ loadLib(0).then(() => {
     // demi garis yang tidak kelihatan.
     const kelompokMenyala = new Set(legendItems
       .filter(h => !state.hidden.includes(h.spec.name) && !(bisaDibalik(h.spec) && keduanyaMati())
-        && satuanTampil(h.spec))
+        && satuanLegend(h.spec))
       .map(h => h.spec.group));
     state.highlights = state.highlights.filter(g => kelompokMenyala.has(g));
     for (const { button, group } of hlButtons) {
@@ -1214,8 +1250,10 @@ loadLib(0).then(() => {
       }
       // Histogram dua warna: warna ada di tiap titik, jadi diwarnai ulang hanya saat
       // keadaan redupnya berubah.
-      if (handle.titik && handle.redup !== faded) {
+      const bersama = !!spec.alpha_together && semuaNyala();
+      if (handle.titik && (handle.redup !== faded || handle.bersama !== bersama)) {
         handle.redup = faded;
+        handle.bersama = bersama;
         handle.line.setData(warnaiTitik(spec, handle.titik, faded));
       }
       if (handle.kembar) {
@@ -1250,7 +1288,27 @@ loadLib(0).then(() => {
     // Kelompok legend yang satuannya mati disembunyikan seluruhnya.
     if (SATUAN.length) {
       for (const { wadah, anggota } of wadahKelompok.values()) {
-        wadah.style.display = anggota.some(h => satuanTampil(h.spec)) ? '' : 'none';
+        wadah.style.display = anggota.some(h => satuanLegend(h.spec)) ? '' : 'none';
+      }
+      // Seri kembaran (spec.twin, tanpa legend): nyala/mati dan redup sorot ikut seri induknya.
+      for (const h of handles) {
+        if (!h.spec.twin) continue;
+        const induk = handles.find(x => x.spec.name === h.spec.twin);
+        const redup = !!induk && state.highlights.length > 0
+          && !state.highlights.includes(induk.spec.group);
+        h.line.applyOptions({
+          visible: !state.hidden.includes(h.spec.twin) && satuanTampil(h.spec),
+          color: redup ? dimmed(h.spec.color, h.spec.dim) : h.spec.color,
+        });
+        // Contoh warna di legend induk: garis kembaran saat ia yang tampil, batang saat tidak.
+        const isi = induk && wadahKelompok.get(induk.spec.group);
+        const sw = isi && isi.wadah.querySelector('.sw');
+        if (sw) {
+          if (sw.dataset.asli === undefined) sw.dataset.asli = sw.style.cssText;
+          sw.style.cssText = satuanTampil(h.spec)
+            ? `width:14px;height:0;border-radius:0;background:none;border-top:2px solid ${h.spec.color}`
+            : sw.dataset.asli;
+        }
       }
     }
     for (const { button, group } of hlButtons) {
@@ -1370,6 +1428,11 @@ loadLib(0).then(() => {
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 
   function contohWarna(spec) {
+    // Seri legend yang sedang digantikan kembarannya (Gold batang -> garis): contoh warna
+    // di tooltip mengikuti garis yang benar-benar tampil.
+    const kembar = spec.show_when && !satuanTampil(spec)
+      ? handles.find(h => h.spec.twin === spec.name) : null;
+    if (kembar) spec = kembar.spec;
     if (duaWarna(spec)) {
       const minus = baseColor(Object.assign({}, spec, { color: spec.negative_color }));
       return `<span class="tbox" style="background:linear-gradient(90deg, ${baseColor(spec)} 50%, ${minus} 50%)"></span>`;
