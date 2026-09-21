@@ -314,6 +314,21 @@ def load_btc_tradfi(window=365):
     return df.drop(columns=["spx", "xau"])
 
 
+@st.cache_data(ttl=3600)
+def load_vix():
+    """VIX (data_vix.csv, Pipeline 24 dari file resmi Cboe) + harga BTC dari data_mvrv.csv.
+
+    Hanya hari hitung Cboe; akhir pekan kosong (tidak di-ffill), garis menyambung
+    Jumat ke Senin. Sejak Mei 2022 Cboe juga memuat sebagian hari libur bursa AS; dibiarkan.
+    Cek data 21 Sep 2026: tanpa 0/macet/celah > 5 hari; lonjakan > 40 % semuanya kejadian
+    pasar asli (maks 82,69 pada 16 Mar 2020). Bukan bagian framework v2.
+    """
+    harga = _prepare(pd.read_csv("data_mvrv.csv", usecols=['date', 'btc_price'])
+                     .rename(columns={'date': 'Date', 'btc_price': 'BTC Price'}))
+    vix = _prepare(pd.read_csv("data_vix.csv").rename(columns={'date': 'Date', 'vix': 'VIX'}))
+    return harga.merge(vix, on='Date', how='left')
+
+
 # Band umur yang dihitung sebagai LTH (batas kohort 155 hari jatuh di dalam band 3m-6m;
 # band itu dimasukkan ke STH supaya tidak dipotong sembarangan).
 LTH_BANDS = ("6m-12m", "1y-2y", "2y-3y", "3y-5y", "5y-7y", "7y-10y", "10y+")

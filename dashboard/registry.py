@@ -703,6 +703,25 @@ FEAR_GREED = MetricFamily(
 )
 
 
+VIX = MetricFamily(
+    key="vix",
+    title="VIX",
+    subtitle="CBOE Volatility Index (VIX)",
+    group="Sentiment & Macro",
+    url_path="vix",
+    loader=data.load_vix,
+    # Pilihan user 21 Sep 2026 dari pratinjau: Overlay (VIX sumbu kiri linear, BTC kanan Log)
+    # dan garis acuan 20. Data resmi Cboe lewat Pipeline 24 (bukan Yahoo, lihat auto_update.py).
+    btc_mode_default="Overlay",
+    metric_scale_default="Auto",  # Auto = linear dengan autoscale; "Linear" di dashboard = sumbu dikunci
+    price_scale_default="Log",
+    series=[
+        Series("VIX", "VIX", color="#0070a6", axis="left", dim=0.49, precision=2),
+    ],
+    reference_lines=[RefLine(20.0, "20")],
+)
+
+
 # Urutan di sini = urutan menu sidebar; kelompok muncul menurut halaman pertamanya.
 # Halaman pertama jadi halaman bawaan (alamat localhost:8503/).
 BTC_TRADFI = MetricFamily(
@@ -742,4 +761,4 @@ BTC_TRADFI = MetricFamily(
 
 FAMILIES = {f.title: f for f in [MARKET_VALUATION, PRICE_LEVELS, AVIV, REALIZED_CAP, SOPR, NUPL, UNREALIZED_PL, SUPPLY_IN_PROFIT,
                                    HODL_WAVES, RHODL_RATIO, HOLDER_SUPPLY, EXCHANGE_FLOW,
-                                   FUNDING_OI, FEAR_GREED, BTC_TRADFI]}
+                                   FUNDING_OI, FEAR_GREED, BTC_TRADFI, VIX]}

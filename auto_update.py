@@ -665,6 +665,30 @@ except Exception as e:
     print(f"❌ Error Pipeline 23 Pasar Tradisional: {e}")
 
 # ==========================================
+# 24. PIPELINE: VIX (CBOE RESMI)
+# ==========================================
+# VIX dari file resmi Cboe (pembuat indeks), bukan Yahoo: Yahoo kehilangan 31 dari 33 hari
+# libur bursa AS yang dihitung Cboe sejak Mei 2022 dan 9 penutupannya beda (terbesar 6 Feb
+# 2026: 20,37 vs 17,76). FRED VIXCLS = salinan persis Cboe (dicek 21 Sep 2026).
+# Nilai di hari libur bursa AS itu resmi dari Cboe, dibiarkan apa adanya.
+# Seluruh sejarah ditarik ulang tiap jalan; gagal = file lama tidak diubah.
+print("\n[24] Menarik VIX dari Cboe...")
+try:
+    df_vix = pd.read_csv(
+        "https://cdn.cboe.com/api/global/us_indices/daily_prices/VIX_History.csv",
+        storage_options={'User-Agent': 'Mozilla/5.0'},
+    )
+    df_vix = pd.DataFrame({
+        'date': pd.to_datetime(df_vix['DATE'], format='%m/%d/%Y').dt.strftime('%Y-%m-%d'),
+        'vix': df_vix['CLOSE'],
+    }).dropna()
+    if df_vix.empty:
+        raise ValueError("data kosong")
+    simpan(df_vix, "data_vix.csv")
+except Exception as e:
+    print(f"❌ Error Pipeline 24 VIX: {e} — data_vix.csv tidak diubah")
+
+# ==========================================
 # 18. MASTER PIPELINE: ALL METRICS AGGREGATOR (NEW)
 # ==========================================
 print("\n[Master] 🌌 Mengkompilasi Semua File CSV ke dalam 1 Master Dataset...")
@@ -677,7 +701,7 @@ try:
         "data_hodl_waves.csv", "data_realized_cap.csv", "data_cdd.csv", "data_lth_flow.csv",
         "data_aviv.csv", "data_apparent_demand.csv", "data_treasury_2y.csv",
         "data_relative_unrealized_pl_by_cohort.csv", "data_median_mvrv.csv",
-        "data_tradfi.csv"
+        "data_tradfi.csv", "data_vix.csv"
     ]
     
     df_master = None
