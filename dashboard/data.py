@@ -346,6 +346,29 @@ def load_yields():
     return harga.merge(y, on='Date', how='left')
 
 
+@st.cache_data(ttl=3600)
+def load_futures_basis():
+    """BTC 3M annualized futures basis vs US 2Y yield (+ selisihnya) dan harga BTC.
+
+    Basis dari data_futures_basis_3m.csv (Pipeline 26: Binance COIN-M + Deribit, tenor tetap
+    90 hari, mulai Jun 2020). 2Y dari data_yields.csv; akhir pekan/libur diisi nilai terakhir
+    (ffill) supaya selisih harian ada. Cek data 22 Sep 2026: tanpa tanggal bolong; lonjakan
+    besar (2021, 11 Mar 2023 -4,7 %) dikonfirmasi kedua bursa; 3 Sep 2020 kedua bursa
+    berlawanan tanda (penyebab belum dicek). Bukan bagian framework v2.
+    """
+    harga = _prepare(pd.read_csv("data_mvrv.csv", usecols=['date', 'btc_price'])
+                     .rename(columns={'date': 'Date', 'btc_price': 'BTC Price'}))
+    basis = _prepare(pd.read_csv("data_futures_basis_3m.csv", usecols=['date', 'basis_3m'])
+                     .rename(columns={'date': 'Date', 'basis_3m': 'Basis 3M'}))
+    y2 = _prepare(pd.read_csv("data_yields.csv", usecols=['date', 'us2y'])
+                  .rename(columns={'date': 'Date', 'us2y': 'US 2Y'}))
+    df = harga.merge(basis, on='Date', how='left').merge(y2, on='Date', how='left')
+    df = df[df['Date'] >= basis['Date'].min()].copy()
+    df['US 2Y'] = df['US 2Y'].ffill()
+    df['Basis - 2Y'] = df['Basis 3M'] - df['US 2Y']
+    return df
+
+
 # Band umur yang dihitung sebagai LTH (batas kohort 155 hari jatuh di dalam band 3m-6m;
 # band itu dimasukkan ke STH supaya tidak dipotong sembarangan).
 LTH_BANDS = ("6m-12m", "1y-2y", "2y-3y", "3y-5y", "5y-7y", "7y-10y", "10y+")

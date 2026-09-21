@@ -502,6 +502,20 @@ loadLib(0).then(() => {
   // spec.color, negatif spec.negative_color. Warna per titik mengalahkan warna seri, jadi
   // saat seri diredupkan (Highlight) titiknya diwarnai ulang lewat warnaiTitik(..., true).
   const duaWarna = spec => spec.kind === 'histogram' && !!spec.negative_color;
+  // Area dua warna dari garis nol (kind "baseline", Futures Basis vs 2Y; 22 Sep 2026): garis
+  // dan isian di atas nol memakai spec.color, di bawah nol spec.negative_color; isian
+  // tembus pandang spec.alpha. faded = redup Highlight.
+  const garisNol = spec => spec.kind === 'baseline';
+  const contohDuaWarna = spec => duaWarna(spec) || garisNol(spec);
+  const warnaGarisNol = (spec, faded) => {
+    const k = faded ? spec.dim : 1, isi = spec.alpha * k;
+    return {
+      topLineColor: dimmed(spec.color, k), bottomLineColor: dimmed(spec.negative_color, k),
+      topFillColor1: dimmed(spec.color, isi), topFillColor2: dimmed(spec.color, isi),
+      bottomFillColor1: dimmed(spec.negative_color, isi),
+      bottomFillColor2: dimmed(spec.negative_color, isi),
+    };
+  };
   // Semua saklar satuan menyala (BTC vs Stocks & Gold: S&P 500 dan Gold bersama).
   // warnaiTitik sudah dipanggil saat seri dibuat, sebelum state dan saklar satuan ada, jadi
   // sampai saklar siap (siapSatuan) jawabannya false; apply() mewarnai ulang sesudahnya.
@@ -592,6 +606,10 @@ loadLib(0).then(() => {
         }))
       : spec.kind === 'histogram'
       ? panes[spec.pane].addHistogramSeries(Object.assign({ base: 0 }, umum))
+      : garisNol(spec)
+      ? panes[spec.pane].addBaselineSeries(Object.assign({}, umum, {
+          baseValue: { type: 'price', price: 0 }, lineWidth: 1,
+        }, warnaGarisNol(spec, false)))
       : panes[spec.pane].addLineSeries(Object.assign({
           lineWidth: spec.width,
           lineStyle: spec.style,
@@ -903,12 +921,12 @@ loadLib(0).then(() => {
     button.className = 'lg';
     const swatch = document.createElement('span');
     swatch.className = 'sw';
-    if (contoh.spec.kind === 'histogram' || tumpukan(contoh.spec)) {
+    if (contoh.spec.kind === 'histogram' || tumpukan(contoh.spec) || garisNol(contoh.spec)) {
       swatch.style.height = '9px';
       swatch.style.width = '11px';
       swatch.style.borderRadius = '2px';
       // Dua warna: separuh kiri warna positif, separuh kanan warna negatif.
-      swatch.style.background = duaWarna(contoh.spec)
+      swatch.style.background = contohDuaWarna(contoh.spec)
         ? `linear-gradient(90deg, ${baseColor(contoh.spec)} 50%, ${baseColor(Object.assign({}, contoh.spec, { color: contoh.spec.negative_color }))} 50%)`
         : baseColor(contoh.spec);
     } else if (bergradasi(contoh.spec)) {
@@ -1252,6 +1270,7 @@ loadLib(0).then(() => {
         const c = warna(spec.color);
         handle.line.applyOptions({ topColor: c, bottomColor: c, lineColor: c });
       }
+      if (garisNol(spec)) handle.line.applyOptions(warnaGarisNol(spec, faded));
       // Histogram dua warna: warna ada di tiap titik, jadi diwarnai ulang hanya saat
       // keadaan redupnya berubah.
       const bersama = !!spec.alpha_together && semuaNyala();
@@ -1437,7 +1456,7 @@ loadLib(0).then(() => {
     const kembar = spec.show_when && !satuanTampil(spec)
       ? handles.find(h => kembaran(h.spec) && h.spec.col === spec.col) : null;
     if (kembar) spec = kembar.spec;
-    if (duaWarna(spec)) {
+    if (contohDuaWarna(spec)) {
       const minus = baseColor(Object.assign({}, spec, { color: spec.negative_color }));
       return `<span class="tbox" style="background:linear-gradient(90deg, ${baseColor(spec)} 50%, ${minus} 50%)"></span>`;
     }

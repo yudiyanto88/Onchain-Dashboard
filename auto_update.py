@@ -712,6 +712,117 @@ except Exception as e:
     print(f"❌ Error Pipeline 25 Treasury Yield: {e} — data_yields.csv tidak diubah")
 
 # ==========================================
+# 26. PIPELINE: BTC 3M ANNUALIZED FUTURES BASIS (BINANCE COIN-M + DERIBIT)
+# ==========================================
+# Dipindah dari research/fetch_futures_basis_history.py (22 Sep 2026). Per hari, per bursa:
+# dua kontrak quarterly yang mengapit tenor 90 hari, basis tahunan = (F/S - 1) * 365 / hari ke
+# expiry, diinterpolasi linear ke tepat 90 hari; hasil = rata-rata bursa yang ada. Spot = index
+# Binance BTCUSD, close 00:00 UTC. Mulai Jun 2020. Seluruh sejarah dihitung ulang tiap jalan.
+# Satu bursa gagal = bursa lain tetap dipakai; semua gagal = file lama tidak diubah.
+print("\n[26] Menarik futures basis 3 bulan (Binance COIN-M + Deribit)...")
+try:
+    import calendar
+    from datetime import timedelta, timezone
+
+    BASIS_START = datetime(2020, 6, 1, tzinfo=timezone.utc)
+    BASIS_END = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    BULAN = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"]
+
+    def _ms(dt):
+        return int(dt.timestamp() * 1000)
+
+    def _jumat_terakhir(y, m):
+        dt = datetime(y, m, calendar.monthrange(y, m)[1], 8, tzinfo=timezone.utc)
+        while dt.weekday() != 4:
+            dt -= timedelta(days=1)
+        return dt
+
+    # Expiry quarterly Deribit & Binance: Jumat terakhir Mar/Jun/Sep/Des 08:00 UTC
+    EXPIRY = [_jumat_terakhir(y, m) for y in range(2020, BASIS_END.year + 2) for m in (3, 6, 9, 12)]
+
+    def _binance(path, params):
+        rows, start = [], _ms(BASIS_START)
+        while True:
+            r = requests.get(f"https://dapi.binance.com/dapi/v1/{path}", timeout=30, params={
+                **params, "interval": "1d", "startTime": start, "limit": 1500}).json()
+            if not isinstance(r, list) or not r:
+                break
+            rows += r
+            start = r[-1][0] + 86_400_000
+            if len(r) < 1500:
+                break
+        s = pd.Series({pd.Timestamp(k[0], unit="ms"): float(k[4]) for k in rows}, dtype=float)
+        return s[~s.index.duplicated()]
+
+    def _deribit(nama, start, end):
+        r = requests.get("https://www.deribit.com/api/v2/public/get_tradingview_chart_data", timeout=30,
+                         params={"instrument_name": nama, "resolution": "60",
+                                 "start_timestamp": _ms(start), "end_timestamp": _ms(end)}).json()
+        res = r.get("result") or {}
+        if res.get("status") != "ok":
+            return pd.Series(dtype=float)
+        # Bar 1 jam yang mulai 23:00 -> close 00:00 UTC, sama dengan index
+        s = pd.Series(res["close"], index=pd.to_datetime(res["ticks"], unit="ms"))
+        s = s[s.index.hour == 23]
+        s.index = s.index.normalize()
+        return s
+
+    def _ke_90_hari(titik):
+        titik = sorted(p for p in titik if p[0] >= 7)  # kontrak < 7 hari ke expiry terlalu berisik
+        bawah = [p for p in titik if p[0] <= 90]
+        atas = [p for p in titik if p[0] > 90]
+        if bawah and atas:
+            (t1, b1), (t2, b2) = bawah[-1], atas[0]
+            return b1 + (b2 - b1) * (90 - t1) / (t2 - t1)
+        dekat = [p for p in titik if 60 <= p[0] <= 120]
+        return min(dekat, key=lambda p: abs(p[0] - 90))[1] if dekat else None
+
+    def _aman(f, *a):
+        try:
+            return f(*a)
+        except Exception as e:
+            print(f"   ⚠️ {f.__name__}{a[:1]} gagal: {e}")
+            return pd.Series(dtype=float)
+
+    idx = _binance("indexPriceKlines", {"pair": "BTCUSD"})
+    if idx.empty:
+        raise ValueError("index Binance kosong")
+    cq = _aman(_binance, "continuousKlines", {"pair": "BTCUSD", "contractType": "CURRENT_QUARTER"})
+    nq = _aman(_binance, "continuousKlines", {"pair": "BTCUSD", "contractType": "NEXT_QUARTER"})
+    deribit = {}
+    for e in EXPIRY:
+        if e - timedelta(days=200) > BASIS_END:
+            continue
+        s = _aman(_deribit, f"BTC-{e.day}{BULAN[e.month - 1]}{e.year % 100:02d}",
+                  max(BASIS_START, e - timedelta(days=200)), min(e, BASIS_END + timedelta(days=1)))
+        if len(s):
+            deribit[e] = s
+    print(f"   index {len(idx)} hari, Binance CQ {len(cq)} / NQ {len(nq)}, Deribit {len(deribit)} kontrak")
+
+    baris = []
+    for hari, spot in idx.items():
+        tutup = hari.tz_localize("UTC") + timedelta(days=1)
+        depan = [e for e in EXPIRY if e > tutup]
+        tenor = lambda e: (e - tutup).total_seconds() / 86400
+        tahunan = lambda f, e: (f / spot - 1) * 365 / tenor(e) * 100
+        bn = []
+        if hari in cq.index:
+            bn.append((tenor(depan[0]), tahunan(cq[hari], depan[0])))
+        if hari in nq.index:
+            bn.append((tenor(depan[1]), tahunan(nq[hari], depan[1])))
+        dr = [(tenor(e), tahunan(s[hari], e)) for e, s in deribit.items() if e > tutup and hari in s.index]
+        b, d = _ke_90_hari(bn), _ke_90_hari(dr)
+        ada = [v for v in (b, d) if v is not None]
+        baris.append({'date': hari.strftime('%Y-%m-%d'), 'basis_binance': b, 'basis_deribit': d,
+                      'basis_3m': sum(ada) / len(ada) if ada else None})
+    df_basis = pd.DataFrame(baris).dropna(subset=['basis_3m']).round(4)
+    if df_basis.empty:
+        raise ValueError("basis kosong (semua bursa gagal)")
+    simpan(df_basis, "data_futures_basis_3m.csv")
+except Exception as e:
+    print(f"❌ Error Pipeline 26 Futures Basis: {e} — data_futures_basis_3m.csv tidak diubah")
+
+# ==========================================
 # 18. MASTER PIPELINE: ALL METRICS AGGREGATOR (NEW)
 # ==========================================
 print("\n[Master] 🌌 Mengkompilasi Semua File CSV ke dalam 1 Master Dataset...")
@@ -724,7 +835,8 @@ try:
         "data_hodl_waves.csv", "data_realized_cap.csv", "data_cdd.csv", "data_lth_flow.csv",
         "data_aviv.csv", "data_apparent_demand.csv", "data_treasury_2y.csv",
         "data_relative_unrealized_pl_by_cohort.csv", "data_median_mvrv.csv",
-        "data_tradfi.csv", "data_vix.csv", "data_yields.csv"
+        "data_tradfi.csv", "data_vix.csv", "data_yields.csv",
+        "data_futures_basis_3m.csv"
     ]
     
     df_master = None

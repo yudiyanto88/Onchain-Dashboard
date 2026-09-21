@@ -665,6 +665,35 @@ FUNDING_OI = MetricFamily(
 )
 
 
+FUTURES_BASIS = MetricFamily(
+    key="futures_basis",
+    title="Futures Basis vs 2Y",
+    subtitle="BTC 3M Futures Basis vs US 2Y Treasury",
+    group="Derivatives",
+    url_path="futures-basis",
+    loader=data.load_futures_basis,
+    # Pilihan user 22 Sep 2026 dari pratinjau (acuan: chart Glassnode "Crypto has yielded less
+    # than Treasuries"): basis navy, 2Y abu sebagai patokan (pengecualian satu-metrik-satu-warna:
+    # 2Y navy di halaman US Treasury Yields), BTC Overlay kanan Log. Arsiran di antara dua garis
+    # tidak bisa digambar lightweight-charts, jadi selisihnya di pane bawah sebagai area
+    # (kind "baseline"): teal saat crypto memberi yield lebih besar, rust saat di bawah Treasury.
+    btc_mode_default="Overlay",
+    metric_scale_default="Auto",
+    price_scale_default="Log",
+    series=[
+        Series("BTC 3M Annualized Basis (%)", "Basis 3M", color="#0070a6", axis="left", dim=0.49,
+               short="Basis"),
+        Series("US 2Y Yield (%)", "US 2Y", color="#8b949e", axis="left", dim=0.45, short="2Y",
+               smoothing=False),
+        Series("Basis - 2Y (pp)", "Basis - 2Y", color="#0b8e89", negative_color="#bf5546",
+               axis="right", dim=0.45, kind="baseline", smoothing=False, alpha=0.45,
+               short="Spread", pane="extra"),
+    ],
+    extra_label="Basis - 2Y",
+    extra_default=True,
+)
+
+
 FEAR_GREED = MetricFamily(
     key="fear_greed",
     title="Fear & Greed",
@@ -789,4 +818,4 @@ BTC_TRADFI = MetricFamily(
 
 FAMILIES = {f.title: f for f in [MARKET_VALUATION, PRICE_LEVELS, AVIV, REALIZED_CAP, SOPR, NUPL, UNREALIZED_PL, SUPPLY_IN_PROFIT,
                                    HODL_WAVES, RHODL_RATIO, HOLDER_SUPPLY, EXCHANGE_FLOW,
-                                   FUNDING_OI, FEAR_GREED, VIX, BTC_TRADFI, TREASURY_YIELDS]}
+                                   FUNDING_OI, FUTURES_BASIS, FEAR_GREED, VIX, BTC_TRADFI, TREASURY_YIELDS]}
