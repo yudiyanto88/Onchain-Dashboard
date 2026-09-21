@@ -668,6 +668,65 @@ except Exception as e:
     print(f"❌ Error Pipeline 22 URPD Snapshot: {e}")
 
 # ==========================================
+# 23. PIPELINE: PASAR TRADISIONAL (YAHOO FINANCE)
+# ==========================================
+# Harga penutupan harian aset non-kripto untuk halaman pembanding di dashboard.
+# Semua ticker masuk SATU file, satu kolom per aset: menambah VIX / DXY / yield nanti
+# cukup satu baris di TRADFI_TICKERS.
+# - Hanya hari bursa (akhir pekan & libur tidak ada baris); isi kekosongan dilakukan
+#   di loader dashboard/research, bukan di sini, supaya data mentah tetap jujur.
+# - Tanggal = timestamp + gmtoffset bursa, jadi tanggalnya tanggal lokal bursa.
+# - Seluruh sejarah ditarik ulang tiap jalan, sehingga bar hari ini yang belum final
+#   (mis. GC=F yang diperdagangkan hampir 24 jam) otomatis terkoreksi besoknya.
+# - Kalau satu ticker gagal, kolom lamanya di file dipertahankan (tidak dikosongkan).
+TRADFI_TICKERS = {
+    'spx': '^GSPC',   # S&P 500
+    'xau': 'GC=F',    # Emas, futures bulan terdekat (pendekatan harga spot)
+}
+print("\n[23/23] Menarik harga pasar tradisional dari Yahoo Finance...")
+try:
+    tradfi_file = "data_tradfi.csv"
+    if os.path.exists(tradfi_file):
+        df_tradfi = pd.read_csv(tradfi_file, dtype={'date': str}).set_index('date')
+    else:
+        df_tradfi = pd.DataFrame(index=pd.Index([], name='date', dtype=str))
+
+    berhasil = 0
+    for kolom, simbol in TRADFI_TICKERS.items():
+        try:
+            res_yf = requests.get(
+                f"https://query1.finance.yahoo.com/v8/finance/chart/{simbol}",
+                params={'period1': 1262304000,  # 1 Jan 2010
+                        'period2': int(datetime.now().timestamp()),
+                        'interval': '1d'},
+                headers={'User-Agent': 'Mozilla/5.0'},
+                timeout=30,
+            )
+            hasil = res_yf.json()['chart']['result'][0]
+            offset = hasil['meta'].get('gmtoffset', 0)
+            tanggal = pd.to_datetime(pd.Series(hasil['timestamp']) + offset, unit='s').dt.strftime('%Y-%m-%d')
+            seri = pd.Series(hasil['indicators']['quote'][0]['close'], index=tanggal.values, dtype=float).dropna()
+            seri = seri[~seri.index.duplicated(keep='last')]
+            if seri.empty:
+                raise ValueError("data kosong")
+            df_tradfi = df_tradfi.drop(columns=[kolom], errors='ignore').join(seri.rename(kolom), how='outer')
+            berhasil += 1
+            print(f"   {kolom} ({simbol}): {len(seri)} hari, terakhir {seri.index[-1]} = {seri.iloc[-1]:,.2f}")
+        except Exception as e:
+            print(f"   ⚠️ {kolom} ({simbol}) gagal: {e} — kolom lama dipertahankan")
+
+    if berhasil:
+        df_tradfi.index.name = 'date'
+        df_tradfi = df_tradfi.sort_index()
+        df_tradfi = df_tradfi[[k for k in TRADFI_TICKERS if k in df_tradfi.columns]]
+        df_tradfi.reset_index().to_csv(tradfi_file, index=False)
+        print(f"✅ {tradfi_file} berhasil diperbarui ({berhasil}/{len(TRADFI_TICKERS)} ticker).")
+    else:
+        print(f"❌ GAGAL: semua ticker Yahoo gagal, {tradfi_file} tidak diubah.")
+except Exception as e:
+    print(f"❌ Error Pipeline 23 Pasar Tradisional: {e}")
+
+# ==========================================
 # 18. MASTER PIPELINE: ALL METRICS AGGREGATOR (NEW)
 # ==========================================
 print("\n[18/18] 🌌 Mengkompilasi Semua File CSV ke dalam 1 Master Dataset...")
@@ -679,7 +738,8 @@ try:
         "data_mvrv.csv", "data_fg.csv", "data_exchange.csv", "data_rhodl.csv",
         "data_hodl_waves.csv", "data_realized_cap.csv", "data_cdd.csv", "data_lth_flow.csv",
         "data_aviv.csv", "data_apparent_demand.csv", "data_treasury_2y.csv",
-        "data_relative_unrealized_pl_by_cohort.csv", "data_median_mvrv.csv"
+        "data_relative_unrealized_pl_by_cohort.csv", "data_median_mvrv.csv",
+        "data_tradfi.csv"
     ]
     
     df_master = None
