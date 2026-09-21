@@ -669,7 +669,7 @@ FEAR_GREED = MetricFamily(
     key="fear_greed",
     title="Fear & Greed",
     subtitle="Crypto Fear & Greed Index",
-    group="Sentiment & Macro",
+    group="Sentiment",
     url_path="fear-greed",
     loader=data.load_fear_greed,
     # Disetujui user 16 Sep 2026 dari pratinjau: garis bergradasi
@@ -707,7 +707,7 @@ VIX = MetricFamily(
     key="vix",
     title="VIX",
     subtitle="CBOE Volatility Index (VIX)",
-    group="Sentiment & Macro",
+    group="Sentiment",
     url_path="vix",
     loader=data.load_vix,
     # Pilihan user 21 Sep 2026 dari pratinjau: Overlay (VIX sumbu kiri linear, BTC kanan Log)
@@ -726,7 +726,7 @@ TREASURY_YIELDS = MetricFamily(
     key="treasury_yields",
     title="US Treasury Yields",
     subtitle="US Treasury Yields (2Y & 10Y)",
-    group="Sentiment & Macro",
+    group="Macro",
     url_path="treasury-yields",
     loader=data.load_yields,
     # Pilihan user 21 Sep 2026 dari pratinjau: 2Y + 10Y + pane spread; tampilan awal 2Y saja
@@ -756,7 +756,7 @@ BTC_TRADFI = MetricFamily(
     key="btc_tradfi",
     title="BTC vs Stocks & Gold",
     subtitle="BTC Relative Strength vs S&P 500 & Gold",
-    group="Sentiment & Macro",
+    group="Macro",
     url_path="btc-stocks-gold",
     loader=data.load_btc_tradfi,
     # Permintaan user 21 Sep 2026 dari gambar riset: Z-Score log(BTC / pembanding) sebagai
@@ -789,4 +789,4 @@ BTC_TRADFI = MetricFamily(
 
 FAMILIES = {f.title: f for f in [MARKET_VALUATION, PRICE_LEVELS, AVIV, REALIZED_CAP, SOPR, NUPL, UNREALIZED_PL, SUPPLY_IN_PROFIT,
                                    HODL_WAVES, RHODL_RATIO, HOLDER_SUPPLY, EXCHANGE_FLOW,
-                                   FUNDING_OI, FEAR_GREED, BTC_TRADFI, VIX, TREASURY_YIELDS]}
+                                   FUNDING_OI, FEAR_GREED, VIX, BTC_TRADFI, TREASURY_YIELDS]}

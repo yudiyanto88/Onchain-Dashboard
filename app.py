@@ -10,7 +10,7 @@ from dashboard.metric_page import render_metric_page
 from dashboard.registry import FAMILIES
 
 st.set_page_config(
-    page_title="On-Chain Dashboard v2",
+    page_title="BTC Dashboard v2",
     layout="wide",
     # "auto": terbuka di layar lebar, tertutup di HP. Dulu "expanded", dan di HP sidebar
     # langsung menutupi seluruh halaman setiap kali dibuka (15 Sep 2026).
@@ -43,6 +43,20 @@ section[data-testid="stSidebar"] { background-color: #151924; }
 /* Huruf pertama judul kelompok lurus dengan huruf pertama nama menu (garis kiri 3 px +
    jarak dalam 10 px pada link). Terukur sebelum ini: judul x=20, nama menu x=33. */
 [data-testid="stNavSectionHeader"] { padding-left: 13px !important; }
+
+/* Pemisah ON-CHAIN / MARKET (pilihan user 22 Sep 2026). Menu Streamlit tidak punya pemisah,
+   jadi label ditempel lewat ::before pada kelompok ke-1 dan ke-5 (Derivatives).
+   ponytail: bergantung urutan kelompok di FAMILIES; ubah angka nth-child kalau urutan berubah. */
+[data-testid="stSidebarNav"] ul > div:nth-child(1)::before,
+[data-testid="stSidebarNav"] ul > div:nth-child(5)::before {
+    display: block; padding: 4px 0 6px 13px;
+    color: #e6e6e6; font-size: 15px; font-weight: 700; letter-spacing: 0.14em;
+}
+[data-testid="stSidebarNav"] ul > div:nth-child(1)::before { content: "ON-CHAIN"; }
+[data-testid="stSidebarNav"] ul > div:nth-child(5)::before {
+    content: "MARKET"; margin-top: 14px; padding-top: 14px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+}
 
 /* Menu halaman: tulisan abu terang, menu aktif bergaris kiri teal gelap dengan latar
    #102e39 (teal 25% di atas sidebar) — sama dengan menu radio v2 sebelumnya. */
@@ -293,12 +307,10 @@ div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"]) { mar
 """, unsafe_allow_html=True)
 
 with st.sidebar:
-    st.markdown("<h1 style='text-align:center;color:#ffffff;font-size:2.2rem;'>Yudiyanto</h1>",
-                unsafe_allow_html=True)
     # Tulisan memakai teal terang #2aa6b0 (hue sama dengan #006d77): teal gelap sebagai
     # warna huruf cuma 2.9:1 di latar sidebar, teal terang 6.0:1.
     st.markdown("<h3 style='text-align:center;color:#2aa6b0;font-weight:800;font-size:1.3rem;"
-                "margin-top:-15px;'>ON-CHAIN DASHBOARD v2</h3>", unsafe_allow_html=True)
+                "margin-top:-15px;'>BTC DASHBOARD v2</h3>", unsafe_allow_html=True)
 
 # Menu: navigasi bawaan Streamlit (cara B, dipilih user 14 Sep 2026). Tiap halaman punya
 # alamat sendiri (localhost:8503/sopr), jadi reload tetap di halaman yang sama dan halaman
