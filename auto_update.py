@@ -716,9 +716,13 @@ except Exception as e:
 # ==========================================
 # Dipindah dari research/fetch_futures_basis_history.py (22 Sep 2026). Per hari, per bursa:
 # dua kontrak quarterly yang mengapit tenor 90 hari, basis tahunan = (F/S - 1) * 365 / hari ke
-# expiry, diinterpolasi linear ke tepat 90 hari; hasil = rata-rata bursa yang ada. Spot = index
-# Binance BTCUSD, close 00:00 UTC. Mulai Jun 2020. Seluruh sejarah dihitung ulang tiap jalan.
-# Satu bursa gagal = bursa lain tetap dipakai; semua gagal = file lama tidak diubah.
+# expiry, diinterpolasi linear ke tepat 90 hari; hasil = rata-rata bursa yang ada. Mulai Jun 2020.
+# Seluruh sejarah dihitung ulang tiap jalan. Satu bursa gagal = bursa lain tetap dipakai; semua
+# gagal = file lama tidak diubah.
+# Spot = Bitstamp BTC/USD, close 00:00 UTC (sejak 22 Sep 2026). Sebelumnya index Binance BTCUSD
+# (dapi), tapi di GitHub Actions dapi tidak memberi data ("index Binance kosong", run 22 Sep) dan
+# seluruh pipeline gagal. Beda Bitstamp vs index Binance: median 0,001 %, p95 0,05 % = efek ke
+# basis 3M median 0,005 poin, p95 0,2 poin.
 print("\n[26] Menarik futures basis 3 bulan (Binance COIN-M + Deribit)...")
 try:
     import calendar
@@ -745,7 +749,10 @@ try:
         while True:
             r = requests.get(f"https://dapi.binance.com/dapi/v1/{path}", timeout=30, params={
                 **params, "interval": "1d", "startTime": start, "limit": 1500}).json()
-            if not isinstance(r, list) or not r:
+            if not isinstance(r, list):
+                print(f"   ⚠️ Binance {path}: {str(r)[:150]}")   # jawaban mentah untuk diagnosis
+                break
+            if not r:
                 break
             rows += r
             start = r[-1][0] + 86_400_000
@@ -760,6 +767,8 @@ try:
                                  "start_timestamp": _ms(start), "end_timestamp": _ms(end)}).json()
         res = r.get("result") or {}
         if res.get("status") != "ok":
+            if "error" in r:
+                print(f"   ⚠️ Deribit {nama}: {str(r['error'])[:150]}")
             return pd.Series(dtype=float)
         # Bar 1 jam yang mulai 23:00 -> close 00:00 UTC, sama dengan index
         s = pd.Series(res["close"], index=pd.to_datetime(res["ticks"], unit="ms"))
@@ -784,9 +793,23 @@ try:
             print(f"   ⚠️ {f.__name__}{a[:1]} gagal: {e}")
             return pd.Series(dtype=float)
 
-    idx = _binance("indexPriceKlines", {"pair": "BTCUSD"})
+    def _bitstamp():
+        rows, start = [], int(BASIS_START.timestamp())
+        while True:
+            o = requests.get("https://www.bitstamp.net/api/v2/ohlc/btcusd/", timeout=30, params={
+                "step": 86400, "limit": 1000, "start": start}).json()["data"]["ohlc"]
+            rows += o
+            if len(o) < 1000:
+                break
+            start = int(o[-1]["timestamp"]) + 86400
+        s = pd.Series({pd.Timestamp(int(x["timestamp"]), unit="s"): float(x["close"]) for x in rows},
+                      dtype=float)
+        s = s[~s.index.duplicated()]
+        return s[s.index < pd.Timestamp(BASIS_END.date())]   # bar hari ini belum tutup
+
+    idx = _bitstamp()
     if idx.empty:
-        raise ValueError("index Binance kosong")
+        raise ValueError("spot Bitstamp kosong")
     cq = _aman(_binance, "continuousKlines", {"pair": "BTCUSD", "contractType": "CURRENT_QUARTER"})
     nq = _aman(_binance, "continuousKlines", {"pair": "BTCUSD", "contractType": "NEXT_QUARTER"})
     deribit = {}
@@ -797,7 +820,7 @@ try:
                   max(BASIS_START, e - timedelta(days=200)), min(e, BASIS_END + timedelta(days=1)))
         if len(s):
             deribit[e] = s
-    print(f"   index {len(idx)} hari, Binance CQ {len(cq)} / NQ {len(nq)}, Deribit {len(deribit)} kontrak")
+    print(f"   spot Bitstamp {len(idx)} hari, Binance CQ {len(cq)} / NQ {len(nq)}, Deribit {len(deribit)} kontrak")
 
     baris = []
     for hari, spot in idx.items():
