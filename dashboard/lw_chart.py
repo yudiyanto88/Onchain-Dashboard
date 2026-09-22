@@ -15,7 +15,8 @@ LWC_URLS = [
 ]
 TOOLBAR_H = 40
 PANE_GAP = 6
-NAV_H = 52          # slider rentang di bawah chart; diambil dari tinggi pane, bukan ditambahkan
+NAV_H = 32          # slider rentang di bawah chart; diambil dari tinggi pane, bukan ditambahkan
+                    # (52 -> 32 px, user 22 Sep 2026)
 NAV_COL = "BTC Price"
 
 TEMPLATE = """
@@ -634,7 +635,7 @@ loadLib(0).then(() => {
       ? panes[spec.pane].addHistogramSeries(Object.assign({ base: 0 }, umum))
       : garisNol(spec)
       ? panes[spec.pane].addBaselineSeries(Object.assign({}, umum, {
-          baseValue: { type: 'price', price: 0 }, lineWidth: 1,
+          baseValue: { type: 'price', price: spec.base || 0 }, lineWidth: 1,
         }, warnaGarisNol(spec, false)))
       : panes[spec.pane].addLineSeries(Object.assign({
           lineWidth: spec.width,
@@ -1154,6 +1155,8 @@ loadLib(0).then(() => {
   const wadahBingkai = bingkai ? bingkai.parentElement : null;
   const tinggiBingkaiAwal = bingkai ? bingkai.style.height : '';
   const tinggiWadahAwal = wadahBingkai ? wadahBingkai.style.height : '';
+  // Streamlit juga memaku tinggi wadah lewat flex-basis (flex: 0 0 <px>), jadi ikut ditimpa.
+  const flexWadahAwal = wadahBingkai ? wadahBingkai.style.flexBasis : '';
 
   const tinggiAwal = C.panes.map(p => p.height);
   const totalTinggiAwal = tinggiAwal.reduce((a, b) => a + b, 0);
@@ -1184,10 +1187,23 @@ loadLib(0).then(() => {
       const atas = bingkai.getBoundingClientRect().top;
       tinggiBingkai = Math.max(320, (window.parent.innerHeight || 0) - atas - 8);
       bingkai.style.height = tinggiBingkai + 'px';
-      if (wadahBingkai) wadahBingkai.style.height = tinggiBingkai + 'px';
+      if (wadahBingkai) wadahBingkai.style.height = wadahBingkai.style.flexBasis = tinggiBingkai + 'px';
+    } else if (bingkai && C.fit) {
+      // Fit: bingkai mengisi sisa tinggi layar di bawah letaknya di halaman (tidak ikut
+      // berubah saat halaman digulir), minimal 520 px supaya pane tidak gepeng.
+      const d = docInduk();
+      const utama = d ? d.querySelector('[data-testid="stMain"]') : null;
+      const atas = bingkai.getBoundingClientRect().top + (utama ? utama.scrollTop : 0)
+        + (window.parent.scrollY || 0);
+      tinggiBingkai = Math.max(520, (window.parent.innerHeight || 0) - atas - 16);
+      bingkai.style.height = tinggiBingkai + 'px';
+      if (wadahBingkai) wadahBingkai.style.height = wadahBingkai.style.flexBasis = tinggiBingkai + 'px';
     } else if (bingkai) {
       bingkai.style.height = tinggiBingkaiAwal;
-      if (wadahBingkai) wadahBingkai.style.height = tinggiWadahAwal;
+      if (wadahBingkai) {
+        wadahBingkai.style.height = tinggiWadahAwal;
+        wadahBingkai.style.flexBasis = flexWadahAwal;
+      }
     }
     // Sinkron sumbu hanya kalau tinggi benar-benar berubah: rapikanBar memanggil fungsi
     // ini, dan sinkron sumbu memanggil rapikanBar — tanpa syarat ini keduanya berputar.
@@ -1201,6 +1217,9 @@ loadLib(0).then(() => {
   // Tinggi baris legend berubah saat lebar chart berubah atau jarak kiri-kanannya
   // diluruskan ke sumbu (rapikanBar), jadi tinggi pane dihitung ulang setiap kali.
   new ResizeObserver(() => sesuaikanTinggiLayar()).observe(barEl);
+  if (C.fit) {
+    try { window.parent.addEventListener('resize', () => sesuaikanTinggiLayar()); } catch (e) {}
+  }
 
   const fsSep = document.createElement('span');
   fsSep.className = 'fssep';
@@ -1992,7 +2011,8 @@ def render(df, lines, price_line, extra_lines, height, metric_mode, price_mode, 
            tooltip="Cursor", metric_range=None, complement=None, view=None,
            unit_switch=None, unit_label="", stack_units=None, extra_mode="Auto",
            price_extra=None):
-    """Gambar chart.
+    """Gambar chart. height "Fit" = tinggi mengikuti layar (dihitung di browser; 720 dipakai
+    sebagai tinggi awal dan dasar pembagian pane).
 
     view: (tanggal awal, tanggal akhir) yang tampil saat chart dibuka — dari kotak Range.
     df selalu berisi seluruh sejarah; di luar view tetap bisa digeser/zoom dan tampil di slider.
@@ -2039,10 +2059,14 @@ def render(df, lines, price_line, extra_lines, height, metric_mode, price_mode, 
     # Pembagian tinggi: pane harga dan pane tambahan mengambil porsi tetap, sisanya
     # untuk pane metrik yang tetap jadi yang terbesar.
     # Tinggi total chart tetap; slider rentang mengambil tempatnya dari pane.
+    fit = height == "Fit"
+    if fit:
+        height = 720
     tinggi_pane = height - nav_h
     porsi_harga = 0.30 if price_line is not None and extra_lines else 0.45
     tinggi_harga = int(tinggi_pane * porsi_harga) if price_line is not None else 0
-    tinggi_extra = int(tinggi_pane * (0.25 if price_line is not None else 0.30)) if extra_lines else 0
+    # Pane bawah dipertinggi (user 22 Sep 2026): 25 -> 30 % dengan pane harga, 30 -> 40 % tanpa.
+    tinggi_extra = int(tinggi_pane * (0.30 if price_line is not None else 0.40)) if extra_lines else 0
 
     daftar_pane = []
     if price_line is not None:
@@ -2078,6 +2102,7 @@ def render(df, lines, price_line, extra_lines, height, metric_mode, price_mode, 
         # Tinggi bingkai tetap; tinggi pane dihitung ulang di browser dari tinggi baris
         # legend yang sebenarnya (bisa lebih dari satu baris).
         "frameHeight": total_height,
+        "fit": fit,
         # Semua pane menampilkan sisi sumbu yang sama supaya area gambarnya sejajar.
         "showLeft": any(ln.axis == "left" for ln in lines) or banyak_pane,
         "showRight": any(ln.axis == "right" for ln in lines) or banyak_pane,

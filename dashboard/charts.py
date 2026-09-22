@@ -41,6 +41,7 @@ class Line:
     fill_with: str | None = None         # arsiran ke garis berkolom ini (lihat Series)
     fill_colors: tuple | None = None
     fill_alpha: float = 0.35
+    base: float = 0.0                    # patokan area kind "baseline"
 
 
 def render(df, lines, price_line, extra_lines, height, metric_mode, price_mode, key,

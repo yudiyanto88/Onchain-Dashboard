@@ -58,6 +58,8 @@ class Series:
     # Arsiran di antara garis ini dan garis berkolom fill_with (Futures Basis vs 2Y): warna
     # fill_colors[0] saat garis ini di atas, fill_colors[1] saat di bawah, opasitas fill_alpha.
     fill_with: str | None = None
+    # Patokan area kind "baseline": warna berganti di nilai ini (rasio: 1.0; bawaan 0).
+    base: float = 0.0
     fill_colors: tuple[str, str] | None = None
     fill_alpha: float = 0.35
 
@@ -192,6 +194,41 @@ MARKET_VALUATION = MetricFamily(
     ],
     reference_lines=[RefLine(1.0, "Neutral (1.0)")],
     extra_label="Z-Score",
+)
+
+
+
+MVRV_MOMENTUM = MetricFamily(
+    key="mvrv_momentum",
+    title="MVRV Momentum",
+    subtitle="MVRV Momentum",
+    group="Valuation",
+    url_path="mvrv-momentum",
+    loader=data.load_mvrv_momentum,
+    # Pilihan user 22 Sep 2026 dari pratinjau (acuan: chart Glassnode "MVRV Momentum Is Turning
+    # Positive"): osilator sebagai area teal (di atas patokan) / rust (di bawah) dengan harga BTC
+    # Overlay; saklar tiga varian, bawaan Momentum (dipakai K2). Pane bawah MVRV Ratio + rata-rata
+    # sepanjang sejarah, Hidden awal. Garis ambang framework tidak dipasang.
+    btc_mode_default="Overlay",
+    metric_scale_default="Auto",
+    price_scale_default="Log",
+    series=[
+        Series("MVRV Momentum (SMA30 − SMA30 of SMA30)", "MVRV Momentum", color="#0b8e89",
+               negative_color="#bf5546", axis="left", dim=0.45, kind="baseline", alpha=0.45,
+               smoothing=False, short="Momentum", precision=3, unit="Momentum"),
+        Series("MVRV / SMA180", "MVRV / SMA180", color="#0b8e89", negative_color="#bf5546",
+               axis="left", dim=0.45, kind="baseline", base=1.0, alpha=0.45, smoothing=False,
+               short="÷180", precision=3, unit="÷ SMA180"),
+        Series("MVRV / SMA365", "MVRV / SMA365", color="#0b8e89", negative_color="#bf5546",
+               axis="left", dim=0.45, kind="baseline", base=1.0, alpha=0.45, smoothing=False,
+               short="÷365", precision=3, unit="÷ SMA365"),
+        Series("MVRV Ratio", "MVRV", color="#0070a6", axis="right", dim=0.49, short="MVRV",
+               smoothing=False, pane="extra"),
+        Series("All-time Mean", "MVRV Mean", color="#8b949e", axis="right", dim=0.45,
+               short="Mean", smoothing=False, pane="extra"),
+    ],
+    unit_switch=("Momentum", "÷ SMA180", "÷ SMA365"),
+    extra_label="MVRV Ratio",
 )
 
 
@@ -824,6 +861,6 @@ BTC_TRADFI = MetricFamily(
 
 # Batang -> area (kind "baseline", pilihan user 22 Sep 2026): semua histogram kecuali data harian
 # yang loncat-loncat (Funding Rate, OI Change, Net Flow) — di sana batang lebih jujur.
-FAMILIES = {f.title: f for f in [MARKET_VALUATION, PRICE_LEVELS, AVIV, REALIZED_CAP, SOPR, NUPL, UNREALIZED_PL, SUPPLY_IN_PROFIT,
+FAMILIES = {f.title: f for f in [MARKET_VALUATION, MVRV_MOMENTUM, PRICE_LEVELS, AVIV, REALIZED_CAP, SOPR, NUPL, UNREALIZED_PL, SUPPLY_IN_PROFIT,
                                    HODL_WAVES, RHODL_RATIO, HOLDER_SUPPLY, EXCHANGE_FLOW,
                                    FUNDING_OI, FUTURES_BASIS, FEAR_GREED, VIX, BTC_TRADFI, TREASURY_YIELDS]}

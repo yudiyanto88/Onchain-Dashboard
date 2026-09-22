@@ -24,7 +24,9 @@ AUTO, LINEAR, LOG = "Auto", "Linear", "Log"
 SCALE_MODES = [AUTO, LINEAR, LOG]
 
 # Tinggi chart bisa disetel karena tinggi layar tiap orang berbeda.
-HEIGHTS = [600, 720, 860, 1000]
+# "Fit" (bawaan, user 22 Sep 2026): tinggi chart mengikuti tinggi layar supaya judul, kontrol,
+# semua pane, dan slider muat satu layar tanpa scroll (dihitung di browser, lw_chart).
+HEIGHTS = ["Fit", 600, 720, 860, 1000]
 
 # Cara harga BTC ditampilkan. Overlay didahulukan karena jadi default.
 OVERLAY = "Overlay"         # harga digabung ke chart metrik, sumbu kanan
@@ -181,7 +183,7 @@ def _init_state(family, dmin, dmax):
         f"{k}_btc": family.btc_mode_default,
         f"{k}_axis_btc": BTC_AXIS,
         f"{k}_extra": Z_BOTTOM if family.extra_default else Z_HIDDEN,
-        f"{k}_height": 720,
+        f"{k}_height": "Fit",
     }
     if family.window_days:
         defaults[f"{k}_window"] = family.window_default
@@ -425,8 +427,8 @@ def _render_controls(family, dmin, dmax):
         with st.popover(f"Display\n\n**{_axis_summary(family)}**"):
             st.caption("CHART HEIGHT")
             st.segmented_control("Height", HEIGHTS, key=f"{k}_height",
-                                 on_change=_keep, args=(f"{k}_height", 720),
-                                 format_func=lambda h: f"{h}px",
+                                 on_change=_keep, args=(f"{k}_height", "Fit"),
+                                 format_func=lambda h: h if h == "Fit" else f"{h}px",
                                  label_visibility="collapsed")
             st.caption("AXIS")
             # Nama di kiri, tombolnya di kanan pada baris yang sama. Bertumpuk ke bawah
@@ -582,7 +584,7 @@ def render_metric_page(family: MetricFamily):
                          stack_index=sr.stack_index, stack_cols=sr.stack_cols,
                          show_when=sr.show_when, alpha_together=sr.alpha_together,
                          fill_with=sr.fill_with, fill_colors=sr.fill_colors,
-                         fill_alpha=sr.fill_alpha))
+                         fill_alpha=sr.fill_alpha, base=sr.base))
         if not sr.smoothing:
             continue
         for p in periods:

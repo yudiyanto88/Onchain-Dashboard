@@ -40,6 +40,29 @@ def load_mvrv():
     return df.merge(_median_mvrv()[['Date', 'Median MVRV']], on='Date', how='left')
 
 
+
+@st.cache_data(ttl=3600)
+def load_mvrv_momentum():
+    """Tiga osilator momentum MVRV Ratio (data_mvrv.csv) + rata-rata sepanjang sejarah.
+
+    - Momentum = SMA30(MVRV) - SMA30 dari SMA30 itu: cross nol = MVRV Momentum bullish/bearish
+      cross di framework v2 (K2).
+    - MVRV / SMA180: < 1 = MVRV di bawah SMA180-nya (penghenti pembelian K2 bila >= 7 hari).
+    - MVRV / SMA365: versi Glassnode "MVRV over its 365-day mean", pembanding jangka panjang.
+    Rata-rata MVRV seluruh sejarah = 1,80 (22 Sep 2026; sama dengan angka Glassnode 1,8).
+    Ambang framework (>= 7 hari dsb.) tidak digambar.
+    """
+    df = _prepare(pd.read_csv("data_mvrv.csv", usecols=['date', 'btc_price', 'mvrv_ratio'])
+                  .rename(columns={'date': 'Date', 'btc_price': 'BTC Price', 'mvrv_ratio': 'MVRV'}))
+    v = df['MVRV']
+    cepat = v.rolling(30).mean()
+    df['MVRV Momentum'] = cepat - cepat.rolling(30).mean()
+    df['MVRV / SMA180'] = v / v.rolling(180).mean()
+    df['MVRV / SMA365'] = v / v.rolling(365).mean()
+    df['MVRV Mean'] = v.mean()
+    return df
+
+
 @st.cache_data(ttl=3600)
 def _median_mvrv():
     """Median MVRV dan Median Realized Price dari data_median_mvrv.csv.
