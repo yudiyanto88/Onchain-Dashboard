@@ -744,21 +744,31 @@ try:
     # Expiry quarterly Deribit & Binance: Jumat terakhir Mar/Jun/Sep/Des 08:00 UTC
     EXPIRY = [_jumat_terakhir(y, m) for y in range(2020, BASIS_END.year + 2) for m in (3, 6, 9, 12)]
 
-    def _binance(path, params):
-        rows, start = [], _ms(BASIS_START)
-        while True:
-            r = requests.get(f"https://dapi.binance.com/dapi/v1/{path}", timeout=30, params={
-                **params, "interval": "1d", "startTime": start, "limit": 1500}).json()
-            if not isinstance(r, list):
-                print(f"   ⚠️ Binance {path}: {str(r)[:150]}")   # jawaban mentah untuk diagnosis
-                break
-            if not r:
-                break
-            rows += r
-            start = r[-1][0] + 86_400_000
-            if len(r) < 1500:
-                break
-        s = pd.Series({pd.Timestamp(k[0], unit="ms"): float(k[4]) for k in rows}, dtype=float)
+    # Binance COIN-M dari arsip resmi data.binance.vision, bukan API dapi: API menolak server
+    # GitHub Actions ("Service unavailable from a restricted location", run 22 Sep 2026).
+    # Per kontrak quarterly (BTCUSD_YYMMDD): zip bulanan untuk bulan yang sudah lewat, zip harian
+    # untuk bulan berjalan (zip bulanannya belum ada). Bar 1d = close 00:00 UTC hari berikutnya.
+    def _binance(nama, start, end):
+        import io, zipfile
+        dasar = f"https://data.binance.vision/data/futures/cm/%s/klines/{nama}/1d/{nama}-1d-%s.zip"
+        bulan_ini = BASIS_END.strftime("%Y-%m")
+        urls = [dasar % ("monthly", b) for b in pd.period_range(start.date(), end.date(), freq="M")
+                .strftime("%Y-%m") if b < bulan_ini]
+        if end.strftime("%Y-%m") >= bulan_ini:
+            urls += [dasar % ("daily", h) for h in pd.date_range(f"{bulan_ini}-01", end.date())
+                     .strftime("%Y-%m-%d") if h < BASIS_END.strftime("%Y-%m-%d")]
+        baris = []
+        for u in urls:
+            r = requests.get(u, timeout=30)
+            if r.status_code == 404:
+                continue                     # kontrak belum listing / hari itu belum diarsip
+            r.raise_for_status()
+            z = zipfile.ZipFile(io.BytesIO(r.content))
+            for l in z.read(z.namelist()[0]).decode().splitlines():
+                k = l.split(",")
+                if k[0].isdigit():            # file baru punya baris judul, file lama tidak
+                    baris.append((int(k[0]), float(k[4])))
+        s = pd.Series({pd.Timestamp(t, unit="ms"): c for t, c in baris}, dtype=float)
         return s[~s.index.duplicated()]
 
     def _deribit(nama, start, end):
@@ -810,30 +820,26 @@ try:
     idx = _bitstamp()
     if idx.empty:
         raise ValueError("spot Bitstamp kosong")
-    cq = _aman(_binance, "continuousKlines", {"pair": "BTCUSD", "contractType": "CURRENT_QUARTER"})
-    nq = _aman(_binance, "continuousKlines", {"pair": "BTCUSD", "contractType": "NEXT_QUARTER"})
-    deribit = {}
+    binance, deribit = {}, {}
     for e in EXPIRY:
         if e - timedelta(days=200) > BASIS_END:
             continue
-        s = _aman(_deribit, f"BTC-{e.day}{BULAN[e.month - 1]}{e.year % 100:02d}",
-                  max(BASIS_START, e - timedelta(days=200)), min(e, BASIS_END + timedelta(days=1)))
+        mulai, akhir = max(BASIS_START, e - timedelta(days=200)), min(e, BASIS_END + timedelta(days=1))
+        s = _aman(_binance, f"BTCUSD_{e:%y%m%d}", mulai, akhir)
+        if len(s):
+            binance[e] = s
+        s = _aman(_deribit, f"BTC-{e.day}{BULAN[e.month - 1]}{e.year % 100:02d}", mulai, akhir)
         if len(s):
             deribit[e] = s
-    print(f"   spot Bitstamp {len(idx)} hari, Binance CQ {len(cq)} / NQ {len(nq)}, Deribit {len(deribit)} kontrak")
+    print(f"   spot Bitstamp {len(idx)} hari, Binance {len(binance)} kontrak, Deribit {len(deribit)} kontrak")
 
     baris = []
     for hari, spot in idx.items():
         tutup = hari.tz_localize("UTC") + timedelta(days=1)
-        depan = [e for e in EXPIRY if e > tutup]
         tenor = lambda e: (e - tutup).total_seconds() / 86400
         tahunan = lambda f, e: (f / spot - 1) * 365 / tenor(e) * 100
-        bn = []
-        if hari in cq.index:
-            bn.append((tenor(depan[0]), tahunan(cq[hari], depan[0])))
-        if hari in nq.index:
-            bn.append((tenor(depan[1]), tahunan(nq[hari], depan[1])))
-        dr = [(tenor(e), tahunan(s[hari], e)) for e, s in deribit.items() if e > tutup and hari in s.index]
+        bn, dr = [[(tenor(e), tahunan(s[hari], e)) for e, s in bursa.items()
+                   if e > tutup and hari in s.index] for bursa in (binance, deribit)]
         b, d = _ke_90_hari(bn), _ke_90_hari(dr)
         ada = [v for v in (b, d) if v is not None]
         baris.append({'date': hari.strftime('%Y-%m-%d'), 'basis_binance': b, 'basis_deribit': d,
