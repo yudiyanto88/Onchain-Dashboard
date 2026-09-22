@@ -11,7 +11,7 @@ Baca dokumen ini dan `CLAUDE.md` sebelum mulai. Semua yang ditandai **ditahan/di
 - Item yang selesai dihapus dari bagian 6, bukan dicoret.
 - Jebakan teknis hanya yang masih bisa terulang; hapus kalau fiturnya sudah tidak ada.
 - Perubahan handoff diusulkan ke user dulu sebelum ditulis.
-- **Saat user konfirmasi akan lanjut di sesi baru:** sesudah handoff diperbarui (dan di-commit/push kalau diminta), tulis **prompt pembuka sesi baru langsung di chat** — sesuaikan dengan status terakhir. Prompt itu tidak disimpan di handoff.
+- **Saat user konfirmasi akan lanjut di sesi baru:** sesudah handoff diperbarui (dan di-commit/push kalau diminta), tulis **prompt pembuka sesi baru langsung di chat** — sesuaikan dengan status terakhir. Prompt itu tidak disimpan di handoff. **Prompt pembuka jangan meminta cek ulang halaman atau pipeline yang sudah divalidasi user** (user 22 Sep): cukup nyalakan localhost, laporkan status bagian 1 & 6, tanyakan lanjutan.
 
 ---
 
@@ -19,8 +19,8 @@ Baca dokumen ini dan `CLAUDE.md` sebelum mulai. Semua yang ditandai **ditahan/di
 
 - **Live: 19 halaman, 7 kelompok, dua label** — **ON-CHAIN** (Valuation · Profitability · Holder Behavior · Exchange) dan **MARKET** (Derivatives · Sentiment · Macro). Semua halaman: slider rentang, nyaman di HP, kontrol diingat per halaman, tombol Style di chart.
 - **Langkah pertama sesi baru:**
-  1. Cek server `dashboard-v2-uji` (bagian 2), buka halaman, lihat keadaannya sebelum mengubah apa pun.
-  2. Cek run bot terakhir (tab Actions / `gh run view --log`): Pipeline 23–26 harus `✅`. **Terakhir diuji 22 Sep 14:58 UTC — semua lolos** (Pipeline 26 sempat gagal, sudah beres; lihat bagian 7).
+  1. Cek server `dashboard-v2-uji` (bagian 2). Halaman yang sudah divalidasi user tidak perlu dibuka ulang.
+  2. Run bot tidak perlu dicek ulang kecuali ada gejala (data berhenti, error). Terakhir diuji 22 Sep 14:58 UTC: Pipeline 23–26 lolos (lihat bagian 7).
   3. Tanyakan apakah **Cohort State** (bagian 6) sudah boleh dilanjutkan, lalu **halaman berikutnya** (DXY di bagian 6; kandidat dan hasil cek data di bagian 7 — jangan dicek ulang).
 - **Menambah halaman:** satu `MetricFamily` di `dashboard/registry.py` (+ loader di `data.py`). Urutan kerja yang disukai user: cek kualitas data (nilai macet, lonjakan, satuan, cakupan, revisi) → pratinjau widget dengan data asli + uji palet (bagian 8) → tunggu pilihan user → kerjakan di localhost → user bilang valid → merge dari GitHub → commit → push.
 
@@ -165,7 +165,7 @@ Semua file punya `date`; sebagian besar punya `btc_price`. Bukan untuk halaman: 
 | `data_sentiment.csv` | trend_*, wiki_* | skip (Google) |
 
 **`auto_update.py`** (audit ponytail 21 Sep, CSV terbukti identik): helper `simpan()` dan `baca_median_mvrv()`; normalisasi tanggal hanya di `fetch_data` dan saat membaca CSV. Pipeline 23 (Yahoo): hari bursa saja, sejarah ditarik ulang tiap jalan, ticker gagal = kolom lama tetap. Pipeline 24 (Cboe `VIX_History.csv` → `data_vix.csv`) dan 25 (FRED `fredgraph.csv?id=DGS2/DGS10` → `data_yields.csv`): sejarah penuh tiap jalan, gagal = file lama tetap.
-- **Pipeline 26 (futures basis, beres 22 Sep):** spot = **Bitstamp** BTC/USD, Binance COIN-M dari **arsip `data.binance.vision`** (zip per kontrak quarterly), Deribit dari API. Alasannya: API Binance (`dapi`) menolak server GitHub Actions (*"Service unavailable from a restricted location"*); arsip lolos. Hasil Binance identik dengan API; basis bergeser rata-rata ±0,01 poin (maks 1,4 poin, 14 Jun 2022) karena spot ganti sumber. Bar hari berjalan tidak dihitung. Run bot jadi ±3 menit. Hasil lokal = hasil GitHub.
+- **Pipeline 26 (futures basis, beres 22 Sep):** spot = **Bitstamp** BTC/USD, Binance COIN-M dari **arsip `data.binance.vision`** (zip per kontrak quarterly), Deribit dari API. Alasannya: API Binance (`dapi`) menolak server GitHub Actions (*"Service unavailable from a restricted location"*); arsip lolos. Hasil Binance identik dengan API; basis bergeser rata-rata ±0,01 poin (maks 1,4 poin, 14 Jun 2022) karena spot ganti sumber. Bar hari berjalan tidak dihitung. Kalau zip bulanan belum terbit (terbit tgl 2 ±07:30 UTC; zip harian D+1 ±06:40 UTC), zip harian bulan itu dipakai — tanpa ini run tgl 1 diam-diam kehilangan Binance sebulan (diuji dengan simulasi). Run bot ±3–4 menit. Hasil lokal = hasil GitHub.
 
 **Hasil cek kualitas kandidat (17 Sep; jangan diulang kecuali data berubah):**
 - **RHODL (`data_rhodl.csv`):** = persen RC 1d–1w ÷ 1y–2y, tanpa pengali umur pasar Glassnode; puncak 443 (2011), p99 sejak 2012 = 37. Didominasi penyebut.
