@@ -1,6 +1,6 @@
 # Handoff — Dashboard Streamlit v2
 
-Diperbarui 22 Sep 2026 (versi ringkas; terakhir sesudah `7e0f902`). Versi lengkap sebelum diringkas — cerita pengerjaan tiap fitur, opsi yang ditolak, hasil ukur piksel — ada di `archive/handoff_riwayat_2026-09-17.md` (buka hanya kalau perlu detail sejarah; nomor bagian 3.x yang disebut di bawah merujuk ke file itu).
+Diperbarui 22 Sep 2026 (versi ringkas; terakhir sesudah Pipeline 26 beres). Versi lengkap sebelum diringkas — cerita pengerjaan tiap fitur, opsi yang ditolak, hasil ukur piksel — ada di `archive/handoff_riwayat_2026-09-17.md` (buka hanya kalau perlu detail sejarah; nomor bagian 3.x yang disebut di bawah merujuk ke file itu).
 
 Baca dokumen ini dan `CLAUDE.md` sebelum mulai. Semua yang ditandai **ditahan/ditunda** harus ditanyakan ke user dulu.
 
@@ -20,7 +20,7 @@ Baca dokumen ini dan `CLAUDE.md` sebelum mulai. Semua yang ditandai **ditahan/di
 - **Live: 18 halaman, 7 kelompok, dua label** — **ON-CHAIN** (Valuation · Profitability · Holder Behavior · Exchange) dan **MARKET** (Derivatives · Sentiment · Macro). Semua halaman: slider rentang, nyaman di HP, kontrol diingat per halaman, tombol Style di chart.
 - **Langkah pertama sesi baru:**
   1. Cek server `dashboard-v2-uji` (bagian 2), buka halaman, lihat keadaannya sebelum mengubah apa pun.
-  2. **Run bot 22 Sep 08:53 UTC (commit `3222770`): Pipeline 23 (Yahoo), 24 (Cboe), 25 (FRED) lolos.** **Pipeline 26 gagal: "index Binance kosong"** — `data_futures_basis_3m.csv` berhenti di 21 Sep (bagian 6). Tanyakan ke user sebelum memperbaiki.
+  2. Cek run bot terakhir (tab Actions / `gh run view --log`): Pipeline 23–26 harus `✅`. **Terakhir diuji 22 Sep 14:58 UTC — semua lolos** (Pipeline 26 sempat gagal, sudah beres; lihat bagian 7).
   3. Tanyakan apakah **Cohort State** (bagian 6) sudah boleh dilanjutkan, lalu **halaman berikutnya** (DXY di bagian 6; kandidat dan hasil cek data di bagian 7 — jangan dicek ulang).
 - **Menambah halaman:** satu `MetricFamily` di `dashboard/registry.py` (+ loader di `data.py`). Urutan kerja yang disukai user: cek kualitas data (nilai macet, lonjakan, satuan, cakupan, revisi) → pratinjau widget dengan data asli + uji palet (bagian 8) → tunggu pilihan user → kerjakan di localhost → user bilang valid → merge dari GitHub → commit → push.
 
@@ -138,7 +138,6 @@ Semua: BTC oranye `#F7931A` (kecuali HODL Waves), key localStorage `dash_v2_<key
 - **Usulan disetujui tapi belum diterapkan:** latar brand `#0D1117`; font JetBrains Mono (angka/sumbu) + Inter (label). Ide dua chart bertumpuk — user: "slightly over modif".
 - **Belum dibahas/dilaporkan kecil:** label nilai terakhir bertumpuk saat banyak smoothing (kandidat `lastValueVisible` false, tanya dengan pratinjau); Supply in Profit saat Profit & Loss mati legend tidak dicoret; gradasi area Z-Score; judul HODL Waves tidak berubah saat saklar Supply.
 - **Spot CVD (ditunda user 22 Sep):** Binance BTCUSDT `klines` harian dari `data-api.binance.vision` (delta = 2×taker buy − volume), sejak 17 Agt 2017, tanpa hari bolong. Rencana: CVD 90d + delta harian, BTC Overlay. Terbuka: letak menu ("Trading Flow"?), kotak Window, izin Pipeline. Masa zero-fee Binance (Jul 2022–Mar 2023) volume ×4,7 — efek ke delta belum pasti. OKX (180 hari)/Coinbase (diblok) tidak layak.
-- **Pipeline 26 gagal di GitHub Actions (22 Sep):** pesan "index Binance kosong" — `dapi.binance.com` (index BTCUSD) tidak memberi data di Actions, jadi Deribit tidak sempat dicoba. Isi respons Binance belum dicatat (dugaan: diblok dari AS, belum dibuktikan). Cara cek: cetak respons mentah di log. Pilihan perbaikan: index/spot dari sumber lain (mis. `data-api.binance.vision` spot BTCUSDT atau index Deribit) dan Binance futures boleh gagal. Lokal jalan normal.
 - **Halaman DXY (belum dikerjakan):** Yahoo `DX-Y.NYB` = satu baris `TRADFI_TICKERS`; kelompok Macro. Cek kualitas data dulu.
 - **Pipeline 19 / `data_treasury_2y.csv` boleh dibuang (menunggu user):** = DGS2 bulanan, digantikan `data_yields.csv`; tanpa pemakai (dicek seluruh repo), tanpa sejarah hilang (keduanya mulai 1 Jun 1976). Kalau dibuang: hapus dari daftar master + sesuaikan `data_dictionary.md` (izin user).
 - **Ide nanti:** LTV intraday dari harga 10 menit ChartInspect (`/api/charts/crypto/intraday-price?cryptocurrency=bitcoin&resolution=10&from=&to=`, gratis 30 hari).
@@ -164,6 +163,7 @@ Semua file punya `date`; sebagian besar punya `btc_price`. Bukan untuk halaman: 
 | `data_sentiment.csv` | trend_*, wiki_* | skip (Google) |
 
 **`auto_update.py`** (audit ponytail 21 Sep, CSV terbukti identik): helper `simpan()` dan `baca_median_mvrv()`; normalisasi tanggal hanya di `fetch_data` dan saat membaca CSV. Pipeline 23 (Yahoo): hari bursa saja, sejarah ditarik ulang tiap jalan, ticker gagal = kolom lama tetap. Pipeline 24 (Cboe `VIX_History.csv` → `data_vix.csv`) dan 25 (FRED `fredgraph.csv?id=DGS2/DGS10` → `data_yields.csv`): sejarah penuh tiap jalan, gagal = file lama tetap.
+- **Pipeline 26 (futures basis, beres 22 Sep):** spot = **Bitstamp** BTC/USD, Binance COIN-M dari **arsip `data.binance.vision`** (zip per kontrak quarterly), Deribit dari API. Alasannya: API Binance (`dapi`) menolak server GitHub Actions (*"Service unavailable from a restricted location"*); arsip lolos. Hasil Binance identik dengan API; basis bergeser rata-rata ±0,01 poin (maks 1,4 poin, 14 Jun 2022) karena spot ganti sumber. Bar hari berjalan tidak dihitung. Run bot jadi ±3 menit. Hasil lokal = hasil GitHub.
 
 **Hasil cek kualitas kandidat (17 Sep; jangan diulang kecuali data berubah):**
 - **RHODL (`data_rhodl.csv`):** = persen RC 1d–1w ÷ 1y–2y, tanpa pengali umur pasar Glassnode; puncak 443 (2011), p99 sejak 2012 = 37. Didominasi penyebut.
@@ -233,6 +233,7 @@ Semua file punya `date`; sebagian besar punya `btc_price`. Bukan untuk halaman: 
 - Membaca format angka seri dari browser: `series.priceFormatter().format(v)`.
 - Chart terbuka di zoom/legend aneh dari percobaan lama → `localStorage.removeItem('dash_v2_<key>')` lalu reload.
 - **FRED membiarkan User-Agent `Mozilla/5.0` sampai timeout**; User-Agent bawaan Python/curl diterima. Cboe dipanggil dengan `Mozilla/5.0` dan jalan (tanpa header belum diuji).
+- **API Binance menolak GitHub Actions (lokasi AS)** → data Binance lewat arsip `data.binance.vision`. Merge data bot bisa konflik di CSV yang dihitung ulang penuh (mis. `data_futures_basis_3m.csv`) → pilih versi lokal (`git checkout --ours`), bot menghitung ulang di run berikutnya.
 - **Heredoc Bash mengubah `\\n` di skrip patch jadi baris baru sungguhan** → tulis skrip dengan Write, atau pakai Edit.
 
 ---
