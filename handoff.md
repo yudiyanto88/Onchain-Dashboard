@@ -1,6 +1,6 @@
 # Handoff — Dashboard Streamlit v2
 
-Diperbarui 22 Sep 2026 (versi ringkas; terakhir sesudah Pipeline 26 beres). Versi lengkap sebelum diringkas — cerita pengerjaan tiap fitur, opsi yang ditolak, hasil ukur piksel — ada di `archive/handoff_riwayat_2026-09-17.md` (buka hanya kalau perlu detail sejarah; nomor bagian 3.x yang disebut di bawah merujuk ke file itu).
+Diperbarui 22 Sep 2026 (versi ringkas; terakhir sesudah MVRV Momentum + tinggi Fit). Versi lengkap sebelum diringkas — cerita pengerjaan tiap fitur, opsi yang ditolak, hasil ukur piksel — ada di `archive/handoff_riwayat_2026-09-17.md` (buka hanya kalau perlu detail sejarah; nomor bagian 3.x yang disebut di bawah merujuk ke file itu).
 
 Baca dokumen ini dan `CLAUDE.md` sebelum mulai. Semua yang ditandai **ditahan/ditunda** harus ditanyakan ke user dulu.
 
@@ -17,7 +17,7 @@ Baca dokumen ini dan `CLAUDE.md` sebelum mulai. Semua yang ditandai **ditahan/di
 
 ## 1. Status dan langkah berikutnya
 
-- **Live: 18 halaman, 7 kelompok, dua label** — **ON-CHAIN** (Valuation · Profitability · Holder Behavior · Exchange) dan **MARKET** (Derivatives · Sentiment · Macro). Semua halaman: slider rentang, nyaman di HP, kontrol diingat per halaman, tombol Style di chart.
+- **Live: 19 halaman, 7 kelompok, dua label** — **ON-CHAIN** (Valuation · Profitability · Holder Behavior · Exchange) dan **MARKET** (Derivatives · Sentiment · Macro). Semua halaman: slider rentang, nyaman di HP, kontrol diingat per halaman, tombol Style di chart.
 - **Langkah pertama sesi baru:**
   1. Cek server `dashboard-v2-uji` (bagian 2), buka halaman, lihat keadaannya sebelum mengubah apa pun.
   2. Cek run bot terakhir (tab Actions / `gh run view --log`): Pipeline 23–26 harus `✅`. **Terakhir diuji 22 Sep 14:58 UTC — semua lolos** (Pipeline 26 sempat gagal, sudah beres; lihat bagian 7).
@@ -49,6 +49,7 @@ Semua: BTC oranye `#F7931A` (kecuali HODL Waves), key localStorage `dash_v2_<key
 | Menu / alamat | Loader & kolom | Bawaan & bentuk | Catatan data / keputusan |
 |---|---|---|---|
 | **MVRV** `/` (key `market_valuation`) | `load_mvrv` — `data_mvrv.csv`; Rolling Z-Score 1y/2y/4y dihitung | BTC Separate pane, metrik & harga Log; LTH MVRV sumbu kanan; **Median MVRV `#6fb6de`** sumbu kiri, nyala awal; ref Neutral 1.0; pane **Z-Score** (Hidden, kanan): Z-Score navy + Rolling hijau `#97c459` (2y/4y mati awal) | Z-Score full-history untuk aturan, rolling untuk mata (KB MVRV). Median MVRV dari `data_median_mvrv.csv`; bukan bagian framework v2 |
+| **MVRV Momentum** `/mvrv-momentum` (key `mvrv_momentum`) | `load_mvrv_momentum` — `data_mvrv.csv`: Momentum = SMA30(MVRV) − SMA30 dari SMA30, MVRV ÷ SMA180, MVRV ÷ SMA365, rata-rata MVRV seluruh sejarah (1,80) | Overlay, BTC Log kanan; osilator area teal/rust dari patokan (`Series.base`: 0 Momentum, 1,0 rasio); saklar **Momentum \| ÷ SMA180 \| ÷ SMA365** (bawaan Momentum, boleh lebih dari satu); pane **MVRV Ratio** (garis navy + All-time Mean abu, Hidden awal) | Acuan chart Glassnode "MVRV Momentum Is Turning Positive". Momentum cross = K2 framework v2; ÷ SMA180 < 1 = penghenti K2; ÷ SMA365 = versi Glassnode (pembanding). Ambang ≥ 7 hari tidak digambar. Range All dari 2010: lonjakan 2011–13 melebarkan sumbu (zoom). Garis mean belum putus-putus |
 | **Price Levels** `/price-levels` | `load_price_levels` — `data_price_level.csv` + AVIV Mean/Upper dari `data_aviv.csv` | Overlay, satu sumbu kanan, Auto. STH RP, RP, LTH RP, TMM `#3fa96b`, Median RP `#6fb6de`, AVIV Mean `#7b65d2`, AVIV Upper `#a58df0`, CVDD `#a8963f`; mati awal: MVRV 0σ, 200 DMA, 50 WMA, 200 WMA (abu). Pane bawah **Price / CVDD** (Hidden, Log, olive); Price / RP navy mati awal | Price/CVDD dipakai K4 framework v2 — garis ambang tidak dipasang. AVIV dihitung ulang `btc_price/aviv_ratio × band` (kolom `price_at_aviv_*` salah basis), 84 hari pertama disembunyikan (`_aviv_awal`). |
 | **AVIV** `/aviv` | `load_aviv` — `data_aviv.csv` (satuan rasio) | Separate pane, Log/Log; AVIV Ratio navy, Mean violet, Upper (+0.5σ) violet muda, sumbu kanan; kelompok **σ Bands** (+1σ +2σ −1σ −2σ, abu, mati awal); pane bawah **Deviation (σ)** menyala awal, sumbu kanan | Rasio ≥ Upper ⇔ harga ≥ AVIV Upper (1.279 hari sejak 2011). Band bawah negatif s/d 2014 dikosongkan |
 | **Realized Cap** `/realized-cap` (key `realized_cap`) | `load_realized_cap` — `data_realized_cap.csv` (% dan 30d change dihitung) | Separate pane, Log; total navy, LTH teal, STH rust (compact); saklar **USD \| %**; **30d Change (%)** area di pane harga sumbu kiri, Overlay/Hidden → pane bawah kanan | 30d change 2011–2013 ratusan persen, sengaja tidak dikosongkan (zoom). Tidak dipakai framework. Detail di docstring |
@@ -87,7 +88,7 @@ Semua: BTC oranye `#F7931A` (kecuali HODL Waves), key localStorage `dash_v2_<key
 - Seri `pane="price"` digambar di pane harga sebelum garis BTC; sisinya selalu linear; saat Overlay/Hidden pindah ke pane bawah sumbu kanan. Pembatas antar pane putih 22 % (`#panes > div + div::before`).
 - Zoom dan lebar sumbu tersinkron; sumbu waktu hanya di pane terbawah; slider rentang (isi BTC Log) di bawah semua.
 - Sumbu: `axis` bawaan + `separate_axis` saat Separate pane (aturan user: metrik berskala sama ke kanan saat Separate pane). `metric_range` (sumbu tetap, angka bulat tanpa desimal, di luar rentang kosong). Angka sumbu disembunyikan (lebar tetap) kalau semua garis di sisi itu mati. Seri mati diparkir ke skala lain supaya format sumbu tidak kacau.
-- Jenis seri: garis, histogram (`negative_color` dua warna), gradasi per titik (`gradient`), area bertumpuk (`kind="stack"`, `stack_index`, `stack_cols` + `stack_units`), kembaran Loss (`complement`), area dua warna dari nol (`kind="baseline"`), arsiran di antara dua garis (`Series.fill_with` + `fill_colors`: area garis atas berwarna per titik + area penutup warna latar; grid samar di bawahnya ikut tertutup).
+- Jenis seri: garis, histogram (`negative_color` dua warna), gradasi per titik (`gradient`), area bertumpuk (`kind="stack"`, `stack_index`, `stack_cols` + `stack_units`), kembaran Loss (`complement`), area dua warna dari patokan (`kind="baseline"`, patokan `Series.base` bawaan 0), arsiran di antara dua garis (`Series.fill_with` + `fill_colors`: area garis atas berwarna per titik + area penutup warna latar; grid samar di bawahnya ikut tertutup).
 - Legend berkelompok (garis utama + kotak angka periode/anggota), `hidden_default` (sekali, dicatat di `seen`), Highlight multi (redup kontras 1,70:1; disembunyikan kalau hanya BTC), tarik chart menggeser sumbu garis yang disorot, klik dua kali reset.
 - Saklar di chart: Profit/Loss, satuan (`unit_switch`/`unit`/`pair`/`compact`), bobot tumpukan (`stack_units`). Tersimpan di localStorage.
 - `Series.show_when` ("alone"/"together" menurut saklar satuan; "together" tanpa group = kembaran, induk = seri berkolom sama), `alpha_together`; `MetricFamily.window_days` ({label: hari}) = kotak Window ganti Smoothing, `loader(window)`.
@@ -114,7 +115,8 @@ Semua: BTC oranye `#F7931A` (kecuali HODL Waves), key localStorage `dash_v2_<key
 - Tombol layar penuh satu, di dalam chart. Line style di **tombol Style dalam chart (opsi B)**, bukan popover dan bukan klik kanan kotak periode.
 - Tooltip bawaan **Cursor**, latar 94 %.
 - Garis pembatas antar pane **22 %** (dipilih dari 10/16/22/28 %). Pane bawah dengan legend tetap masuk legend (Price/CVDD: supaya Price/RP bisa dinyalakan).
-- Slider rentang: isi BTC, semua halaman, 52 px. Range memindahkan jendela (pilihan B).
+- Slider rentang: isi BTC, semua halaman, **32 px** (dari 52, user 22 Sep). Range memindahkan jendela (pilihan B).
+- **Tinggi chart bawaan "Fit"** (user 22 Sep): chart mengisi sisa tinggi layar sehingga judul + kontrol + semua pane + slider muat satu layar tanpa scroll (min 520 px; pilihan 600–1000 px tetap di Display). **Pembagian pane (user puas, jangan diubah):** tanpa pane harga = metrik 60 % / pane bawah 40 %; dengan pane harga = harga 30 % / metrik 40 % / bawah 30 %. Di layar 940 px: 2 pane ±420/279 px, AVIV 3 pane ±213/286/214 px.
 - HP: tahap 2 (chart lebih pendek, angka ringkas, tombol legend besar) **ditolak**. Angka sumbu terpotong di tepi pane dibiarkan.
 - Z-Score di pane ketiga (bukan di chart MVRV), area polos (gradasi ditunda), tanpa pita ambang tetap.
 - **Unrealized P/L dihitung sendiri, bukan dari endpoint `relative-unrealized-pl-by-cohort`.** Sisi untung kedua sumber sama (LTH 0,349 vs 0,350 pada 18 Agt 2026), tapi sisi rugi endpoint jauh lebih besar (0,501 vs 0,156) sehingga NUPL-nya berlawanan tanda dengan halaman NUPL (−0,15 vs +0,23) dan tidak bisa direkonsiliasi dengan realized cap ChartInspect sendiri. NUPL tetap satu sumber: halaman NUPL.
@@ -208,6 +210,8 @@ Semua file punya `date`; sebagian besar punya `btc_price`. Bukan untuk halaman: 
 - **Sumbu Log di pane pendek hanya menampilkan 1–4 angka** kalau rentangnya lebar (Price/CVDD, harga sejak 2010). Penyebab belum dipastikan — dibiarkan (keputusan user 17 Sep).
 - **Histogram rapat + rgba tembus pandang tampak pekat di Range All** (alpha menumpuk per piksel) → redup pakai warna padat `campurLatar`.
 - **`RefLine` hanya digambar di pane tengah** (`metric_page`, dari seri non-`extra`) → garis acuan untuk pane bawah belum bisa; memasangnya di halaman berskala besar menarik sumbu pane tengah ke nilai itu.
+
+- **Tinggi "Fit" (`C.fit`, `sesuaikanTinggiLayar`)**: tinggi iframe dihitung dari `window.parent.innerHeight` − posisi atas iframe (+ scroll `stMain`), ikut `resize`. Streamlit memaku tinggi wadah iframe **dua kali** (`style.height` dan `flex: 0 0 <px>`) → keduanya harus ditimpa (juga untuk tombol Full). Emulasi viewport panel Claude tidak memicu event `resize` → uji dengan `window.dispatchEvent(new Event('resize'))`.
 
 ### lightweight-charts 4.2.3
 - `minBarSpacing` 0.005 supaya `fitContent()` muat ~5.900 titik. `fitContent()` gagal selama lebar chart 0 → tampilan awal diulang lewat poller.
