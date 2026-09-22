@@ -508,7 +508,8 @@ loadLib(0).then(() => {
   const garisNol = spec => spec.kind === 'baseline';
   const contohDuaWarna = spec => duaWarna(spec) || garisNol(spec);
   const warnaGarisNol = (spec, faded) => {
-    const k = faded ? spec.dim : 1, isi = spec.alpha * k;
+    // alphaDasar: isian S&P 500 ikut diredupkan saat Gold juga menyala (alpha_together).
+    const k = faded ? spec.dim : 1, isi = alphaDasar(spec) * k;
     return {
       topLineColor: dimmed(spec.color, k), bottomLineColor: dimmed(spec.negative_color, k),
       topFillColor1: dimmed(spec.color, isi), topFillColor2: dimmed(spec.color, isi),

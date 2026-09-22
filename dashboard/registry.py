@@ -18,10 +18,10 @@ class Series:
     axis: str = "left"                # sumbu bawaan: "left" atau "right"
     dim: float = 0.3                  # opasitas saat seri lain disorot
     separate_axis: str | None = None  # sumbu saat harga BTC dipindah ke pane sendiri
-    kind: str = "line"                # "line" atau "histogram"
+    kind: str = "line"                # "line", "histogram" (batang) atau "baseline" (area dari nol)
     smoothing: bool = True            # ikut digandakan oleh kontrol Smoothing
     short: str | None = None          # nama di tombol sorot; bawaannya kata pertama label
-    alpha: float = 1.0                # < 1 = tembus pandang (dipakai batang histogram)
+    alpha: float = 1.0                # < 1 = tembus pandang (batang histogram, isian area)
     group: str | None = None          # kelompok legend; bawaannya label sendiri
     hidden_default: bool = False      # lahir dalam keadaan mati di legend
     pane: str = "main"                # "main", "extra" (pane tambahan paling bawah), atau
@@ -33,8 +33,8 @@ class Series:
                                       # (LTH-SOPR: 1.318 tapi 384, bukan 384.000)
     complement_color: str | None = None  # warna garis pasangan (Loss) saat Profit dan
                                          # Loss sama-sama menyala (MetricFamily.complement)
-    negative_color: str | None = None    # histogram: warna batang bernilai negatif
-                                         # (color dipakai untuk batang positif)
+    negative_color: str | None = None    # histogram/baseline: warna nilai negatif
+                                         # (color dipakai untuk nilai positif)
     unit: str | None = None       # satuan untuk saklar MetricFamily.unit_switch ("BTC"/"USD")
     pair: str | None = None       # kolom seri pasangan satuan pertama; seri ini pindah ke sisi
                                   # sumbu seberang saat keduanya menyala (lihat lw_chart)
@@ -50,10 +50,10 @@ class Series:
     stack_cols: dict | None = None
     # Seri bersatuan yang hanya tampil pada keadaan saklar tertentu: "alone" = satuannya satu-
     # satunya yang menyala, "together" = semua satuan menyala (BTC vs Stocks & Gold: Gold
-    # batang saat sendirian, garis saat bersama S&P 500). Seri "together" tanpa group = kembaran
+    # area saat sendirian, garis saat bersama S&P 500). Seri "together" tanpa group = kembaran
     # tanpa legend; nyala/mati dan sorotnya ikut seri legend dengan kolom yang sama.
     show_when: str | None = None
-    # Opasitas batang saat semua satuan menyala (S&P 500 diredupkan supaya garis Gold terbaca).
+    # Opasitas isian saat semua satuan menyala (S&P 500 diredupkan supaya garis Gold terbaca).
     alpha_together: float | None = None
     # Arsiran di antara garis ini dan garis berkolom fill_with (Futures Basis vs 2Y): warna
     # fill_colors[0] saat garis ini di atas, fill_colors[1] saat di bawah, opasitas fill_alpha.
@@ -158,14 +158,14 @@ MARKET_VALUATION = MetricFamily(
         # Bukan bagian framework v2 — tidak ada garis ambang.
         Series("Median MVRV", "Median MVRV", color="#6fb6de", axis="left", dim=0.27,
                short="Median"),
-        # Z-Score digambar sebagai batang dari garis nol, bukan garis: bentuknya
+        # Z-Score digambar sebagai area dari garis nol, bukan garis: bentuknya
         # langsung membedakannya dari tiga rasio di atas. Tidak ikut smoothing —
         # yang rolling sudah merupakan penghalusan, dan yang full-history bergerak
         # seiring MVRV Ratio yang penghalusannya sudah tersedia sendiri.
         # Nama pendek ditentukan sendiri: bawaannya kata pertama, dan ketiga seri
         # MVRV ini akan sama-sama menulis "MVRV" di tombol sorot.
         # Z-Score tinggal di pane sendiri paling bawah, menyala lewat kotak Z-Score.
-        # Batangnya tembus pandang supaya dua kelompok bisa menyala bersamaan.
+        # Areanya tembus pandang supaya dua kelompok bisa menyala bersamaan.
         # Warna Z-Score ikut induknya (navy MVRV): pane-nya terpisah dari garis MVRV,
         # jadi tidak bisa tertukar. Navy lebih gelap dari hijau Rolling, jadi dibuat
         # lebih pekat (0.80, kontras 2.54:1 ke latar chart; pada 0.55 cuma 1.83:1).
@@ -174,20 +174,20 @@ MARKET_VALUATION = MetricFamily(
         # dim 0.45 x alpha 0.80 = redup 1.44:1, setara violet lama (1.40:1).
         # Pane bawah memakai sumbu kanan (permintaan user 17 Sep 2026), begitu juga SOPR Gap
         # dan AVIV Deviation.
-        Series("MVRV Z-Score", "MVRV Z-Score", color="#0070a6", axis="right",
-               dim=0.45, kind="histogram", smoothing=False, short="Z", alpha=0.80,
+        Series("MVRV Z-Score", "MVRV Z-Score", color="#0070a6", negative_color="#0070a6", axis="right",
+               dim=0.45, kind="baseline", smoothing=False, short="Z", alpha=0.45,
                pane="extra"),
         # Tiga jendela rolling satu kelompok legend: namanya keterangan, angka
         # jendelanya kotak kecil yang bisa diklik sendiri-sendiri — sama seperti
         # angka periode smoothing. Hanya 1Y yang menyala di awal.
-        Series("Rolling Z-Score (1y)", "MVRV Z-Score 1Y", color="#97c459", axis="right",
-               dim=0.45, kind="histogram", smoothing=False, short="Z roll", alpha=0.55,
+        Series("Rolling Z-Score (1y)", "MVRV Z-Score 1Y", color="#97c459", negative_color="#97c459", axis="right",
+               dim=0.45, kind="baseline", smoothing=False, short="Z roll", alpha=0.35,
                pane="extra", group="Rolling Z-Score"),
-        Series("Rolling Z-Score (2y)", "MVRV Z-Score 2Y", color="#97c459", axis="right",
-               dim=0.45, kind="histogram", smoothing=False, alpha=0.55,
+        Series("Rolling Z-Score (2y)", "MVRV Z-Score 2Y", color="#97c459", negative_color="#97c459", axis="right",
+               dim=0.45, kind="baseline", smoothing=False, alpha=0.35,
                pane="extra", group="Rolling Z-Score", hidden_default=True),
-        Series("Rolling Z-Score (4y)", "MVRV Z-Score 4Y", color="#97c459", axis="right",
-               dim=0.45, kind="histogram", smoothing=False, alpha=0.55,
+        Series("Rolling Z-Score (4y)", "MVRV Z-Score 4Y", color="#97c459", negative_color="#97c459", axis="right",
+               dim=0.45, kind="baseline", smoothing=False, alpha=0.35,
                pane="extra", group="Rolling Z-Score", hidden_default=True),
     ],
     reference_lines=[RefLine(1.0, "Neutral (1.0)")],
@@ -306,9 +306,9 @@ AVIV = MetricFamily(
                  separate_axis="right", dim=0.42, short="σ", precision=3, smoothing=False,
                  group="σ Bands", hidden_default=True)
           for nama in ["+1σ", "+2σ", "−1σ", "−2σ"]],
-        # Jarak rasio dari Mean dalam σ: batang navy seperti Z-Score ikut MVRV (redup 1.44:1).
-        Series("Deviation (σ)", "AVIV Deviation", color="#0070a6", axis="right", dim=0.45,
-               kind="histogram", smoothing=False, short="Dev", alpha=0.80, pane="extra",
+        # Jarak rasio dari Mean dalam σ: area navy seperti Z-Score ikut MVRV (redup 1.44:1).
+        Series("Deviation (σ)", "AVIV Deviation", color="#0070a6", negative_color="#0070a6", axis="right", dim=0.45,
+               kind="baseline", smoothing=False, short="Dev", alpha=0.45, pane="extra",
                precision=2),
     ],
 )
@@ -322,7 +322,7 @@ REALIZED_CAP = MetricFamily(
     url_path="realized-cap",
     loader=data.load_realized_cap,
     # Disetujui user 17 Sep 2026 dari pratinjau: total navy, LTH teal, STH rust; skala metrik Log;
-    # saklar USD | % (bawaan USD); batang perubahan 30 hari seperti LTH/STH Supply. Kelompok
+    # saklar USD | % (bawaan USD); area perubahan 30 hari seperti LTH/STH Supply. Kelompok
     # Valuation (penyebut MVRV; Realized Price = Realized Cap / supply). Tidak dipakai framework v2.
     btc_mode_default="Separate pane",
     metric_scale_default="Log",
@@ -345,8 +345,8 @@ REALIZED_CAP = MetricFamily(
         # Modal masuk/keluar: di pane harga di belakang BTC (sumbu kiri); Overlay/Hidden -> pane
         # bawah sumbu kanan. Naik teal, turun rust. Selalu persen.
         Series("Realized Cap 30d Change (%)", "Realized Cap 30d Change", color="#0b8e89",
-               negative_color="#bf5546", axis="left", dim=0.45, kind="histogram",
-               smoothing=False, alpha=0.60, short="RC 30d", pane="price", precision=1),
+               negative_color="#bf5546", axis="left", dim=0.45, kind="baseline",
+               smoothing=False, alpha=0.45, short="RC 30d", pane="price", precision=1),
     ],
 )
 
@@ -377,11 +377,11 @@ SOPR = MetricFamily(
         # Di atas 100 (2011, 2013) tanpa desimal: sumbunya tidak menulis "1,200.000".
         Series("LTH-SOPR", "LTH-SOPR", color="#0b8e89", axis="left", dim=0.39,
                separate_axis="right", short="LTH", precision=3, whole_from=100),
-        # Gap SMA90 − SMA60(SMA90), rumus KB SOPR §12 (lihat data.load_sopr). Batang ikut
+        # Gap SMA90 − SMA60(SMA90), rumus KB SOPR §12 (lihat data.load_sopr). Area ikut
         # warna induknya (rust STH), sama seperti Z-Score ikut navy MVRV. 5 desimal: KB
         # menulis nilai seperti +0.00096. dim 0.41 x alpha 0.80 = redup 1.44:1, setara Z-Score.
-        Series("STH-SOPR Gap", "STH-SOPR Gap", color="#bf5546", axis="right", dim=0.41,
-               kind="histogram", smoothing=False, short="Gap", alpha=0.80,
+        Series("STH-SOPR Gap", "STH-SOPR Gap", color="#bf5546", negative_color="#bf5546", axis="right", dim=0.41,
+               kind="baseline", smoothing=False, short="Gap", alpha=0.45,
                pane="extra", precision=5),
     ],
     # Batas untung/rugi (definisi SOPR, bukan ambang framework), di sumbu kiri dan kanan.
@@ -448,9 +448,9 @@ NUPL = MetricFamily(
                short="STH", precision=3),
         Series("LTH-NUPL", "LTH-NUPL", color="#0b8e89", axis="left", separate_axis="right", dim=0.39,
                short="LTH", precision=3),
-        # Gap LTH − STH (KB NUPL §8.1): batang rust, dim sama dengan SOPR Gap (redup 1.44:1).
-        Series("Gap (LTH − STH)", "NUPL Gap", color="#bf5546", axis="right", dim=0.41,
-               kind="histogram", smoothing=False, short="Gap", alpha=0.80,
+        # Gap LTH − STH (KB NUPL §8.1): area rust, dim sama dengan SOPR Gap (redup 1.44:1).
+        Series("Gap (LTH − STH)", "NUPL Gap", color="#bf5546", negative_color="#bf5546", axis="right", dim=0.41,
+               kind="baseline", smoothing=False, short="Gap", alpha=0.45,
                pane="extra", precision=3),
     ],
     # Batas untung/rugi agregat (definisi NUPL, bukan ambang framework).
@@ -586,7 +586,7 @@ HOLDER_SUPPLY = MetricFamily(
         # digabung dengan BTC price"). Naik teal, turun rust. Lompatan pindah dompet koin lama
         # ikut tampil (mis. -1,03 juta Nov 2025, +1,13 juta Apr 2026). Selalu BTC.
         Series("LTH 30d Change", "LTH 30d Change", color="#0b8e89", negative_color="#bf5546",
-               axis="left", dim=0.45, kind="histogram", smoothing=False, alpha=0.60,
+               axis="left", dim=0.45, kind="baseline", smoothing=False, alpha=0.45,
                short="LTH 30d", pane="price", precision=0, compact=True),
     ],
 )
@@ -775,10 +775,10 @@ TREASURY_YIELDS = MetricFamily(
         Series("US 2Y Yield (%)", "US 2Y", color="#0070a6", axis="left", dim=0.49, short="2Y"),
         Series("US 10Y Yield (%)", "US 10Y", color="#7b65d2", axis="left", dim=0.45, short="10Y",
                hidden_default=True),
-        # Batang teal saat 10Y di atas 2Y, rust saat terbalik (negatif). Tanpa garis Zero:
-        # garis acuan hanya bisa di pane tengah; batang sudah tumbuh dari nol.
+        # Area teal saat 10Y di atas 2Y, rust saat terbalik (negatif). Tanpa garis Zero:
+        # garis acuan hanya bisa di pane tengah; area sudah tumbuh dari nol.
         Series("10Y - 2Y Spread (pp)", "10Y-2Y", color="#0b8e89", negative_color="#bf5546",
-               axis="right", dim=0.45, kind="histogram", smoothing=False, alpha=0.80,
+               axis="right", dim=0.45, kind="baseline", smoothing=False, alpha=0.45,
                short="Spread", pane="extra"),
     ],
     extra_label="10Y - 2Y",
@@ -795,9 +795,9 @@ BTC_TRADFI = MetricFamily(
     url_path="btc-stocks-gold",
     loader=data.load_btc_tradfi,
     # Permintaan user 21 Sep 2026 dari gambar riset: Z-Score log(BTC / pembanding) sebagai
-    # batang dua warna, harga BTC menumpang (Overlay, sumbu kanan Log). Di atas nol rust, di
+    # area dua warna, harga BTC menumpang (Overlay, sumbu kanan Log). Di atas nol rust, di
     # bawah nol teal (gambar riset: merah atas, hijau bawah). Saklar S&P 500 | Gold di chart,
-    # boleh dua-duanya: saat bersama, batang S&P diredupkan ke 35 % dan Gold jadi garis olive
+    # boleh dua-duanya: saat bersama, isian S&P diredupkan ke 35 % dan Gold jadi garis olive
     # (pilihan user dari pratinjau). Jendela rolling dipilih di kotak Window (bawaan 365 hari),
     # menggantikan Smoothing. Garis ambang ±2 dan titik sinyal sengaja tidak dipasang: riset
     # menyimpulkan sinyalnya masih hipotesis, dan dashboard tidak memasang ambang.
@@ -807,10 +807,10 @@ BTC_TRADFI = MetricFamily(
     price_scale_default="Log",
     series=[
         Series("BTC / S&P 500 Z-Score", "S&P 500 Z", color="#bf5546", negative_color="#0b8e89",
-               axis="left", dim=0.45, kind="histogram", smoothing=False, alpha=0.80,
+               axis="left", dim=0.45, kind="baseline", smoothing=False, alpha=0.45,
                alpha_together=0.35, short="S&P", unit="S&P 500"),
         Series("BTC / Gold Z-Score", "Gold Z", color="#bf5546", negative_color="#0b8e89",
-               axis="left", dim=0.45, kind="histogram", smoothing=False, alpha=0.80,
+               axis="left", dim=0.45, kind="baseline", smoothing=False, alpha=0.45,
                short="Gold", unit="Gold", show_when="alone"),
         # Olive seperti CVDD (Price Levels): jarak ke oranye BTC 43 normal, 28 deuteranopia,
         # 17 protanopia; dipilih user 21 Sep 2026. Redup 1,70:1 pada dim 0.32.
@@ -822,6 +822,8 @@ BTC_TRADFI = MetricFamily(
 )
 
 
+# Batang -> area (kind "baseline", pilihan user 22 Sep 2026): semua histogram kecuali data harian
+# yang loncat-loncat (Funding Rate, OI Change, Net Flow) — di sana batang lebih jujur.
 FAMILIES = {f.title: f for f in [MARKET_VALUATION, PRICE_LEVELS, AVIV, REALIZED_CAP, SOPR, NUPL, UNREALIZED_PL, SUPPLY_IN_PROFIT,
                                    HODL_WAVES, RHODL_RATIO, HOLDER_SUPPLY, EXCHANGE_FLOW,
                                    FUNDING_OI, FUTURES_BASIS, FEAR_GREED, VIX, BTC_TRADFI, TREASURY_YIELDS]}
