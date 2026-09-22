@@ -746,28 +746,35 @@ try:
 
     # Binance COIN-M dari arsip resmi data.binance.vision, bukan API dapi: API menolak server
     # GitHub Actions ("Service unavailable from a restricted location", run 22 Sep 2026).
-    # Per kontrak quarterly (BTCUSD_YYMMDD): zip bulanan untuk bulan yang sudah lewat, zip harian
-    # untuk bulan berjalan (zip bulanannya belum ada). Bar 1d = close 00:00 UTC hari berikutnya.
+    # Per kontrak quarterly (BTCUSD_YYMMDD): zip bulanan per bulan; kalau zip bulanan belum ada,
+    # zip harian bulan itu. Zip bulanan terbit tanggal 2 ±07:30 UTC, zip harian hari D terbit D+1
+    # ±06:40 UTC (Last-Modified, cek 22 Sep 2026) — tanpa cadangan harian, run tanggal 1 (atau
+    # run tanggal 2 sebelum 07:30) kehilangan Binance sebulan penuh dan diam-diam memakai Deribit
+    # saja. Bar 1d = close 00:00 UTC hari berikutnya.
     def _binance(nama, start, end):
         import io, zipfile
         dasar = f"https://data.binance.vision/data/futures/cm/%s/klines/{nama}/1d/{nama}-1d-%s.zip"
-        bulan_ini = BASIS_END.strftime("%Y-%m")
-        urls = [dasar % ("monthly", b) for b in pd.period_range(start.date(), end.date(), freq="M")
-                .strftime("%Y-%m") if b < bulan_ini]
-        if end.strftime("%Y-%m") >= bulan_ini:
-            urls += [dasar % ("daily", h) for h in pd.date_range(f"{bulan_ini}-01", end.date())
-                     .strftime("%Y-%m-%d") if h < BASIS_END.strftime("%Y-%m-%d")]
-        baris = []
-        for u in urls:
-            r = requests.get(u, timeout=30)
+        hari_ini = BASIS_END.strftime("%Y-%m-%d")
+
+        def _zip(jenis, tanggal):
+            r = requests.get(dasar % (jenis, tanggal), timeout=30)
             if r.status_code == 404:
-                continue                     # kontrak belum listing / hari itu belum diarsip
+                return None                  # belum listing / belum diarsip
             r.raise_for_status()
             z = zipfile.ZipFile(io.BytesIO(r.content))
-            for l in z.read(z.namelist()[0]).decode().splitlines():
-                k = l.split(",")
-                if k[0].isdigit():            # file baru punya baris judul, file lama tidak
-                    baris.append((int(k[0]), float(k[4])))
+            return [(int(k[0]), float(k[4])) for k in
+                    (l.split(",") for l in z.read(z.namelist()[0]).decode().splitlines())
+                    if k[0].isdigit()]       # file baru punya baris judul, file lama tidak
+
+        baris = []
+        for b in pd.period_range(start.date(), end.date(), freq="M"):
+            isi = _zip("monthly", b.strftime("%Y-%m")) if b.strftime("%Y-%m") < hari_ini[:7] else None
+            if isi is None:
+                hari = [h for h in pd.date_range(max(b.start_time, pd.Timestamp(start.date())),
+                                                 min(b.end_time, pd.Timestamp(end.date())))
+                        .strftime("%Y-%m-%d") if h < hari_ini]
+                isi = [x for h in hari for x in (_zip("daily", h) or [])]
+            baris += isi
         s = pd.Series({pd.Timestamp(t, unit="ms"): c for t, c in baris}, dtype=float)
         return s[~s.index.duplicated()]
 
