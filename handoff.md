@@ -1,6 +1,6 @@
 # Handoff — Dashboard Streamlit v2
 
-Diperbarui 23 Sep 2026 (versi ringkas; terakhir sesudah DXY, SSR, Exchange Ratio, gradasi area). Versi lengkap sebelum diringkas — cerita pengerjaan tiap fitur, opsi yang ditolak, hasil ukur piksel — ada di `archive/handoff_riwayat_2026-09-17.md` (buka hanya kalau perlu detail sejarah; nomor bagian 3.x yang disebut di bawah merujuk ke file itu).
+Diperbarui 24 Sep 2026 (versi ringkas; terakhir sesudah halaman CDD / VDD). Versi lengkap sebelum diringkas — cerita pengerjaan tiap fitur, opsi yang ditolak, hasil ukur piksel — ada di `archive/handoff_riwayat_2026-09-17.md` (buka hanya kalau perlu detail sejarah; nomor bagian 3.x yang disebut di bawah merujuk ke file itu).
 
 Baca dokumen ini dan `CLAUDE.md` sebelum mulai. Semua yang ditandai **ditahan/ditunda** harus ditanyakan ke user dulu.
 
@@ -17,10 +17,10 @@ Baca dokumen ini dan `CLAUDE.md` sebelum mulai. Semua yang ditandai **ditahan/di
 
 ## 1. Status dan langkah berikutnya
 
-- **Live: 22 halaman, 8 kelompok, dua label** — **ON-CHAIN** (Valuation · Profitability · Holder Behavior · Exchange) dan **MARKET** (Derivatives · Sentiment · Macro · Liquidity). Semua halaman: slider rentang, nyaman di HP, kontrol diingat per halaman, tombol Style di chart.
+- **Live: 23 halaman, 8 kelompok, dua label** — **ON-CHAIN** (Valuation · Profitability · Holder Behavior · Exchange) dan **MARKET** (Derivatives · Sentiment · Macro · Liquidity). Semua halaman: slider rentang, nyaman di HP, kontrol diingat per halaman, tombol Style di chart.
 - **Langkah pertama sesi baru:**
   1. Cek server `dashboard-v2-uji` (bagian 2). Halaman yang sudah divalidasi user tidak perlu dibuka ulang.
-  2. Run bot tidak perlu dicek ulang kecuali ada gejala (data berhenti, error). Terakhir diuji 22 Sep 14:58 UTC: Pipeline 23–26 lolos. **Pipeline 27–28 (23 Sep) baru diuji lokal** — cek hasil run bot pertama sesudah push (bagian 7).
+  2. Run bot tidak perlu dicek ulang kecuali ada gejala (data berhenti, error). Pipeline 23–26 lolos (22 Sep), Pipeline 27–28 lolos run bot pertama (dicek user 24 Sep).
   3. Tanyakan apakah **Cohort State** (bagian 6) sudah boleh dilanjutkan, lalu **halaman berikutnya** (kandidat dan hasil cek data di bagian 7 — jangan dicek ulang).
 - **Menambah halaman:** satu `MetricFamily` di `dashboard/registry.py` (+ loader di `data.py`). Urutan kerja yang disukai user: cek kualitas data (nilai macet, lonjakan, satuan, cakupan, revisi) → pratinjau widget dengan data asli + uji palet (bagian 8) → tunggu pilihan user → kerjakan di localhost → user bilang valid → merge dari GitHub → commit → push.
 
@@ -60,6 +60,7 @@ Semua: BTC oranye `#F7931A` (kecuali HODL Waves), key localStorage `dash_v2_<key
 | **HODL Waves** `/hodl-waves` (key `hodl_waves`) | `load_hodl_waves` — `data_hodl_waves.csv` (`RC <band>`, `Supply <band>`) | **Overlay, garis BTC putih** (`btc_color`, `btc_dim` 0,17); 12 band `kind="stack"`, muda di bawah, `#d73027 … #9e7bd6`; saklar **Realized Cap \| Supply**; tanpa Highlight/smoothing | Mematikan band menumpuk ulang sisanya |
 | **RHODL Ratio** `/rhodl-ratio` | `load_rhodl_ratio` — `data_hodl_waves.csv` | Judul "RHODL Ratio (6m–2y ÷ 1d–3m)"; **Overlay, metrik Auto, harga Log**; garis navy sumbu kiri | = RC (6m–12m + 1y–2y) ÷ (1d–1w + 1w–1m + 1m–3m), cocok persis `research/findings/_cohort_state_plane.csv`. **Bukan** `rhodl_ratio` di `data_rhodl.csv`. 86 % varians dari penyebut → jangan dibaca sendirian. Calon tempat Cohort State |
 | **LTH/STH Supply** `/lth-sth-supply` (key `holder_supply`) | `load_holder_supply` — `data_supply.csv` (% dan LTH 30d Change dihitung) | Separate pane, harga Log; LTH teal & STH rust; saklar **BTC \| %** (bawaan BTC, compact). **LTH 30d Change** area teal/rust di pane harga, sumbu kiri; saat Overlay/Hidden pindah ke pane bawah kanan | Tidak entity-adjusted: 30d change sesekali ± 1 juta BTC — bukan bug. Detail di docstring |
+| **CDD / VDD** `/cdd-vdd` (key `cdd_vdd`, kelompok Holder Behavior) | `load_cdd` — `data_cdd.csv` (Pipeline 13): rasio `vdd_30d_ma / vdd_365d_ma` dihitung, CDD harian; harga dari `data_mvrv.csv`; nol 2009–10 dikosongkan | Overlay; rasio navy **Log** kiri, ref **1.0**, BTC Log kanan; pane **CDD** batang navy, **Log**, nyala awal, `base=1e4` (bagian 9) | Dicek 24 Sep: MA 30/365 = rata-rata VDD harian persis, VDD ≈ CDD × harga, `vdd_multiple` = VDD harian ÷ MA365 (tidak dipasang, bagian 6). Sesudah 2011 tanpa bolong/nol/macet. Lonjakan CDD sampai 65× median (28 Mei 2024 = Mt.Gox; lainnya belum dicek). Tidak dipakai framework v2; KB menyusul |
 | **Exchange Flow** `/exchange-flow` | `load_exchange` — `data_exchange.csv` + harga dari `data_mvrv.csv` | Separate pane; Exchange Balance navy; pane **Net Flow** nyala awal, batang masuk teal / keluar rust, sumbu kanan | `net_flow` + = masuk bursa. Sebelum 2012 dan hari inflow = outflow = 0 dikosongkan. Detail di docstring `load_exchange` |
 | **Funding Rates & Open Interest** `/funding-oi` | `load_derivatives` — `data_derivatives.csv` (+13 kolom `oi_<bursa>`) | Separate pane; funding batang teal/rust kanan, OI garis violet kiri; ref Zero ikut funding; saklar **OI BTC \| USD**; pane **OI Change (1d)** (Hidden) | Funding 4 desimal. `total_oi` = jumlah 13 bursa; ΔOI hanya bursa dengan OI > 0 kemarin & hari ini |
 | **Futures Basis vs 2Y** `/futures-basis` (kelompok Derivatives) | `load_futures_basis` — `data_futures_basis_3m.csv` (Pipeline 26, sejak Jun 2020) + 2Y `data_yields.csv` (ffill) | Overlay; basis navy, 2Y **abu `#8b949e`** (pengecualian satu-metrik-satu-warna), BTC Log kanan; **arsiran teal/rust di antara basis dan 2Y** (`fill_with`); pane **Basis - 2Y** area (`kind="baseline"`), Hidden awal | Acuan chart Glassnode. Arsiran rust kecil di Range All (puncak 2021) — dibiarkan (zoom). Basis < 2Y: 178 hari (2022–23), 161 hari (5 Feb–15 Jul 2026) |
@@ -133,7 +134,7 @@ Semua: BTC oranye `#F7931A` (kecuali HODL Waves), key localStorage `dash_v2_<key
 ## 6. Ditahan / ditunda / belum diputuskan (tanyakan dulu)
 
 - **Cohort State (DITAHAN user 17 Sep):** dua sumbu (Demand Impulse, Aged Cohort Turnover) → empat state, rencananya di halaman **RHODL Ratio**. **Penghalang: data ACT belum ada** — butuh pipeline `data_profit_by_age.csv`, izin user ditahan. Rumus/nama/warna di `archive/handoff_riwayat_2026-09-17.md`; analisa `research/analyze_cohort_state_plane.py`. Bukan framework v2.
-- **CDD/VDD (ditunda):** `vdd_multiple` berisik; usulan: `vdd_30d_ma / vdd_365d_ma`, ref 1,0. Research menolak "VDD multiple < 1" sebagai filter. Detail di arsip.
+- **CDD/VDD — `vdd_multiple` cadangan (user 24 Sep):** halaman CDD / VDD memakai rasio `vdd_30d_ma / vdd_365d_ma` + CDD harian; `vdd_multiple` (= VDD harian ÷ `vdd_365d_ma`, dicek persis) sengaja tidak dipasang karena ramai. Tanyakan lagi saat user review ulang halaman ini. Research menolak "VDD multiple < 1" sebagai filter. KB CDD/VDD menyusul (Claude.ai).
 - **Realized P/L (ditunda):** `data_pl.csv` — `rpl_ratio`, `sth/lth_pl_ratio` rusak; yang sehat: profit/loss BTC, `rrp`, `rrl`, `relative_realized_pl`. Butuh KB dulu (Claude.ai).
 - **Temuan framework (user cek di Claude.ai; jangan ubah framework/data_dictionary):** framework v2 menulis "703 hari Z5"; rumus AVIV benar = **1.279 hari** (kolom `price_at_aviv_*` salah basis = 710).
 - **Rumus gap STH-SOPR `alerts/alert_check.py` (`_sth_sopr_ma_gap`) = SMA60 − SMA90, beda dari KB §12** (10 Jan 2021: +0.01141 vs KB +0.02447; dipakai trigger K1 dan alarm bear). Menunggu user; jangan dibetulkan diam-diam.
@@ -158,14 +159,13 @@ Semua: BTC oranye `#F7931A` (kecuali HODL Waves), key localStorage `dash_v2_<key
 
 Semua file punya `date`; sebagian besar punya `btc_price`. Bukan untuk halaman: `data_master_all_metrics.csv`, `data_*_events.csv`.
 
-**Sudah dipakai halaman:** `data_mvrv.csv` · `data_price_level.csv` (`cum_pl_price`, `pl_price_ratio` belum dipakai) · `data_aviv.csv` (`price_at_aviv_*` **salah basis**; `liveliness`, `investor_cap` belum dipakai) · `data_momentum.csv` (`net_realized_pl_usd` belum dipakai) · `data_supply.csv` · `data_hodl_waves.csv` · `data_realized_cap.csv` · `data_derivatives.csv` · `data_exchange.csv` · `data_fg.csv` · `data_median_mvrv.csv` · `data_tradfi.csv` (+ kolom `dxy`) · `data_vix.csv` · `data_yields.csv` · `data_futures_basis_3m.csv` · `data_stablecoin_supply.csv` · `data_exchange_reserves.csv`.
+**Sudah dipakai halaman:** `data_mvrv.csv` · `data_price_level.csv` (`cum_pl_price`, `pl_price_ratio` belum dipakai) · `data_aviv.csv` (`price_at_aviv_*` **salah basis**; `liveliness`, `investor_cap` belum dipakai) · `data_momentum.csv` (`net_realized_pl_usd` belum dipakai) · `data_supply.csv` · `data_hodl_waves.csv` · `data_realized_cap.csv` · `data_derivatives.csv` · `data_exchange.csv` · `data_fg.csv` · `data_median_mvrv.csv` · `data_tradfi.csv` (+ kolom `dxy`) · `data_vix.csv` · `data_yields.csv` · `data_futures_basis_3m.csv` · `data_stablecoin_supply.csv` · `data_exchange_reserves.csv` · `data_cdd.csv`.
 
 | File belum dipakai | Kolom | Status |
 |---|---|---|
 | `data_pl.csv` | realized profit/loss BTC, rpl_ratio, sth/lth_pl_ratio, rrp, rrl, relative_realized_pl | ⚠️ ratio rusak (bagian 6) |
 | `data_relative_unrealized_pl_by_cohort.csv` | sth/lth_rup, sth/lth_rul, sth/lth_nupl | ⚠️ sisi rugi tidak konsisten dengan realized cap (bagian 5); halaman Unrealized P/L memakai hitungan sendiri |
 | `data_rhodl.csv` | rhodl_ratio, realized_cap_1w, realized_cap_1_2y | kandidat |
-| `data_cdd.csv` | cdd, vdd_30d_ma, vdd_365d_ma, vdd_multiple (tanpa harga) | ditunda (bagian 6) |
 | `data_apparent_demand.csv` | apparent_demand | kandidat |
 | `data_treasury_2y.csv` | treasury_2y_yield (bulanan) | digantikan `data_yields.csv` (bagian 6) |
 | `data_lth_flow.csv` | lth_pl_price, lth_pl_flow_btc | skip |
@@ -240,6 +240,7 @@ Semua file punya `date`; sebagian besar punya `btc_price`. Bukan untuk halaman: 
 - **Seri yang dibuat belakangan tergambar di atas** → band bertumpuk dibuat duluan (tua → muda), garis sesudahnya.
 - Menarik angka sumbu = mengubah skala (`handleScale`); menarik area hanya menggeser sumbu utama pane yang autoscale-nya mati.
 - Pola garis hanya 5 (Solid, Dotted, Dashed, LargeDashed, SparseDotted); tangga hanya terlihat kalau satu bar beberapa piksel.
+- **Batang (histogram) di sumbu Log harus mulai dari `Series.base` > 0.** Batang dari 0 menarik sumbu Log ke nilai hampir nol → semua batang tampak sama tinggi (blok padat). Pakai angka di bawah nilai terkecil data (CDD: `base=1e4`, terkecil 43K). `base` harus ikut dikirim di setiap `Line(...)` di `metric_page.py` (pane bawah sempat lupa).
 
 ### Alat kerja
 - **`TEMPLATE` di `lw_chart.py` string Python biasa** → JavaScript tanpa backslash (regex `[(]([0-9]+)[)]`). Cek: `python -W error::SyntaxWarning`, lalu ekstrak `<script>` ke file dan `node --check`.

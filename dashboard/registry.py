@@ -59,6 +59,7 @@ class Series:
     # fill_colors[0] saat garis ini di atas, fill_colors[1] saat di bawah, opasitas fill_alpha.
     fill_with: str | None = None
     # Patokan area kind "baseline": warna berganti di nilai ini (rasio: 1.0; bawaan 0).
+    # Histogram: batang tumbuh dari nilai ini (CDD di sumbu Log: 10K).
     base: float = 0.0
     fill_colors: tuple[str, str] | None = None
     fill_alpha: float = 0.35
@@ -629,6 +630,35 @@ HOLDER_SUPPLY = MetricFamily(
 )
 
 
+CDD_VDD = MetricFamily(
+    key="cdd_vdd",
+    title="CDD / VDD",
+    subtitle="Coin Days Destroyed & VDD Ratio (30d ÷ 365d)",
+    group="Holder Behavior",
+    url_path="cdd-vdd",
+    loader=data.load_cdd,
+    # Pilihan user 24 Sep 2026 dari pratinjau: rasio VDD 30d/365d navy Log kiri, acuan 1.0,
+    # BTC Overlay Log kanan; CDD harian batang (bukan SMA30, data loncat-loncat seperti Net Flow)
+    # di pane bawah Log yang menyala awal. vdd_multiple harian tidak dipasang. Belum ada KB,
+    # tidak dipakai framework v2.
+    btc_mode_default="Overlay",
+    metric_scale_default="Log",
+    price_scale_default="Log",
+    series=[
+        Series("VDD 30d / 365d", "VDD Ratio", color="#0070a6", axis="left", dim=0.49,
+               short="VDD", precision=2),
+        # Batang dari 10K, bukan 0: di sumbu Log batang dari 0 menarik sumbu ke nilai sangat kecil
+        # sehingga pane jadi blok padat. CDD terkecil sejak Jul 2010 = 43K.
+        Series("CDD", "CDD", color="#0070a6", axis="right", dim=0.49, kind="histogram",
+               smoothing=False, alpha=0.80, pane="extra", precision=0, compact=True, base=1e4),
+    ],
+    reference_lines=[RefLine(1.0, "1.0")],
+    extra_label="CDD",
+    extra_default=True,
+    extra_scale="Log",
+)
+
+
 EXCHANGE_FLOW = MetricFamily(
     key="exchange_flow",
     title="Exchange Flow",
@@ -926,5 +956,5 @@ BTC_TRADFI = MetricFamily(
 # Batang -> area (kind "baseline", pilihan user 22 Sep 2026): semua histogram kecuali data harian
 # yang loncat-loncat (Funding Rate, OI Change, Net Flow) — di sana batang lebih jujur.
 FAMILIES = {f.title: f for f in [MARKET_VALUATION, MVRV_MOMENTUM, PRICE_LEVELS, AVIV, REALIZED_CAP, SOPR, NUPL, UNREALIZED_PL, SUPPLY_IN_PROFIT,
-                                   HODL_WAVES, RHODL_RATIO, HOLDER_SUPPLY, EXCHANGE_FLOW,
+                                   HODL_WAVES, RHODL_RATIO, HOLDER_SUPPLY, CDD_VDD, EXCHANGE_FLOW,
                                    FUNDING_OI, FUTURES_BASIS, FEAR_GREED, VIX, BTC_TRADFI, TREASURY_YIELDS, DXY, SSR, EXCHANGE_RATIO]}

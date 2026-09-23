@@ -568,7 +568,7 @@ def render_metric_page(family: MetricFamily):
                               short=sr.short, alpha=sr.alpha,
                               hidden_default=sr.hidden_default, precision=sr.precision,
                               whole_from=sr.whole_from, negative_color=sr.negative_color,
-                              unit=sr.unit, compact=sr.compact))
+                              unit=sr.unit, compact=sr.compact, base=sr.base))
             continue
         axis = st.session_state[f"{k}_axis_{sr.col}"]
         plan.append(Line(sr.label, sr.col, sr.color, axis, width=LINE_WIDTH,

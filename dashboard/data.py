@@ -300,6 +300,24 @@ def load_exchange():
 
 
 @st.cache_data(ttl=3600)
+def load_cdd():
+    """Coin Days Destroyed dan rasio VDD 30d / 365d (data_cdd.csv).
+
+    Dicek 24 Sep 2026: vdd_30d_ma dan vdd_365d_ma = rata-rata VDD harian persis, VDD harian
+    ~ CDD x harga, vdd_multiple = VDD harian / vdd_365d_ma (tidak dipakai: terlalu ramai).
+    Sesudah 2011 tanpa hari bolong, nol, atau nilai macet. Nol (2009-2010) dikosongkan
+    supaya sumbu Log tidak rusak. Harga BTC dari data_mvrv.csv (file ini tanpa harga).
+    """
+    df = _prepare(pd.read_csv("data_cdd.csv").rename(columns={'date': 'Date', 'cdd': 'CDD'}))
+    df['VDD Ratio'] = df['vdd_30d_ma'] / df['vdd_365d_ma']
+    df = df[['Date', 'VDD Ratio', 'CDD']].replace(0, float('nan'))
+    harga = _prepare(pd.read_csv("data_mvrv.csv", usecols=['date', 'btc_price'])
+                     .rename(columns={'date': 'Date', 'btc_price': 'BTC Price'}))
+    df = df.merge(harga, on='Date', how='left')
+    return df[df['Date'] >= df.loc[df['BTC Price'].notna(), 'Date'].min()]
+
+
+@st.cache_data(ttl=3600)
 def load_fear_greed():
     """Crypto Fear & Greed Index (data_fg.csv; sumber Alternative.me lewat ChartInspect).
 

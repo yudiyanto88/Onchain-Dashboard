@@ -636,7 +636,7 @@ loadLib(0).then(() => {
           crosshairMarkerVisible: false, lastValueVisible: false, title: '',
         }))
       : spec.kind === 'histogram'
-      ? panes[spec.pane].addHistogramSeries(Object.assign({ base: 0 }, umum))
+      ? panes[spec.pane].addHistogramSeries(Object.assign({ base: spec.base || 0 }, umum))
       : garisNol(spec)
       ? panes[spec.pane].addBaselineSeries(Object.assign({}, umum, {
           baseValue: { type: 'price', price: spec.base || 0 }, lineWidth: 1,
