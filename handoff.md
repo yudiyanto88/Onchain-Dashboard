@@ -1,6 +1,6 @@
 # Handoff — Dashboard Streamlit v2
 
-Diperbarui 22 Sep 2026 (versi ringkas; terakhir sesudah MVRV Momentum + tinggi Fit). Versi lengkap sebelum diringkas — cerita pengerjaan tiap fitur, opsi yang ditolak, hasil ukur piksel — ada di `archive/handoff_riwayat_2026-09-17.md` (buka hanya kalau perlu detail sejarah; nomor bagian 3.x yang disebut di bawah merujuk ke file itu).
+Diperbarui 23 Sep 2026 (versi ringkas; terakhir sesudah DXY, SSR, Exchange Ratio, gradasi area). Versi lengkap sebelum diringkas — cerita pengerjaan tiap fitur, opsi yang ditolak, hasil ukur piksel — ada di `archive/handoff_riwayat_2026-09-17.md` (buka hanya kalau perlu detail sejarah; nomor bagian 3.x yang disebut di bawah merujuk ke file itu).
 
 Baca dokumen ini dan `CLAUDE.md` sebelum mulai. Semua yang ditandai **ditahan/ditunda** harus ditanyakan ke user dulu.
 
@@ -17,11 +17,11 @@ Baca dokumen ini dan `CLAUDE.md` sebelum mulai. Semua yang ditandai **ditahan/di
 
 ## 1. Status dan langkah berikutnya
 
-- **Live: 19 halaman, 7 kelompok, dua label** — **ON-CHAIN** (Valuation · Profitability · Holder Behavior · Exchange) dan **MARKET** (Derivatives · Sentiment · Macro). Semua halaman: slider rentang, nyaman di HP, kontrol diingat per halaman, tombol Style di chart.
+- **Live: 22 halaman, 8 kelompok, dua label** — **ON-CHAIN** (Valuation · Profitability · Holder Behavior · Exchange) dan **MARKET** (Derivatives · Sentiment · Macro · Liquidity). Semua halaman: slider rentang, nyaman di HP, kontrol diingat per halaman, tombol Style di chart.
 - **Langkah pertama sesi baru:**
   1. Cek server `dashboard-v2-uji` (bagian 2). Halaman yang sudah divalidasi user tidak perlu dibuka ulang.
-  2. Run bot tidak perlu dicek ulang kecuali ada gejala (data berhenti, error). Terakhir diuji 22 Sep 14:58 UTC: Pipeline 23–26 lolos (lihat bagian 7).
-  3. Tanyakan apakah **Cohort State** (bagian 6) sudah boleh dilanjutkan, lalu **halaman berikutnya** (DXY di bagian 6; kandidat dan hasil cek data di bagian 7 — jangan dicek ulang).
+  2. Run bot tidak perlu dicek ulang kecuali ada gejala (data berhenti, error). Terakhir diuji 22 Sep 14:58 UTC: Pipeline 23–26 lolos. **Pipeline 27–28 (23 Sep) baru diuji lokal** — cek hasil run bot pertama sesudah push (bagian 7).
+  3. Tanyakan apakah **Cohort State** (bagian 6) sudah boleh dilanjutkan, lalu **halaman berikutnya** (kandidat dan hasil cek data di bagian 7 — jangan dicek ulang).
 - **Menambah halaman:** satu `MetricFamily` di `dashboard/registry.py` (+ loader di `data.py`). Urutan kerja yang disukai user: cek kualitas data (nilai macet, lonjakan, satuan, cakupan, revisi) → pratinjau widget dengan data asli + uji palet (bagian 8) → tunggu pilihan user → kerjakan di localhost → user bilang valid → merge dari GitHub → commit → push.
 
 ---
@@ -67,6 +67,9 @@ Semua: BTC oranye `#F7931A` (kecuali HODL Waves), key localStorage `dash_v2_<key
 | **VIX** `/vix` (kelompok Sentiment) | `load_vix` — `data_vix.csv` (Pipeline 24, file resmi Cboe) + harga dari `data_mvrv.csv`; tanpa ffill | Overlay; VIX navy sumbu kiri (Auto), BTC Log kanan; ref **20** | Cboe, bukan Yahoo (bagian 5). Nilai di 33 hari libur bursa AS sejak Mei 2022 = resmi Cboe, dibiarkan |
 | **BTC vs Stocks & Gold** `/btc-stocks-gold` (key `btc_tradfi`, kelompok Macro) | `load_btc_tradfi(window)` — `data_tradfi.csv` (Pipeline 23, Yahoo `^GSPC`/`GC=F`) + harga dari `data_mvrv.csv`; libur bursa di-ffill | Overlay, harga Log kanan, Z kiri. Z log(BTC/pembanding) area rust (atas nol) / teal (bawah); saklar **S&P 500 | Gold**, boleh dua-duanya (S&P 35 % + Gold garis olive `#a8963f`). **Kotak Window ganti Smoothing** (6m–4y + isian hari, bawaan 365d) | Rumus = `research/analyze_btc_spx_zscore.py`. Tanpa ambang ±2 (riset: hipotesis) |
 | **US Treasury Yields** `/treasury-yields` (key `treasury_yields`, kelompok Macro) | `load_yields` — `data_yields.csv` (Pipeline 25, FRED DGS2/DGS10) + harga dari `data_mvrv.csv`; spread 10Y−2Y dihitung; tanpa ffill | Overlay; 2Y navy sumbu kiri; 10Y violet `#7b65d2` mati awal; pane **10Y - 2Y** area teal (+) / rust (terbalik), Hidden awal, sumbu kanan | Kalender pasar obligasi (Columbus/Veterans Day kosong, Good Friday ada). Nilai sama ≥ 5 hari hanya di masa suku bunga ~0 % = asli |
+| **DXY** `/dxy` (kelompok Macro) | `load_dxy` — kolom `dxy` di `data_tradfi.csv` (Pipeline 23, Yahoo `DX-Y.NYB`) + harga dari `data_mvrv.csv`; tanpa ffill | Overlay; DXY navy sumbu kiri (Auto), BTC Log kanan; ref **100** (nilai dasar Mar 1973) | Halaman sendiri, bukan digabung dengan yields (sumbu tidak cukup). Dicek vs rumus ICE + kurs FRED H.10: median selisih 0,08 %, tanpa bias (bagian 7) |
+| **SSR** `/ssr` (kelompok **Liquidity**) | `load_ssr` — harga × supply BTC (LTH+STH, `data_supply.csv`) ÷ `data_stablecoin_supply.csv` (Pipeline 27); mulai 2018 | Overlay; SSR navy **Log** kiri, BTC Log kanan; tanpa ref | SSR **standar** (market cap ÷ supply stablecoin), bukan proksi harga. Keranjang beda dengan Glassnode → baca pakai persentil sendiri. Detail: `research/stablecoin_ratios/README.md` |
+| **Exchange Ratio** `/exchange-ratio` (kelompok Liquidity) | `load_exchange_ratio` — `data_exchange_reserves.csv` (Pipeline 28): BTC di bursa ÷ stablecoin di bursa (USD); mulai 1 Jan 2023 | Overlay; rasio navy kiri (Auto), BTC Log kanan; pane **Reserves** nyala awal: BTC Reserve violet `#7b65d2` ("BTC Res"), Stablecoin Reserve teal (USD ringkas) | Gaya CryptoQuant "Stablecoins Ratio", tapi hanya 19 bursa DefiLlama (**tanpa Coinbase/Upbit dkk.**, ±1/3 BTC di bursa) → untuk membedah bentuk, bukan level. Stablecoin Binance dikoreksi dompet jaminan Binance-Peg. 7 lompatan harian > 10 % dari DefiLlama, penyebab belum tahu (bagian 6) |
 
 ---
 
@@ -74,7 +77,7 @@ Semua: BTC oranye `#F7931A` (kecuali HODL Waves), key localStorage `dash_v2_<key
 
 | File | Isi |
 |---|---|
-| `app.py` | Entry point, `st.navigation` berkelompok (`_halaman(family)`), sidebar (judul "BTC DASHBOARD v2", tanpa nama pemilik), seluruh CSS global (termasuk `:fullscreen`, `html.penuh-semu`, `@media max-width 768px`). Label **ON-CHAIN / MARKET** (15 px, garis pemisah) = CSS `::before` pada kelompok ke-1 dan ke-5 → **ubah angka `nth-child` kalau urutan kelompok di `FAMILIES` berubah** |
+| `app.py` | Entry point, `st.navigation` berkelompok (`_halaman(family)`), sidebar (judul "BTC DASHBOARD v2", tanpa nama pemilik), seluruh CSS global (termasuk `:fullscreen`, `html.penuh-semu`, `@media max-width 768px`). Label **ON-CHAIN / MARKET** (15 px, garis pemisah) = CSS `::before` pada kelompok ke-1 dan ke-5 → **ubah angka `nth-child` kalau urutan kelompok di `FAMILIES` berubah** (Liquidity = kelompok ke-8, tidak menggeser) |
 | `.streamlit/config.toml` | Tema: `base = "dark"`, `primaryColor = "#006d77"` |
 | `dashboard/registry.py` | `Series`, `RefLine`, `MetricFamily` (semua field dijelaskan di komentar) + daftar `FAMILIES` (urutan = urutan menu) |
 | `dashboard/data.py` | Loader CSV (cache 1 jam), SMA/EMA, filter, `HODL_BANDS`, `_aviv_awal` |
@@ -121,6 +124,8 @@ Semua: BTC oranye `#F7931A` (kecuali HODL Waves), key localStorage `dash_v2_<key
 - Z-Score di pane ketiga (bukan di chart MVRV), area polos (gradasi ditunda), tanpa pita ambang tetap.
 - **Unrealized P/L dihitung sendiri, bukan dari endpoint `relative-unrealized-pl-by-cohort`.** Sisi untung kedua sumber sama (LTH 0,349 vs 0,350 pada 18 Agt 2026), tapi sisi rugi endpoint jauh lebih besar (0,501 vs 0,156) sehingga NUPL-nya berlawanan tanda dengan halaman NUPL (−0,15 vs +0,23) dan tidak bisa direkonsiliasi dengan realized cap ChartInspect sendiri. NUPL tetap satu sumber: halaman NUPL.
 - **Batang → area (user 22 Sep):** semua seri dari nol digambar sebagai area (`kind="baseline"`, isian 45 %, Rolling Z 35 %; seri satu warna diberi `negative_color` = `color`). **Kecuali Funding Rate, OI Change BTC/USD, Net Flow** — data harian yang loncat-loncat, tetap batang (area jadi gerigi, hari besar tampak seperti paku).
+- **Area bergradasi (user 23 Sep, dari foto On-Chain Mind):** semua `kind="baseline"` — pekat di tepi pane (**2,2 × alpha**), memudar ke garis nol (**0,5 × alpha**), warna teal/rust tetap, tanpa efek pendar (`warnaGarisNol` di `lw_chart.py`). Gradasi lightweight-charts dihitung dari tepi pane, bukan per puncak.
+- **Data stablecoin (SSR):** CoinMetrics mentah ditolak (ikut kas Tether, kebesaran s/d 40 %), CMC ditolak (telat update, selisih s/d 18 %), DefiLlama sebelum 2021 ditolak (USDT Omni hilang), proksi harga ÷ supply ditolak user. SSR dan Exchange Ratio di kelompok **Liquidity**, bukan Exchange (SSR tidak memakai data bursa).
 - Keputusan per halaman ada di tabel bagian 3.
 
 ---
@@ -140,8 +145,11 @@ Semua: BTC oranye `#F7931A` (kecuali HODL Waves), key localStorage `dash_v2_<key
 - **Usulan disetujui tapi belum diterapkan:** latar brand `#0D1117`; font JetBrains Mono (angka/sumbu) + Inter (label). Ide dua chart bertumpuk — user: "slightly over modif".
 - **Belum dibahas/dilaporkan kecil:** label nilai terakhir bertumpuk saat banyak smoothing (kandidat `lastValueVisible` false, tanya dengan pratinjau); Supply in Profit saat Profit & Loss mati legend tidak dicoret; gradasi area Z-Score; judul HODL Waves tidak berubah saat saklar Supply.
 - **Spot CVD (ditunda user 22 Sep):** Binance BTCUSDT `klines` harian dari `data-api.binance.vision` (delta = 2×taker buy − volume), sejak 17 Agt 2017, tanpa hari bolong. Rencana: CVD 90d + delta harian, BTC Overlay. Terbuka: letak menu ("Trading Flow"?), kotak Window, izin Pipeline. Masa zero-fee Binance (Jul 2022–Mar 2023) volume ×4,7 — efek ke delta belum pasti. OKX (180 hari)/Coinbase (diblok) tidak layak.
-- **Halaman DXY (belum dikerjakan):** Yahoo `DX-Y.NYB` = satu baris `TRADFI_TICKERS`; kelompok Macro. Cek kualitas data dulu.
+- **SSR — belum terjelaskan:** versi blockchain ±62 juta USDT (2–3 %) di atas CMC pada 2018–2019 (dugaan: token dibekukan Tether) → SSR masa itu bisa ±3 % terlalu rendah. Cara cek di README riset.
+- **STH MVRV Momentum (ide user 23 Sep, dari foto On-Chain Mind)** — belum diputuskan; bahan STH MVRV sudah ada di `data_mvrv.csv`.
+- **Server localhost mati sendiri (23 Sep, 3×):** dugaan (belum pasti) — panel browser Claude dipakai membuka situs luar di tab yang sama. Buka situs luar di tab lain.
 - **Pipeline 19 / `data_treasury_2y.csv` boleh dibuang (menunggu user):** = DGS2 bulanan, digantikan `data_yields.csv`; tanpa pemakai (dicek seluruh repo), tanpa sejarah hilang (keduanya mulai 1 Jun 1976). Kalau dibuang: hapus dari daftar master + sesuaikan `data_dictionary.md` (izin user).
+- **Exchange Ratio — upgrade nanti (user 23 Sep 2026):** versi awal pakai 19 bursa DefiLlama sejak 1 Jan 2023 (opsi A), tanpa Coinbase/Upbit dkk. Semua riset, data, verifikasi PoR Binance, opsi mulai A/B/C, hasil cek Dune/CryptoQuant, dan jebakan API ada di **`research/stablecoin_ratios/README.md`** — lanjutkan dari situ, jangan diulang.
 - **Ide nanti:** LTV intraday dari harga 10 menit ChartInspect (`/api/charts/crypto/intraday-price?cryptocurrency=bitcoin&resolution=10&from=&to=`, gratis 30 hari).
 
 ---
@@ -150,7 +158,7 @@ Semua: BTC oranye `#F7931A` (kecuali HODL Waves), key localStorage `dash_v2_<key
 
 Semua file punya `date`; sebagian besar punya `btc_price`. Bukan untuk halaman: `data_master_all_metrics.csv`, `data_*_events.csv`.
 
-**Sudah dipakai halaman:** `data_mvrv.csv` · `data_price_level.csv` (`cum_pl_price`, `pl_price_ratio` belum dipakai) · `data_aviv.csv` (`price_at_aviv_*` **salah basis**; `liveliness`, `investor_cap` belum dipakai) · `data_momentum.csv` (`net_realized_pl_usd` belum dipakai) · `data_supply.csv` · `data_hodl_waves.csv` · `data_realized_cap.csv` · `data_derivatives.csv` · `data_exchange.csv` · `data_fg.csv` · `data_median_mvrv.csv` · `data_tradfi.csv` · `data_vix.csv` · `data_yields.csv` · `data_futures_basis_3m.csv`.
+**Sudah dipakai halaman:** `data_mvrv.csv` · `data_price_level.csv` (`cum_pl_price`, `pl_price_ratio` belum dipakai) · `data_aviv.csv` (`price_at_aviv_*` **salah basis**; `liveliness`, `investor_cap` belum dipakai) · `data_momentum.csv` (`net_realized_pl_usd` belum dipakai) · `data_supply.csv` · `data_hodl_waves.csv` · `data_realized_cap.csv` · `data_derivatives.csv` · `data_exchange.csv` · `data_fg.csv` · `data_median_mvrv.csv` · `data_tradfi.csv` (+ kolom `dxy`) · `data_vix.csv` · `data_yields.csv` · `data_futures_basis_3m.csv` · `data_stablecoin_supply.csv` · `data_exchange_reserves.csv`.
 
 | File belum dipakai | Kolom | Status |
 |---|---|---|
@@ -166,6 +174,10 @@ Semua file punya `date`; sebagian besar punya `btc_price`. Bukan untuk halaman: 
 
 **`auto_update.py`** (audit ponytail 21 Sep, CSV terbukti identik): helper `simpan()` dan `baca_median_mvrv()`; normalisasi tanggal hanya di `fetch_data` dan saat membaca CSV. Pipeline 23 (Yahoo): hari bursa saja, sejarah ditarik ulang tiap jalan, ticker gagal = kolom lama tetap. Pipeline 24 (Cboe `VIX_History.csv` → `data_vix.csv`) dan 25 (FRED `fredgraph.csv?id=DGS2/DGS10` → `data_yields.csv`): sejarah penuh tiap jalan, gagal = file lama tetap.
 - **Pipeline 26 (futures basis, beres 22 Sep):** spot = **Bitstamp** BTC/USD, Binance COIN-M dari **arsip `data.binance.vision`** (zip per kontrak quarterly), Deribit dari API. Alasannya: API Binance (`dapi`) menolak server GitHub Actions (*"Service unavailable from a restricted location"*); arsip lolos. Hasil Binance identik dengan API; basis bergeser rata-rata ±0,01 poin (maks 1,4 poin, 14 Jun 2022) karena spot ganti sumber. Bar hari berjalan tidak dihitung. Kalau zip bulanan belum terbit (terbit tgl 2 ±07:30 UTC; zip harian D+1 ±06:40 UTC), zip harian bulan itu dipakai — tanpa ini run tgl 1 diam-diam kehilangan Binance sebulan (diuji dengan simulasi). Run bot ±3–4 menit. Hasil lokal = hasil GitHub.
+- **Pipeline 23 + DXY (23 Sep):** baris `'dxy': 'DX-Y.NYB'` di `TRADFI_TICKERS`. `load_btc_tradfi` membaca `usecols` spx/xau saja.
+- **Pipeline 27 (supply stablecoin → `data_stablecoin_supply.csv`, kolom `stablecoin_supply_usd`, `sumber`):** baris < 16 Feb 2021 (`onchain`) **dibekukan**, dibangun sekali oleh `research/stablecoin_ratios/build_stablecoin_history.py` (USDT = supply on-chain CoinMetrics − saldo 7 dompet kas Tether Omni/ETH/Tron, semuanya lulus uji terhadap laporan resmi Tether). Sesudahnya DefiLlama total, ditarik ulang penuh (tanpa key). Lompatan sambung −0,36 %. File hilang/kosong = pipeline berhenti dengan pesan jalankan skrip itu.
+- **Pipeline 28 (cadangan bursa → `data_exchange_reserves.csv`):** DefiLlama CEX `api.llama.fi/protocol/<slug>` (19 bursa dikunci di `CEX_TETAP`; Binance ±42 MB per tarikan). Kolom `btc_reserve_usd`, `stable_reserve_raw_usd`, `binance_peg_backing_usd`, `stable_reserve_usd` (= mentah − jaminan Peg). Riwayat jaminan Peg dari `research/stablecoin_ratios/build_binance_peg_backing.py`; tiap run menambah saldo hari itu (`eth_call` Tenderly publik). Diverifikasi ke PoR Binance 1 Sep 2026: BTC asli +0,1 %, selisih USDT/USDC = saldo dompet Peg persis.
+- **Riset lengkap kedua metrik** (sumber yang ditolak, alamat, tabel uji, opsi upgrade, jebakan API): `research/stablecoin_ratios/README.md`.
 
 **Hasil cek kualitas kandidat (17 Sep; jangan diulang kecuali data berubah):**
 - **RHODL (`data_rhodl.csv`):** = persen RC 1d–1w ÷ 1y–2y, tanpa pengali umur pasar Glassnode; puncak 443 (2011), p99 sejak 2012 = 37. Didominasi penyebut.
@@ -175,6 +187,7 @@ Semua file punya `date`; sebagian besar punya `btc_price`. Bukan untuk halaman: 
 - **Median MVRV (`data_median_mvrv.csv`, 18 Sep):** 17 Jul 2010 – sekarang; min 0,60 · maks 73,77 (2011). **30 hari kosong** (18 Agt → 18 Sep 2026), baris terakhir `source = urpd_formula`. User: tampilkan apa adanya (garis tersambung melewati lubang).
 - **`data_tradfi.csv` (21 Sep):** sejak 4 Jan 2010, tanpa 0/macet, lonjakan > 10 % hanya asli (Mar 2020, Jan 2026), 6 tanggal libur beda.
 - **VIX (21 Sep):** tanpa 0/macet/celah > 5 hari; 19 lonjakan > 40 % semuanya kejadian pasar asli (maks 82,69, 16 Mar 2020). **Yields (22 Sep):** tanpa ≤ 0; lonjakan terbesar 2Y −0,57 (13 Mar 2023, SVB); FRED telat 1–2 hari bursa. **Basis (22 Sep):** hasil Pipeline 26 identik dengan `research/findings/_futures_basis_3m_history.csv`; lonjakan besar (2021, −4,7 % 11 Mar 2023) dikonfirmasi kedua bursa; 3 Sep 2020 kedua bursa berlawanan tanda (belum dicek).
+- **DXY (22 Sep):** Yahoo `DX-Y.NYB` 4 Jan 2010 –, tanpa 0/macet/akhir pekan; 877 baris kosong = potongan hari Minggu (dibuang `dropna`); celah terpanjang 5 hari (badai Sandy, Okt 2012); 3 hari > 2 % (3 Des 2015, 24 Jun 2016, 10 Nov 2022). Vs DXY hitungan rumus ICE dari kurs FRED H.10 (jam 12 siang NY): median selisih 0,08 %, maks 1,2 %, korelasi perubahan mingguan 0,98; 5 dari 10 selisih terbesar = hari FOMC.
 - **Revisi ChartInspect:** 10 Sep 2026 (`c99e761`) sejarah AVIV, realized cap HODL, VDD MA, LTH flow dihitung ulang (median 0,1–0,6 %, maks ±12 %). Selain itu stabil.
 
 **Perhatian umum:** angka ChartInspect tidak entity-adjusted (tidak sama dengan Glassnode). Kalau halaman menyentuh threshold/zona/sinyal framework, **baca `references/Decision_Framework v2.md` dulu**; Claude Code tidak mengambil keputusan investasi.
@@ -239,6 +252,9 @@ Semua file punya `date`; sebagian besar punya `btc_price`. Bukan untuk halaman: 
 - **FRED membiarkan User-Agent `Mozilla/5.0` sampai timeout**; User-Agent bawaan Python/curl diterima. Cboe dipanggil dengan `Mozilla/5.0` dan jalan (tanpa header belum diuji).
 - **API Binance menolak GitHub Actions (lokasi AS)** → data Binance lewat arsip `data.binance.vision`. Merge data bot bisa konflik di CSV yang dihitung ulang penuh (mis. `data_futures_basis_3m.csv`) → pilih versi lokal (`git checkout --ours`), bot menghitung ulang di run berikutnya.
 - **Heredoc Bash mengubah `\\n` di skrip patch jadi baris baru sungguhan** → tulis skrip dengan Write, atau pakai Edit.
+- **`Stop-Process` untuk server sisa sesi lama ditolak classifier auto mode** walau user mengizinkan → minta user menjalankannya sendiri.
+- **Menguji satu pipeline saja:** `exec` potongan `auto_update.py` dari `def simpan` s/d `# 1. PIPELINE`, lalu dari `# <n>. PIPELINE` s/d pipeline berikutnya — tanpa menjalankan semua pipeline.
+- **API gratis untuk data on-chain** (Tenderly publik untuk log/saldo lama ETH, batas Wayback/Blockscout/drpc, TronGrid/Omni Explorer): daftar di `research/stablecoin_ratios/README.md`. Python `print` di proses latar belakang tertahan buffer → pakai `python -u`.
 
 ---
 

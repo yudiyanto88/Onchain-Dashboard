@@ -506,16 +506,20 @@ loadLib(0).then(() => {
   // Area dua warna dari garis nol (kind "baseline", Futures Basis vs 2Y; 22 Sep 2026): garis
   // dan isian di atas nol memakai spec.color, di bawah nol spec.negative_color; isian
   // tembus pandang spec.alpha. faded = redup Highlight.
+  // Isian bergradasi (pilihan user 23 Sep 2026 dari foto On-Chain Mind): pekat di tepi pane
+  // (2,2 x alpha), memudar ke garis nol (0,5 x alpha). Gradasi lightweight-charts dihitung dari
+  // tepi pane ke garis nol, bukan per puncak, jadi puncak kecil lebih pudar.
   const garisNol = spec => spec.kind === 'baseline';
   const contohDuaWarna = spec => duaWarna(spec) || garisNol(spec);
   const warnaGarisNol = (spec, faded) => {
     // alphaDasar: isian S&P 500 ikut diredupkan saat Gold juga menyala (alpha_together).
     const k = faded ? spec.dim : 1, isi = alphaDasar(spec) * k;
+    const tepi = Math.min(1, isi * 2.2), nol = isi * 0.5;
     return {
       topLineColor: dimmed(spec.color, k), bottomLineColor: dimmed(spec.negative_color, k),
-      topFillColor1: dimmed(spec.color, isi), topFillColor2: dimmed(spec.color, isi),
-      bottomFillColor1: dimmed(spec.negative_color, isi),
-      bottomFillColor2: dimmed(spec.negative_color, isi),
+      topFillColor1: dimmed(spec.color, tepi), topFillColor2: dimmed(spec.color, nol),
+      bottomFillColor1: dimmed(spec.negative_color, nol),
+      bottomFillColor2: dimmed(spec.negative_color, tepi),
     };
   };
   // Semua saklar satuan menyala (BTC vs Stocks & Gold: S&P 500 dan Gold bersama).

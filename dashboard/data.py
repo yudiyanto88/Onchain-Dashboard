@@ -326,7 +326,8 @@ def load_btc_tradfi(window=365):
     """
     harga = _prepare(pd.read_csv("data_mvrv.csv", usecols=['date', 'btc_price'])
                      .rename(columns={'date': 'Date', 'btc_price': 'BTC Price'}))
-    tradfi = _prepare(pd.read_csv("data_tradfi.csv").rename(columns={'date': 'Date'}))
+    tradfi = _prepare(pd.read_csv("data_tradfi.csv", usecols=['date', 'spx', 'xau'])
+                      .rename(columns={'date': 'Date'}))
     df = harga.merge(tradfi, on='Date', how='left')
     df = df[df['Date'] >= tradfi['Date'].min()].copy()
     for kolom, nama in (("spx", "S&P 500"), ("xau", "Gold")):
@@ -350,6 +351,66 @@ def load_vix():
                      .rename(columns={'date': 'Date', 'btc_price': 'BTC Price'}))
     vix = _prepare(pd.read_csv("data_vix.csv").rename(columns={'date': 'Date', 'vix': 'VIX'}))
     return harga.merge(vix, on='Date', how='left')
+
+
+@st.cache_data(ttl=3600)
+def load_dxy():
+    """US Dollar Index (kolom dxy di data_tradfi.csv, Pipeline 23 dari Yahoo DX-Y.NYB) + harga BTC.
+
+    Hanya hari bursa ICE; akhir pekan dan libur kosong (tidak di-ffill). Cek data 22 Sep 2026:
+    tanpa 0/macet, celah terpanjang 5 hari (badai Sandy, Okt 2012). Dibandingkan dengan DXY yang
+    dihitung dari rumus resmi ICE + kurs FRED H.10 (jam 12 siang NY): median selisih 0,08 %,
+    tanpa bias, korelasi perubahan mingguan 0,98. Bukan bagian framework v2.
+    """
+    harga = _prepare(pd.read_csv("data_mvrv.csv", usecols=['date', 'btc_price'])
+                     .rename(columns={'date': 'Date', 'btc_price': 'BTC Price'}))
+    dxy = _prepare(pd.read_csv("data_tradfi.csv", usecols=['date', 'dxy'])
+                   .rename(columns={'date': 'Date', 'dxy': 'DXY'}).dropna())
+    return harga.merge(dxy, on='Date', how='left')
+
+
+@st.cache_data(ttl=3600)
+def load_ssr():
+    """Stablecoin Supply Ratio = market cap BTC / total supply stablecoin (USD), sejak 2018.
+
+    Market cap = harga (data_mvrv.csv) x supply BTC (LTH + STH, data_supply.csv). Supply stablecoin
+    dari data_stablecoin_supply.csv (Pipeline 27): s/d 15 Feb 2021 dari blockchain (USDT = supply
+    on-chain dikurangi kas Tether, lihat research/stablecoin_ratios/build_stablecoin_history.py), sesudahnya DefiLlama.
+    Cek 23 Sep 2026: USDT versi blockchain vs CMC median 2-4 %/tahun (CMC telat update); ~62 juta
+    (2-3 %) di 2018-2019 belum terjelaskan -> SSR 2018-2019 bisa terlalu rendah sampai ~3 %.
+    Keranjang stablecoin beda dengan Glassnode: baca pakai persentil sendiri. Bukan framework v2.
+    """
+    harga = _prepare(pd.read_csv("data_mvrv.csv", usecols=['date', 'btc_price'])
+                     .rename(columns={'date': 'Date', 'btc_price': 'BTC Price'}))
+    sup = _prepare(pd.read_csv("data_supply.csv", usecols=['date', 'lth_supply_btc', 'sth_supply_btc'])
+                   .rename(columns={'date': 'Date'}))
+    stable = _prepare(pd.read_csv("data_stablecoin_supply.csv", usecols=['date', 'stablecoin_supply_usd'])
+                      .rename(columns={'date': 'Date'}))
+    df = harga.merge(sup, on='Date', how='left').merge(stable, on='Date', how='left')
+    df['SSR'] = (df['BTC Price'] * (df['lth_supply_btc'] + df['sth_supply_btc'])
+                 / df['stablecoin_supply_usd'])
+    return df.loc[df['Date'] >= '2018-01-01', ['Date', 'BTC Price', 'SSR']]
+
+
+@st.cache_data(ttl=3600)
+def load_exchange_ratio():
+    """Exchange Stablecoin Ratio = cadangan BTC di bursa (USD) / cadangan stablecoin di bursa (USD).
+
+    Pipeline 28 (data_exchange_reserves.csv): DefiLlama CEX Transparency, 19 bursa tetap, sejak 2023,
+    stablecoin Binance dikurangi dompet jaminan Binance-Peg. Dicek terhadap PoR Binance 1 Sep 2026: BTC
+    asli +0,1 %; stablecoin cocok sesudah koreksi kecuali USDT/USDC Binance di BNB Chain (±2,4 miliar)
+    yang tidak ada di DefiLlama. TIDAK mencakup Coinbase/Upbit/Bithumb dkk. (±1/3 BTC di bursa saja),
+    jadi level tidak sebanding dengan CryptoQuant; dipakai untuk membedah bentuk. Bukan framework v2.
+    """
+    harga = _prepare(pd.read_csv("data_mvrv.csv", usecols=['date', 'btc_price'])
+                     .rename(columns={'date': 'Date', 'btc_price': 'BTC Price'}))
+    r = _prepare(pd.read_csv("data_exchange_reserves.csv",
+                             usecols=['date', 'btc_reserve_usd', 'stable_reserve_usd'])
+                 .rename(columns={'date': 'Date', 'btc_reserve_usd': 'BTC Reserve',
+                                  'stable_reserve_usd': 'Stablecoin Reserve'}))
+    r['Exchange Ratio'] = r['BTC Reserve'] / r['Stablecoin Reserve']
+    df = harga.merge(r, on='Date', how='left')
+    return df[df['Date'] >= r['Date'].min()]
 
 
 @st.cache_data(ttl=3600)

@@ -620,6 +620,7 @@ except Exception as e:
 TRADFI_TICKERS = {
     'spx': '^GSPC',   # S&P 500
     'xau': 'GC=F',    # Emas, futures bulan terdekat (pendekatan harga spot)
+    'dxy': 'DX-Y.NYB',  # ICE US Dollar Index; dicek 22 Sep 2026 vs rumus ICE dari kurs FRED H.10: median selisih 0,08 %
 }
 print("\n[23] Menarik harga pasar tradisional dari Yahoo Finance...")
 try:
@@ -859,6 +860,84 @@ except Exception as e:
     print(f"❌ Error Pipeline 26 Futures Basis: {e} — data_futures_basis_3m.csv tidak diubah")
 
 # ==========================================
+# 27. PIPELINE: TOTAL SUPPLY STABLECOIN (DEFILLAMA) UNTUK SSR
+# ==========================================
+# Baris sebelum 16 Feb 2021 (sumber 'onchain') dibekukan: dibangun sekali oleh
+# research/stablecoin_ratios/build_stablecoin_history.py dari blockchain, karena DefiLlama sebelum 2021 belum
+# melacak USDT di Omni. Sejak 16 Feb 2021 total DefiLlama (supply beredar, cocok dengan laporan
+# resmi Tether dan CoinGecko). Bagian DefiLlama ditarik ulang penuh tiap jalan; gagal = file lama tetap.
+print("\n[27] Menarik total supply stablecoin dari DefiLlama...")
+try:
+    SAMBUNG_STABLE = '2021-02-16'
+    lama = pd.read_csv("data_stablecoin_supply.csv", dtype={'date': str})
+    lama = lama[lama['date'] < SAMBUNG_STABLE]
+    if lama.empty:
+        raise ValueError("sejarah 'onchain' hilang, jalankan research/stablecoin_ratios/build_stablecoin_history.py")
+    j = requests.get("https://stablecoins.llama.fi/stablecoincharts/all", timeout=60).json()
+    baru = pd.DataFrame({
+        'date': [pd.to_datetime(int(x['date']), unit='s').strftime('%Y-%m-%d') for x in j],
+        'stablecoin_supply_usd': [x.get('totalCirculatingUSD', {}).get('peggedUSD') for x in j],
+    }).dropna().drop_duplicates('date', keep='last')
+    baru = baru[baru['date'] >= SAMBUNG_STABLE].assign(sumber='defillama')
+    if baru.empty:
+        raise ValueError("DefiLlama kosong")
+    baru['stablecoin_supply_usd'] = baru['stablecoin_supply_usd'].round().astype('int64')
+    simpan(pd.concat([lama, baru]), "data_stablecoin_supply.csv")
+except Exception as e:
+    print(f"❌ Error Pipeline 27 Stablecoin Supply: {e} — data_stablecoin_supply.csv tidak diubah")
+
+# ==========================================
+# 28. PIPELINE: CADANGAN BTC & STABLECOIN DI BURSA (DEFILLAMA CEX) UNTUK EXCHANGE RATIO
+# ==========================================
+# DefiLlama CEX Transparency (dompet yang dipublikasikan bursa), daftar bursa DIKUNCI ke 19 bursa
+# yang datanya ada sejak 2022, supaya bursa baru tidak membuat lompatan. Coinbase, Upbit, Bithumb,
+# bitFlyer dkk. tidak punya data dompet di DefiLlama (dicek 23 Sep 2026): hanya ±1/3 BTC di bursa.
+# Koreksi Binance: stablecoin di dompet jaminan token Binance-Peg dikurangkan (bukan cadangan bursa;
+# lihat research/stablecoin_ratios/build_binance_peg_backing.py yang membangun riwayatnya). Hari baru = saldo sekarang.
+CEX_TETAP = ['binance-cex', 'okx', 'bitfinex', 'bybit', 'crypto-com', 'htx', 'kucoin', 'deribit', 'gate',
+             'bitget', 'bitmex', 'swissborg', 'korbit', 'phemex', 'woo-x', 'bake.io', 'coinsquare', 'nbx', 'voyager']
+PEG_DOMPET = ['0x47ac0fb4f2d84898e4d9e7b4dab3c24507a6d503', '0xffa69c0080582098af595156240214b742735a5e']
+PEG_TOKEN = {'0xdac17f958d2ee523a2206206994597c13d831ec7': 6, '0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48': 6,
+             '0x4fabb145d64652a948d72533023f6e7a623c7c53': 18, '0x6b175474e89094c44da98b954eedeac495271d0f': 18,
+             '0x0000000000085d4780b73119b644ae5ecd22b376': 18, '0x8e870d67f660d95d5be530380d0ec0bd388289e1': 18}
+print("\n[28] Menarik cadangan BTC & stablecoin di bursa dari DefiLlama...")
+try:
+    cadangan_file = "data_exchange_reserves.csv"
+    lama = pd.read_csv(cadangan_file, dtype={'date': str}).set_index('date')
+    simbol_stable = {a['symbol'].upper() for a in
+                     requests.get("https://stablecoins.llama.fi/stablecoins", timeout=60).json()['peggedAssets']
+                     if a.get('pegType') == 'peggedUSD'}
+    stable = lambda k: k.upper() in simbol_stable or k.upper().startswith(('USDT', 'USDC'))
+    btc_mirip = {'BTC', 'WBTC', 'CBBTC', 'BTCB'}
+    btc_cex, stable_cex = {}, {}
+    for slug in CEX_TETAP:
+        t = requests.get(f"https://api.llama.fi/protocol/{slug}", timeout=300).json().get('tokensInUsd') or []
+        if not t:
+            raise ValueError(f"{slug} kosong")
+        tgl = [pd.to_datetime(x['date'], unit='s').strftime('%Y-%m-%d') for x in t]
+        btc_cex[slug] = pd.Series([sum(v for k, v in x['tokens'].items() if k.upper() in btc_mirip) for x in t], index=tgl)
+        stable_cex[slug] = pd.Series([sum(v for k, v in x['tokens'].items() if stable(k)) for x in t], index=tgl)
+    gabung = lambda d: pd.DataFrame({k: s.groupby(level=0).last() for k, s in d.items()}).sort_index().ffill().sum(axis=1)
+    df_cex = pd.DataFrame({'btc_reserve_usd': gabung(btc_cex), 'stable_reserve_raw_usd': gabung(stable_cex)})
+    df_cex = df_cex[df_cex.index >= '2023-01-01']
+
+    peg = lama['binance_peg_backing_usd'].astype(float)
+    kini = 0
+    for d in PEG_DOMPET:
+        for tok, dec in PEG_TOKEN.items():
+            r = requests.post('https://gateway.tenderly.co/public/mainnet', timeout=60, json={
+                'jsonrpc': '2.0', 'id': 1, 'method': 'eth_call',
+                'params': [{'to': tok, 'data': '0x70a08231' + d[2:].rjust(64, '0')}, 'latest']}).json()
+            kini += int(r['result'], 16) / 10**dec
+    peg[datetime.utcnow().strftime('%Y-%m-%d')] = kini
+    peg = peg.sort_index()
+    df_cex['binance_peg_backing_usd'] = peg.reindex(peg.index.union(df_cex.index)).ffill().reindex(df_cex.index)
+    df_cex['stable_reserve_usd'] = df_cex['stable_reserve_raw_usd'] - df_cex['binance_peg_backing_usd']
+    simpan(df_cex.round(0).reset_index(names='date'), cadangan_file)
+except Exception as e:
+    print(f"❌ Error Pipeline 28 Exchange Reserves: {e} — data_exchange_reserves.csv tidak diubah")
+
+# ==========================================
 # 18. MASTER PIPELINE: ALL METRICS AGGREGATOR (NEW)
 # ==========================================
 print("\n[Master] 🌌 Mengkompilasi Semua File CSV ke dalam 1 Master Dataset...")
@@ -872,7 +951,8 @@ try:
         "data_aviv.csv", "data_apparent_demand.csv", "data_treasury_2y.csv",
         "data_relative_unrealized_pl_by_cohort.csv", "data_median_mvrv.csv",
         "data_tradfi.csv", "data_vix.csv", "data_yields.csv",
-        "data_futures_basis_3m.csv"
+        "data_futures_basis_3m.csv", "data_stablecoin_supply.csv",
+        "data_exchange_reserves.csv"
     ]
     
     df_master = None

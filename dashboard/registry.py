@@ -822,6 +822,70 @@ TREASURY_YIELDS = MetricFamily(
 )
 
 
+DXY = MetricFamily(
+    key="dxy",
+    title="DXY",
+    subtitle="US Dollar Index (DXY)",
+    group="Macro",
+    url_path="dxy",
+    loader=data.load_dxy,
+    # Pilihan user 22 Sep 2026 dari pratinjau: halaman sendiri (bukan digabung dengan yields),
+    # Overlay seperti VIX (DXY sumbu kiri, BTC kanan Log), garis acuan 100 = nilai dasar indeks
+    # (Mar 1973). Data Yahoo DX-Y.NYB lewat Pipeline 23 auto_update.py.
+    btc_mode_default="Overlay",
+    metric_scale_default="Auto",
+    price_scale_default="Log",
+    series=[
+        Series("DXY", "DXY", color="#0070a6", axis="left", dim=0.49, precision=2),
+    ],
+    reference_lines=[RefLine(100.0, "100")],
+)
+
+
+SSR = MetricFamily(
+    key="ssr",
+    title="SSR",
+    subtitle="Stablecoin Supply Ratio (SSR)",
+    group="Liquidity",
+    url_path="ssr",
+    loader=data.load_ssr,
+    # Pilihan user 23 Sep 2026 dari pratinjau: SSR standar (market cap BTC / supply stablecoin,
+    # bukan proksi harga), mulai 2018, Overlay, SSR navy sumbu kiri Log, BTC kanan Log, tanpa
+    # garis acuan. Data: Pipeline 27 auto_update.py (sejarah blockchain + DefiLlama).
+    btc_mode_default="Overlay",
+    metric_scale_default="Log",
+    price_scale_default="Log",
+    series=[
+        Series("SSR", "SSR", color="#0070a6", axis="left", dim=0.49, precision=2),
+    ],
+)
+
+
+EXCHANGE_RATIO = MetricFamily(
+    key="exchange_ratio",
+    title="Exchange Ratio",
+    subtitle="Exchange Stablecoin Ratio (BTC ÷ Stablecoin Reserves)",
+    group="Liquidity",
+    url_path="exchange-ratio",
+    loader=data.load_exchange_ratio,
+    # Pilihan user 23 Sep 2026 dari pratinjau: halaman sendiri (bukan saklar di SSR), Overlay, rasio
+    # navy kiri, BTC Log kanan; pane Reserves (BTC violet, stablecoin teal, USD ringkas) nyala awal.
+    # Hanya 19 bursa DefiLlama (tanpa Coinbase dkk.): untuk membedah bentuk, bukan level CryptoQuant.
+    btc_mode_default="Overlay",
+    metric_scale_default="Auto",
+    price_scale_default="Log",
+    series=[
+        Series("Exchange Ratio", "Exchange Ratio", color="#0070a6", axis="left", dim=0.49, precision=3),
+        Series("BTC Reserve (USD)", "BTC Reserve", color="#7b65d2", axis="right", dim=0.45,
+               short="BTC Res", precision=0, compact=True, pane="extra", smoothing=False),
+        Series("Stablecoin Reserve (USD)", "Stablecoin Reserve", color="#0b8e89", axis="right", dim=0.39,
+               short="Stable", precision=0, compact=True, pane="extra", smoothing=False),
+    ],
+    extra_label="Reserves",
+    extra_default=True,
+)
+
+
 # Urutan di sini = urutan menu sidebar; kelompok muncul menurut halaman pertamanya.
 # Halaman pertama jadi halaman bawaan (alamat localhost:8503/).
 BTC_TRADFI = MetricFamily(
@@ -863,4 +927,4 @@ BTC_TRADFI = MetricFamily(
 # yang loncat-loncat (Funding Rate, OI Change, Net Flow) — di sana batang lebih jujur.
 FAMILIES = {f.title: f for f in [MARKET_VALUATION, MVRV_MOMENTUM, PRICE_LEVELS, AVIV, REALIZED_CAP, SOPR, NUPL, UNREALIZED_PL, SUPPLY_IN_PROFIT,
                                    HODL_WAVES, RHODL_RATIO, HOLDER_SUPPLY, EXCHANGE_FLOW,
-                                   FUNDING_OI, FUTURES_BASIS, FEAR_GREED, VIX, BTC_TRADFI, TREASURY_YIELDS]}
+                                   FUNDING_OI, FUTURES_BASIS, FEAR_GREED, VIX, BTC_TRADFI, TREASURY_YIELDS, DXY, SSR, EXCHANGE_RATIO]}
