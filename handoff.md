@@ -1,6 +1,6 @@
 # Handoff — Dashboard Streamlit v2
 
-Diperbarui 24 Sep 2026 (versi ringkas; terakhir sesudah halaman CDD / VDD). Versi lengkap sebelum diringkas — cerita pengerjaan tiap fitur, opsi yang ditolak, hasil ukur piksel — ada di `archive/handoff_riwayat_2026-09-17.md` (buka hanya kalau perlu detail sejarah; nomor bagian 3.x yang disebut di bawah merujuk ke file itu).
+Diperbarui 24 Sep 2026 (versi ringkas; terakhir sesudah halaman CDD / VDD dan ETF Flows). Versi lengkap sebelum diringkas — cerita pengerjaan tiap fitur, opsi yang ditolak, hasil ukur piksel — ada di `archive/handoff_riwayat_2026-09-17.md` (buka hanya kalau perlu detail sejarah; nomor bagian 3.x yang disebut di bawah merujuk ke file itu).
 
 Baca dokumen ini dan `CLAUDE.md` sebelum mulai. Semua yang ditandai **ditahan/ditunda** harus ditanyakan ke user dulu.
 
@@ -17,10 +17,10 @@ Baca dokumen ini dan `CLAUDE.md` sebelum mulai. Semua yang ditandai **ditahan/di
 
 ## 1. Status dan langkah berikutnya
 
-- **Live: 23 halaman, 8 kelompok, dua label** — **ON-CHAIN** (Valuation · Profitability · Holder Behavior · Exchange) dan **MARKET** (Derivatives · Sentiment · Macro · Liquidity). Semua halaman: slider rentang, nyaman di HP, kontrol diingat per halaman, tombol Style di chart.
+- **Live: 24 halaman, 8 kelompok, dua label** — **ON-CHAIN** (Valuation · Profitability · Holder Behavior · Exchange) dan **MARKET** (Derivatives · Sentiment · Macro · Liquidity). Semua halaman: slider rentang, nyaman di HP, kontrol diingat per halaman, tombol Style di chart.
 - **Langkah pertama sesi baru:**
   1. Cek server `dashboard-v2-uji` (bagian 2). Halaman yang sudah divalidasi user tidak perlu dibuka ulang.
-  2. Run bot tidak perlu dicek ulang kecuali ada gejala (data berhenti, error). Pipeline 23–26 lolos (22 Sep), Pipeline 27–28 lolos run bot pertama (dicek user 24 Sep).
+  2. Run bot tidak perlu dicek ulang kecuali ada gejala (data berhenti, error). Pipeline 23–26 lolos (22 Sep), Pipeline 27–28 lolos run bot pertama (dicek user 24 Sep). **Pipeline 29 (24 Sep) baru diuji lokal** — cek run bot pertama.
   3. Tanyakan apakah **Cohort State** (bagian 6) sudah boleh dilanjutkan, lalu **halaman berikutnya** (kandidat dan hasil cek data di bagian 7 — jangan dicek ulang).
 - **Menambah halaman:** satu `MetricFamily` di `dashboard/registry.py` (+ loader di `data.py`). Urutan kerja yang disukai user: cek kualitas data (nilai macet, lonjakan, satuan, cakupan, revisi) → pratinjau widget dengan data asli + uji palet (bagian 8) → tunggu pilihan user → kerjakan di localhost → user bilang valid → merge dari GitHub → commit → push.
 
@@ -71,6 +71,7 @@ Semua: BTC oranye `#F7931A` (kecuali HODL Waves), key localStorage `dash_v2_<key
 | **DXY** `/dxy` (kelompok Macro) | `load_dxy` — kolom `dxy` di `data_tradfi.csv` (Pipeline 23, Yahoo `DX-Y.NYB`) + harga dari `data_mvrv.csv`; tanpa ffill | Overlay; DXY navy sumbu kiri (Auto), BTC Log kanan; ref **100** (nilai dasar Mar 1973) | Halaman sendiri, bukan digabung dengan yields (sumbu tidak cukup). Dicek vs rumus ICE + kurs FRED H.10: median selisih 0,08 %, tanpa bias (bagian 7) |
 | **SSR** `/ssr` (kelompok **Liquidity**) | `load_ssr` — harga × supply BTC (LTH+STH, `data_supply.csv`) ÷ `data_stablecoin_supply.csv` (Pipeline 27); mulai 2018 | Overlay; SSR navy **Log** kiri, BTC Log kanan; tanpa ref | SSR **standar** (market cap ÷ supply stablecoin), bukan proksi harga. Keranjang beda dengan Glassnode → baca pakai persentil sendiri. Detail: `research/stablecoin_ratios/README.md` |
 | **Exchange Ratio** `/exchange-ratio` (kelompok Liquidity) | `load_exchange_ratio` — `data_exchange_reserves.csv` (Pipeline 28): BTC di bursa ÷ stablecoin di bursa (USD); mulai 1 Jan 2023 | Overlay; rasio navy kiri (Auto), BTC Log kanan; pane **Reserves** nyala awal: BTC Reserve violet `#7b65d2` ("BTC Res"), Stablecoin Reserve teal (USD ringkas) | Gaya CryptoQuant "Stablecoins Ratio", tapi hanya 19 bursa DefiLlama (**tanpa Coinbase/Upbit dkk.**, ±1/3 BTC di bursa) → untuk membedah bentuk, bukan level. Stablecoin Binance dikoreksi dompet jaminan Binance-Peg. 7 lompatan harian > 10 % dari DefiLlama, penyebab belum tahu (bagian 6) |
+| **ETF Flows** `/etf-flows` (key `etf_flows`, kelompok Liquidity) | `load_etf` — `data_etf.csv` (Pipeline 29, ChartInspect `etf-flows`); flow 1d + jumlah 7/14/30 hari per hari kalender; harga dari `data_mvrv.csv`; **halaman mulai 11 Jan 2024** (CSV sejak Nov 2018) | Overlay; saklar **1d \| 7d \| 14d \| 30d** (`unit_default` 14d): 1d batang, lainnya area teal/rust dari nol, sumbu kiri; BTC Log kanan; pane **Holdings** (saldo ETF navy, Hidden awal) | Flow = metrik utama (user: lebih penting dari saldo). Kolom `net_flow` sejak 2025 = flow ETF spot AS versi Farside dalam BTC (cocok berita: 3 Sep 2026 +$731 jt, 13 Nov 2025 −$867 jt). Saldo: level ±benar ($102,4 vs $103,3 miliar 3 Sep 2026) tapi selisih harian sering telat 1 hari/meloncat → tidak dipakai untuk flow. Saklar dipilih ketimbang Smoothing (jumlah, bukan rata-rata) |
 
 ---
 
@@ -149,6 +150,7 @@ Semua: BTC oranye `#F7931A` (kecuali HODL Waves), key localStorage `dash_v2_<key
 - **SSR — belum terjelaskan:** versi blockchain ±62 juta USDT (2–3 %) di atas CMC pada 2018–2019 (dugaan: token dibekukan Tether) → SSR masa itu bisa ±3 % terlalu rendah. Cara cek di README riset.
 - **STH MVRV Momentum (ide user 23 Sep, dari foto On-Chain Mind)** — belum diputuskan; bahan STH MVRV sudah ada di `data_mvrv.csv`.
 - **Server localhost mati sendiri (23 Sep, 3×):** dugaan (belum pasti) — panel browser Claude dipakai membuka situs luar di tab yang sama. Buka situs luar di tab lain.
+- **ETF — belum terjelaskan (24 Sep):** saldo ChartInspect datar sejak 4 Sep 2026 padahal flow jalan; jumlah flow sejak 2025 (+175 ribu BTC) vs kenaikan saldo (+82 ribu); loncatan saldo −33 ribu sehari yang kembali besoknya (Jul–Agu 2026); isi saldo sebelum 2024 (loncat +241 ribu Agu 2019, ±700 ribu 2021–23). Farside diblok Cloudflare untuk skrip; SoSoValue butuh akun (user).
 - **Pipeline 19 / `data_treasury_2y.csv` boleh dibuang (menunggu user):** = DGS2 bulanan, digantikan `data_yields.csv`; tanpa pemakai (dicek seluruh repo), tanpa sejarah hilang (keduanya mulai 1 Jun 1976). Kalau dibuang: hapus dari daftar master + sesuaikan `data_dictionary.md` (izin user).
 - **Exchange Ratio — upgrade nanti (user 23 Sep 2026):** versi awal pakai 19 bursa DefiLlama sejak 1 Jan 2023 (opsi A), tanpa Coinbase/Upbit dkk. Semua riset, data, verifikasi PoR Binance, opsi mulai A/B/C, hasil cek Dune/CryptoQuant, dan jebakan API ada di **`research/stablecoin_ratios/README.md`** — lanjutkan dari situ, jangan diulang.
 - **Ide nanti:** LTV intraday dari harga 10 menit ChartInspect (`/api/charts/crypto/intraday-price?cryptocurrency=bitcoin&resolution=10&from=&to=`, gratis 30 hari).
@@ -159,7 +161,7 @@ Semua: BTC oranye `#F7931A` (kecuali HODL Waves), key localStorage `dash_v2_<key
 
 Semua file punya `date`; sebagian besar punya `btc_price`. Bukan untuk halaman: `data_master_all_metrics.csv`, `data_*_events.csv`.
 
-**Sudah dipakai halaman:** `data_mvrv.csv` · `data_price_level.csv` (`cum_pl_price`, `pl_price_ratio` belum dipakai) · `data_aviv.csv` (`price_at_aviv_*` **salah basis**; `liveliness`, `investor_cap` belum dipakai) · `data_momentum.csv` (`net_realized_pl_usd` belum dipakai) · `data_supply.csv` · `data_hodl_waves.csv` · `data_realized_cap.csv` · `data_derivatives.csv` · `data_exchange.csv` · `data_fg.csv` · `data_median_mvrv.csv` · `data_tradfi.csv` (+ kolom `dxy`) · `data_vix.csv` · `data_yields.csv` · `data_futures_basis_3m.csv` · `data_stablecoin_supply.csv` · `data_exchange_reserves.csv` · `data_cdd.csv`.
+**Sudah dipakai halaman:** `data_mvrv.csv` · `data_price_level.csv` (`cum_pl_price`, `pl_price_ratio` belum dipakai) · `data_aviv.csv` (`price_at_aviv_*` **salah basis**; `liveliness`, `investor_cap` belum dipakai) · `data_momentum.csv` (`net_realized_pl_usd` belum dipakai) · `data_supply.csv` · `data_hodl_waves.csv` · `data_realized_cap.csv` · `data_derivatives.csv` · `data_exchange.csv` · `data_fg.csv` · `data_median_mvrv.csv` · `data_tradfi.csv` (+ kolom `dxy`) · `data_vix.csv` · `data_yields.csv` · `data_futures_basis_3m.csv` · `data_stablecoin_supply.csv` · `data_exchange_reserves.csv` · `data_cdd.csv` · `data_etf.csv`.
 
 | File belum dipakai | Kolom | Status |
 |---|---|---|
@@ -177,6 +179,7 @@ Semua file punya `date`; sebagian besar punya `btc_price`. Bukan untuk halaman: 
 - **Pipeline 23 + DXY (23 Sep):** baris `'dxy': 'DX-Y.NYB'` di `TRADFI_TICKERS`. `load_btc_tradfi` membaca `usecols` spx/xau saja.
 - **Pipeline 27 (supply stablecoin → `data_stablecoin_supply.csv`, kolom `stablecoin_supply_usd`, `sumber`):** baris < 16 Feb 2021 (`onchain`) **dibekukan**, dibangun sekali oleh `research/stablecoin_ratios/build_stablecoin_history.py` (USDT = supply on-chain CoinMetrics − saldo 7 dompet kas Tether Omni/ETH/Tron, semuanya lulus uji terhadap laporan resmi Tether). Sesudahnya DefiLlama total, ditarik ulang penuh (tanpa key). Lompatan sambung −0,36 %. File hilang/kosong = pipeline berhenti dengan pesan jalankan skrip itu.
 - **Pipeline 28 (cadangan bursa → `data_exchange_reserves.csv`):** DefiLlama CEX `api.llama.fi/protocol/<slug>` (19 bursa dikunci di `CEX_TETAP`; Binance ±42 MB per tarikan). Kolom `btc_reserve_usd`, `stable_reserve_raw_usd`, `binance_peg_backing_usd`, `stable_reserve_usd` (= mentah − jaminan Peg). Riwayat jaminan Peg dari `research/stablecoin_ratios/build_binance_peg_backing.py`; tiap run menambah saldo hari itu (`eth_call` Tenderly publik). Diverifikasi ke PoR Binance 1 Sep 2026: BTC asli +0,1 %, selisih USDT/USDC = saldo dompet Peg persis.
+- **Pipeline 29 (ETF → `data_etf.csv`, kolom `total_balance`, `net_flow`, `inflow`, `outflow`, `btc_price`):** ChartInspect `api/charts/exchange-etf/etf-flows?timeframe=all`, ditarik ulang penuh, baris saldo 0 dibuang. Sebelum 2025 `net_flow` = selisih saldo; sejak 2025 = flow Farside (lihat bagian 3). Gagal = file lama tetap.
 - **Riset lengkap kedua metrik** (sumber yang ditolak, alamat, tabel uji, opsi upgrade, jebakan API): `research/stablecoin_ratios/README.md`.
 
 **Hasil cek kualitas kandidat (17 Sep; jangan diulang kecuali data berubah):**
@@ -240,6 +243,7 @@ Semua file punya `date`; sebagian besar punya `btc_price`. Bukan untuk halaman: 
 - **Seri yang dibuat belakangan tergambar di atas** → band bertumpuk dibuat duluan (tua → muda), garis sesudahnya.
 - Menarik angka sumbu = mengubah skala (`handleScale`); menarik area hanya menggeser sumbu utama pane yang autoscale-nya mati.
 - Pola garis hanya 5 (Solid, Dotted, Dashed, LargeDashed, SparseDotted); tangga hanya terlihat kalau satu bar beberapa piksel.
+- **Label kotak periode di legend diambil dari kurung TERAKHIR nama seri** (`split('(').pop()`): nama berkurung seperti "ETF Net Flow (BTC) SMA(7)" dulu tampil "BTC SMA".
 - **Batang (histogram) di sumbu Log harus mulai dari `Series.base` > 0.** Batang dari 0 menarik sumbu Log ke nilai hampir nol → semua batang tampak sama tinggi (blok padat). Pakai angka di bawah nilai terkecil data (CDD: `base=1e4`, terkecil 43K). `base` harus ikut dikirim di setiap `Line(...)` di `metric_page.py` (pane bawah sempat lupa).
 
 ### Alat kerja

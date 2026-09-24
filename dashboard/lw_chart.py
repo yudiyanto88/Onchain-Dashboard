@@ -896,7 +896,7 @@ loadLib(0).then(() => {
   // atau mati. Seri pane bawah (ΔOI) cuma satu yang digambar: satuan pertama yang menyala;
   // tooltip tetap menampilkan semua satuan yang menyala. Tersimpan di localStorage.
   const SATUAN = C.unitSwitch || [];
-  const nyalaAwal = Object.fromEntries(SATUAN.map((u, i) => [u, i === 0]));
+  const nyalaAwal = Object.fromEntries(SATUAN.map((u, i) => [u, C.unitDefault ? u === C.unitDefault : i === 0]));
   state.unitOn = Object.assign({}, nyalaAwal,
     state.unitOn && typeof state.unitOn === 'object' ? state.unitOn : {});
   siapSatuan = true;
@@ -989,10 +989,10 @@ loadLib(0).then(() => {
 
     for (const handle of anggota) {
       if (handle === utama) continue;
-      const dalamKurung = handle.spec.name.split('(')[1];
+      // Kurung terakhir: "ETF Net Flow (BTC) SMA(7)" -> "7", bukan "BTC".
       const titik = document.createElement('button');
       titik.className = 'lgdot';
-      titik.textContent = dalamKurung ? dalamKurung.replace(')', '') : handle.spec.name;
+      titik.textContent = handle.spec.name.split('(').pop().replace(')', '');
       titik.title = handle.spec.name;
       titik.style.borderColor = baseColor(handle.spec);
       titik.onclick = () => toggleHidden(handle.spec.name);
@@ -1575,7 +1575,7 @@ loadLib(0).then(() => {
       // anggota yang ON jadi satu kolom dengan judul kecilnya sendiri (1y · 2y · 4y).
       if (lainnya.length > 0) {
         baris.push({ label: group, spec: lainnya[0].spec, jendela: lainnya.map(h => ({
-          judul: (h.spec.name.split('(')[1] || h.spec.name).replace(')', ''),
+          judul: h.spec.name.split('(').pop().replace(')', ''),
           nilai: angkaSeri(h.spec, nilaiDi(h.spec, i)),
         })) });
       }
@@ -2014,7 +2014,7 @@ def _scale(mode):
 def render(df, lines, price_line, extra_lines, height, metric_mode, price_mode, store_key,
            tooltip="Cursor", metric_range=None, complement=None, view=None,
            unit_switch=None, unit_label="", stack_units=None, extra_mode="Auto",
-           price_extra=None):
+           price_extra=None, unit_default=None):
     """Gambar chart. height "Fit" = tinggi mengikuti layar (dihitung di browser; 720 dipakai
     sebagai tinggi awal dan dasar pembagian pane).
 
@@ -2102,6 +2102,7 @@ def render(df, lines, price_line, extra_lines, height, metric_mode, price_mode, 
         "view": list(view) if view else None,   # rentang tampil awal (kotak Range)
         "unitSwitch": list(unit_switch) if unit_switch else None,   # saklar satuan (BTC | USD)
         "unitLabel": unit_label,
+        "unitDefault": unit_default,   # satuan yang menyala awal; None = yang pertama
         "stackUnits": list(stack_units) if stack_units else None,   # saklar bobot area bertumpuk
         # Tinggi bingkai tetap; tinggi pane dihitung ulang di browser dari tinggi baris
         # legend yang sebenarnya (bisa lebih dari satu baris).

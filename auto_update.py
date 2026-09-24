@@ -938,6 +938,23 @@ except Exception as e:
     print(f"❌ Error Pipeline 28 Exchange Reserves: {e} — data_exchange_reserves.csv tidak diubah")
 
 # ==========================================
+# 29. PIPELINE: BTC YANG DIPEGANG ETF (CHARTINSPECT)
+# ==========================================
+# Sejak 2025 net_flow = flow harian ETF spot AS versi Farside dalam BTC (cocok: 3 Sep 2026 +$731 jt,
+# 13 Nov 2025 -$867 jt), sedangkan selisih saldo harian sering telat 1 hari dan meloncat (dicek 24 Sep
+# 2026). Sebelum 2025 net_flow = selisih saldo. Data sejak Nov 2018; isinya sebelum ETF spot AS belum jelas.
+print("\n[29] Menarik saldo BTC di ETF...")
+try:
+    df_etf = fetch_data("https://chartinspect.com/api/charts/exchange-etf/etf-flows?timeframe=all",
+                        ['date', 'total_balance', 'net_flow', 'inflow', 'outflow', 'btc_price'])
+    df_etf = df_etf[df_etf['total_balance'] > 0]
+    if df_etf.empty:
+        raise ValueError("data kosong")
+    simpan(df_etf, "data_etf.csv")
+except Exception as e:
+    print(f"❌ Error Pipeline 29 ETF: {e} — data_etf.csv tidak diubah")
+
+# ==========================================
 # 18. MASTER PIPELINE: ALL METRICS AGGREGATOR (NEW)
 # ==========================================
 print("\n[Master] 🌌 Mengkompilasi Semua File CSV ke dalam 1 Master Dataset...")

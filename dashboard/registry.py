@@ -116,6 +116,7 @@ class MetricFamily:
     # Saklar satuan di dalam chart, mis. ("BTC", "USD"); seri bertanda Series.unit ikut saklar.
     unit_switch: tuple[str, ...] | None = None
     unit_label: str = ""          # keterangan kecil sebelum saklar ("OI")
+    unit_default: str | None = None   # satuan yang menyala awal; None = yang pertama
     # Kotak Window menggantikan kotak Smoothing (BTC vs Stocks & Gold): label tombol -> jendela
     # rolling dalam hari; loader dipanggil dengan jendela terpilih. None = kotak Smoothing biasa.
     window_days: dict[str, int] | None = None
@@ -891,6 +892,38 @@ SSR = MetricFamily(
 )
 
 
+ETF_FLOWS = MetricFamily(
+    key="etf_flows",
+    title="ETF Flows",
+    subtitle="Bitcoin ETF Net Flows",
+    group="Liquidity",
+    url_path="etf-flows",
+    loader=data.load_etf,
+    # Pilihan user 24 Sep 2026: flow jadi metrik utama (lebih penting dari saldo), satu pane dengan
+    # BTC Overlay. Net flow dari kolom flow ChartInspect (sejak 2025 cocok Farside), mulai 11 Jan 2024
+    # (ETF spot AS). Saklar 1d (batang harian) | 7d | 14d | 30d (jumlah flow, area teal/rust), bawaan
+    # 14d; dipilih ketimbang kotak Smoothing karena jumlah lebih umum dibaca daripada rata-rata. Saldo
+    # ETF di pane bawah, Hidden awal (levelnya kira-kira benar, perubahan hariannya kasar). Seluruh
+    # halaman mulai 11 Jan 2024. Tidak dipakai framework v2.
+    btc_mode_default="Overlay",
+    metric_scale_default="Auto",
+    price_scale_default="Log",
+    series=[
+        # 1d batang (data harian loncat-loncat, seperti Net Flow bursa); jumlah 7/14/30 hari area.
+        *[Series(f"ETF Net Flow {n}d (BTC)", f"ETF {n}d Flow", color="#0b8e89",
+                 negative_color="#bf5546", axis="left", dim=0.45,
+                 kind="histogram" if n == 1 else "baseline", alpha=0.80 if n == 1 else 0.45,
+                 smoothing=False, short=f"{n}d", precision=0, compact=True,
+                 unit=f"{n}d") for n in (1, 7, 14, 30)],
+        Series("ETF Holdings (BTC)", "ETF Holdings", color="#0070a6", axis="right", dim=0.49,
+               short="Holdings", precision=0, compact=True, smoothing=False, pane="extra"),
+    ],
+    unit_switch=("1d", "7d", "14d", "30d"),
+    unit_default="14d",
+    extra_label="Holdings",
+)
+
+
 EXCHANGE_RATIO = MetricFamily(
     key="exchange_ratio",
     title="Exchange Ratio",
@@ -957,4 +990,4 @@ BTC_TRADFI = MetricFamily(
 # yang loncat-loncat (Funding Rate, OI Change, Net Flow) — di sana batang lebih jujur.
 FAMILIES = {f.title: f for f in [MARKET_VALUATION, MVRV_MOMENTUM, PRICE_LEVELS, AVIV, REALIZED_CAP, SOPR, NUPL, UNREALIZED_PL, SUPPLY_IN_PROFIT,
                                    HODL_WAVES, RHODL_RATIO, HOLDER_SUPPLY, CDD_VDD, EXCHANGE_FLOW,
-                                   FUNDING_OI, FUTURES_BASIS, FEAR_GREED, VIX, BTC_TRADFI, TREASURY_YIELDS, DXY, SSR, EXCHANGE_RATIO]}
+                                   FUNDING_OI, FUTURES_BASIS, FEAR_GREED, VIX, BTC_TRADFI, TREASURY_YIELDS, DXY, SSR, EXCHANGE_RATIO, ETF_FLOWS]}

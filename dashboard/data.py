@@ -318,6 +318,27 @@ def load_cdd():
 
 
 @st.cache_data(ttl=3600)
+def load_etf():
+    """Total BTC yang dipegang ETF (data_etf.csv, Pipeline 29) dan net flow 1/7/14/30 hari.
+
+    Flow dari kolom net_flow (sejak 2025 = flow harian ETF spot AS versi Farside, dicek ke berita
+    24 Sep 2026), bukan dari selisih saldo: saldo levelnya kira-kira benar, tapi perubahan hariannya
+    sering telat 1 hari dan meloncat. Halaman mulai 11 Jan 2024 (ETF spot AS; pilihan user 24 Sep
+    2026): sebelumnya flow = turunan saldo, termasuk +241 ribu BTC Agu 2019, dan isi saldonya belum
+    jelas. CSV tetap menyimpan sejak Nov 2018. 7/14/30 hari = jumlah flow per hari kalender.
+    """
+    df = _prepare(pd.read_csv("data_etf.csv", usecols=['date', 'total_balance', 'net_flow'])
+                  .rename(columns={'date': 'Date', 'total_balance': 'ETF Holdings'}))
+    flow = df.set_index('Date')['net_flow'].asfreq('D').fillna(0).loc['2024-01-11':]
+    for n in (1, 7, 14, 30):
+        df[f'ETF {n}d Flow'] = df['Date'].map(flow.rolling(n).sum())
+    harga = _prepare(pd.read_csv("data_mvrv.csv", usecols=['date', 'btc_price'])
+                     .rename(columns={'date': 'Date', 'btc_price': 'BTC Price'}))
+    df = df.drop(columns='net_flow').merge(harga, on='Date', how='left')
+    return df[df['Date'] >= '2024-01-11']
+
+
+@st.cache_data(ttl=3600)
 def load_fear_greed():
     """Crypto Fear & Greed Index (data_fg.csv; sumber Alternative.me lewat ChartInspect).
 
