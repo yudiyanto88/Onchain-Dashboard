@@ -181,7 +181,7 @@ def _init_state(family, dmin, dmax):
         f"{k}_scale_price": family.price_scale_default,
         f"{k}_scale_metric": family.metric_scale_default,
         f"{k}_btc": family.btc_mode_default,
-        f"{k}_axis_btc": BTC_AXIS,
+        f"{k}_axis_btc": family.btc_axis_default,
         f"{k}_extra": Z_BOTTOM if family.extra_default else Z_HIDDEN,
         f"{k}_height": "Fit",
     }
@@ -442,12 +442,12 @@ def _render_controls(family, dmin, dmax):
                 _axis_control(s.label, f"{k}_axis_{s.col}", s.axis)
             # Harga BTC juga bisa dipindah sumbu. Berguna untuk halaman yang metriknya
             # sendiri berupa harga (Price Levels, AVIV): satu sumbu untuk semuanya.
-            # Hanya berlaku saat harga digabung ke chart metrik; di Separate pane harga
-            # punya pane sendiri, dan saat Hidden tidak ada yang diatur.
-            overlay = st.session_state[f"{k}_btc"] == OVERLAY
-            _axis_control("BTC Price", f"{k}_axis_btc", BTC_AXIS, disabled=not overlay)
-            if not overlay:
-                st.caption("Only for BTC price = Overlay.")
+            # Di Separate pane pilihan ini memindah sumbu pane harga; saat Hidden tidak ada
+            # yang diatur.
+            hidden = st.session_state[f"{k}_btc"] == HIDDEN
+            _axis_control("BTC Price", f"{k}_axis_btc", BTC_AXIS, disabled=hidden)
+            if hidden:
+                st.caption("BTC price is hidden.")
 
     with cols[6]:
         with st.popover(f"Tooltip\n\n**{st.session_state[TIP_STORE]}**"):
@@ -633,7 +633,8 @@ def render_metric_page(family: MetricFamily):
     btc_dim = family.btc_dim if family.btc_color else BTC_DIM
     price_line = None
     if btc_mode == PANE:
-        price_line = Line("BTC Price", "BTC Price", btc_color, "right", width=LINE_WIDTH,
+        price_line = Line("BTC Price", "BTC Price", btc_color, st.session_state[f"{k}_axis_btc"],
+                          width=LINE_WIDTH,
                           group="BTC Price", dim=btc_dim, precision=BTC_PRECISION)
     elif btc_mode == OVERLAY:
         # Sumbu harga bisa dipilih (bawaan: kanan). Sumbu yang hanya berisi harga memakai

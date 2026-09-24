@@ -109,6 +109,7 @@ class MetricFamily:
     # Keadaan awal kotak BTC price ("Overlay" / "Separate pane" / "Hidden").
     # Nilainya sama dengan pilihan di metric_page.
     btc_mode_default: str = "Overlay"
+    btc_axis_default: str = "right"   # sisi sumbu harga BTC (Fear & Greed: kiri)
     # Rentang tetap sumbu metrik, mis. (0, 100) untuk persen supply. None = ikut data.
     metric_range: tuple[float, float] | None = None
     # Kolom tooltip untuk metrik yang punya pasangan 100 − nilai, mis. ("Profit", "Loss").
@@ -781,6 +782,7 @@ FEAR_GREED = MetricFamily(
     # BTC di pane sendiri sejak awal (sempat Overlay satu pane; diganti permintaan user 16 Sep
     # 2026). F&G pindah ke sumbu kanan lewat separate_axis, kembali ke kiri saat Overlay.
     btc_mode_default="Separate pane",
+    btc_axis_default="left",   # uji user 24 Sep 2026: sumbu harga dan F&G di kiri
     metric_scale_default="Auto",
     price_scale_default="Log",
     metric_range=(0, 100),
@@ -794,7 +796,7 @@ FEAR_GREED = MetricFamily(
         # Kelas resmi dari API: Extreme Fear <=25, Fear 26-46, Neutral 47-54, Greed 55-75,
         # Extreme Greed >=76 (dibaca dari valueClassification, 16 Sep 2026).
         Series("Fear & Greed", "Fear & Greed", color="#8b949e", axis="left",
-               separate_axis="right", dim=0.45, short="F&G", precision=0, whole_from=0,
+               dim=0.45, short="F&G", precision=0, whole_from=0,
                # Nilai harian bilangan bulat (69); SMA30 satu desimal seperti framework (92.4).
                smoothing_precision=1,
                gradient=[[0, "#bf5546"], [25, "#bf5546"], [40, "#dc9390"], [50, "#8b949e"],
