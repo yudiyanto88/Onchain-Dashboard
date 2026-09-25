@@ -103,6 +103,7 @@ Semua: BTC oranye `#F7931A` (kecuali HODL Waves), key localStorage `dash_v2_<key
 - Layar penuh tombol **Full** di chart (Fullscreen API; iPhone: kelas `penuh-semu`), tombol **Scale** hanya perangkat sentuh (`vertTouchDrag`, tidak disimpan). Sidebar `initial_sidebar_state="auto"`.
 - Zoom bertahan saat rerun (posisi bar + sidik data `sig`; tombol Range tetap menang). Range tidak memotong data, hanya rentang tampil (`C.view`).
 - **Yang bertahan:** legend, Highlight, zoom, saklar, gaya garis → localStorage (juga setelah reload). Kontrol Python → `{k}_mem` hanya selama tab terbuka; reload = bawaan.
+- **Favorit (user 25 Sep 2026):** bintang ☆/★ di sebelah judul halaman (`metric_page`, key tombol `<key>_fav_on/off` untuk warna CSS) → kelompok **★ FAVORITES** di atas menu sidebar (`st.page_link`, urutan = urutan menu, halaman tetap juga di kelompok aslinya). Disimpan di cookie browser `dash_fav` (family.key dipisah koma, 1 tahun): dibaca `st.context.cookies` saat sesi mulai ke `st.session_state["favorit"]` (`FAV`), ditulis balik oleh iframe tersembunyi di sidebar (`app.py`). Per browser/HP, tidak sinkron. **Belum dicek di Streamlit Cloud.**
 
 ---
 
@@ -218,6 +219,7 @@ Semua file punya `date`; sebagian besar punya `btc_price`. Bukan untuk halaman: 
 - Opsi `--theme.*` apa pun membuat tema jadi terang → wajib `--theme.base dark`.
 - Jangan `display:none` pada `stHeader` (tombol pembuka sidebar ada di dalamnya); pakai `pointer-events:none` pada `header *`, nyalakan lagi untuk `stExpandSidebarButton`.
 - `stMarkdownContainer` dan caption punya `margin-bottom:-16px` (isi jatuh 8 px di kolom `vertical_alignment="center"`) → batalkan dengan `margin-bottom:16px`.
+- **`st.context.cookies` hanya dibaca saat sesi dimulai** (reload), tidak berubah per rerun → nilai selama sesi hidup di session_state. Iframe penulis cookie ditaruh di **sidebar** supaya urutan elemen halaman utama (iframe chart) tidak bergeser. Margin −16 px wadah teks juga berlaku di sidebar (judul FAVORITES sempat ditimpa tautan). Aturan tombol global `div[data-testid="stButton"] button` menang atas selektor pendek → selektor bintang harus lebih spesifik.
 - Tinggi tombol dipaku 32 px → timpa `height` langsung. Teks `st.button` duduk di garis dasar → `display:block` + `line-height` pada `p`.
 - Isi popover di portal terpisah → CSS lewat `[data-testid="stPopoverBody"]`. Popover tertutup oleh `click` di luar/Escape (chart meneruskan keduanya ke induk).
 - Kalender tanggal milik browser → hanya `accent-color`. Atribut 1.63: radio terpilih `data-selected`. Fokus bawaan merah → timpa teal.

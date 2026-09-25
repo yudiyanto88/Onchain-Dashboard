@@ -7,6 +7,7 @@ Jalankan dengan (tema teal gelap dari .streamlit/config.toml):
 import streamlit as st
 
 from dashboard.metric_page import render_metric_page
+from dashboard.metric_page import FAV
 from dashboard.registry import FAMILIES
 
 st.set_page_config(
@@ -303,6 +304,22 @@ header[data-testid="stHeader"] [data-testid="stExpandSidebarButton"] * { pointer
 .block-container hr { margin: 6px 0 !important; }
 div[data-testid="stVerticalBlock"] { gap: 0.35rem !important; }
 div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"]) { margin-bottom: 0 !important; }
+
+/* Favorit (user 25 Sep 2026): bintang kuning pucat seperti SMA30 F&G = favorit, abu = bukan.
+   Kuncinya berakhiran _fav_on / _fav_off (metric_page). Judul FAVORITES kuning, huruf kecil
+   kapital seperti judul kelompok menu; iframe penulis cookie disembunyikan. */
+div[class*="_fav_"] div[data-testid="stButton"] button { border: none !important; background: transparent !important; padding: 0 2px !important; min-height: 0 !important; }
+[class*="_fav_on"] button p { color: #F7E9A8 !important; font-size: 20px !important; }
+[class*="_fav_off"] button p { color: #8b949e !important; font-size: 20px !important; }
+.fav-judul { color: #F7E9A8; font-size: 11px; font-weight: 600; letter-spacing: 0.1em;
+             padding: 4px 0 2px 13px; }
+section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(iframe) { display: none; }
+/* Wadah teks Streamlit bermargin -16 px (bagian 9 handoff): tanpa ini tautan pertama menimpa judul. */
+section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"]:has(.fav-judul) { margin-bottom: 0 !important; }
+/* Tautan favorit dibuat sama dengan menu di bawahnya (huruf 15 px abu terang, garis kiri 3 px). */
+[data-testid="stPageLink-NavLink"] { border-left: 3px solid transparent; border-radius: 6px !important; padding: 0 10px !important; min-height: 30px; }
+[data-testid="stPageLink-NavLink"] span { font-size: 15px !important; color: #c9d1d9 !important; }
+[data-testid="stPageLink-NavLink"]:hover { background-color: #1e2330 !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -323,14 +340,32 @@ def _halaman(family):
     return buka
 
 
-kelompok = {}
+kelompok, halaman = {}, {}
 for i, family in enumerate(FAMILIES.values()):
-    kelompok.setdefault(family.group, []).append(
-        st.Page(_halaman(family), title=family.title, url_path=family.url_path,
-                default=(i == 0)))
+    halaman[family.key] = st.Page(_halaman(family), title=family.title, url_path=family.url_path,
+                                  default=(i == 0))
+    kelompok.setdefault(family.group, []).append(halaman[family.key])
 
 # expanded=True: tanpa ini Streamlit menyembunyikan halaman ke-11 dst. di balik "View more".
-st.navigation(kelompok, position="sidebar", expanded=True).run()
+nav = st.navigation(kelompok, position="sidebar", expanded=True)
+
+# Favorit (user 25 Sep 2026): disimpan di cookie browser "dash_fav" (key dipisah koma), jadi tiap
+# browser/HP punya daftar sendiri dan bertahan walau reload atau app di-reboot. st.context.cookies
+# hanya dibaca saat sesi dimulai; selama sesi daftar hidup di session_state.
+if FAV not in st.session_state:
+    st.session_state[FAV] = {k for k in st.context.cookies.get("dash_fav", "").split(",") if k in halaman}
+with st.sidebar:
+    favorit = [k for k in halaman if k in st.session_state[FAV]]   # urutan = urutan menu
+    if favorit:
+        st.markdown("<div class='fav-judul'>★ FAVORITES</div>", unsafe_allow_html=True)
+        for k in favorit:
+            st.page_link(halaman[k])
+    # Iframe kosong yang menulis cookie; isinya berubah hanya kalau daftar berubah. Ditaruh di
+    # sidebar supaya urutan elemen di halaman utama (iframe chart) tidak bergeser.
+    isi = ",".join(sorted(st.session_state[FAV]))
+    st.iframe(f"<script>document.cookie='dash_fav={isi}; path=/; max-age=31536000; SameSite=Lax'</script>",
+              height=1)
+nav.run()
 
 
 # Tombol layar penuh hidup di dalam chart (dashboard/lw_chart.py), bukan di sini.

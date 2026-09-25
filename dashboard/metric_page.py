@@ -51,6 +51,15 @@ TIP_KEY = "tooltip_mode"
 TIP_STORE = "tooltip_pref"
 
 
+# Halaman favorit (user 25 Sep 2026): set berisi family.key, diisi app.py dari cookie browser
+# saat sesi dimulai dan ditulis balik ke cookie oleh app.py setiap kali berubah.
+FAV = "favorit"
+
+
+def _toggle_fav(key):
+    st.session_state[FAV] ^= {key}
+
+
 def _on_tooltip():
     _keep(TIP_KEY, st.session_state[TIP_STORE])
     st.session_state[TIP_STORE] = st.session_state[TIP_KEY]
@@ -145,7 +154,7 @@ def _render_header(family, latest):
         f"<span style='font-size:1.15rem;font-weight:600;color:#ffffff;'>{family.subtitle}</span>"
         f"<span style='font-size:0.72rem;color:#8b90a0;font-weight:400;'>"
         f"Latest data: {latest:%d %b %Y}</span></div></div>",
-        unsafe_allow_html=True)
+        unsafe_allow_html=True, width="content")
 
 
 # ------------------------------------------------------------------ kontrol
@@ -515,7 +524,12 @@ def render_metric_page(family: MetricFamily):
     # Tanggal terakhir yang benar-benar punya nilai metrik, bukan sekadar baris tanggal.
     latest = df_raw.dropna(subset=[s.col for s in family.series if s.pane == "main"],
                            how="all")['Date'].max()
-    _render_header(family, latest)
+    # Bintang favorit di sebelah judul: kuning = favorit, abu = bukan (warna di CSS app.py).
+    with st.container(horizontal=True, vertical_alignment="bottom", gap="small", key="judul"):
+        _render_header(family, latest)
+        fav = k in st.session_state[FAV]
+        st.button("★" if fav else "☆", key=f"{k}_fav_{'on' if fav else 'off'}", type="tertiary", on_click=_toggle_fav,
+                  args=(k,), help="Remove from favorites" if fav else "Add to favorites")
     _render_controls(family, dmin, dmax)
 
     kind = st.session_state[f"{k}_smooth_kind"]
