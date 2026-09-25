@@ -4,10 +4,12 @@ Menggantikan dashboard v1 sejak 13 Sep 2026; v1 diarsipkan di archive/app_v1.py.
 Jalankan dengan (tema teal gelap dari .streamlit/config.toml):
     streamlit run app.py
 """
+import json
+
 import streamlit as st
 
 from dashboard.metric_page import render_metric_page
-from dashboard.metric_page import FAV
+from dashboard.metric_page import FAV, _toggle_fav
 from dashboard.registry import FAMILIES
 
 st.set_page_config(
@@ -309,8 +311,14 @@ div[data-testid="stElementContainer"]:has(> div[data-testid="stMarkdown"]) { mar
    Kuncinya berakhiran _fav_on / _fav_off (metric_page). Judul FAVORITES kuning, huruf kecil
    kapital seperti judul kelompok menu; iframe penulis cookie disembunyikan. */
 div[class*="_fav_"] div[data-testid="stButton"] button { border: none !important; background: transparent !important; padding: 0 2px !important; min-height: 0 !important; }
-[class*="_fav_on"] button p { color: #F7E9A8 !important; font-size: 20px !important; }
-[class*="_fav_off"] button p { color: #8b949e !important; font-size: 20px !important; }
+div[class*="_fav_on"] div[data-testid="stButton"] button p { color: #F7E9A8 !important; font-size: 22px !important; line-height: 1 !important; }
+div[class*="_fav_off"] div[data-testid="stButton"] button p { color: #8b949e !important; font-size: 22px !important; line-height: 1 !important; }
+/* Bintang di menu sidebar (disisipkan JavaScript, lihat app.py bawah): kuning selalu tampil untuk
+   favorit, abu hanya saat menu disorot. Tombol Streamlit tersembunyi favbtn_<key> yang diklik. */
+span.fav-bintang { margin-left: auto; padding: 0 2px 0 8px; font-size: 17px !important; line-height: 1; color: #8b949e !important; visibility: hidden; cursor: pointer; }
+span.fav-bintang.on { color: #F7E9A8 !important; visibility: visible; }
+a:hover > .fav-bintang { visibility: visible; }
+section[data-testid="stSidebar"] [class*="st-key-favbtn_"] { display: none; }
 .fav-judul { color: #F7E9A8; font-size: 11px; font-weight: 600; letter-spacing: 0.1em;
              padding: 4px 0 2px 13px; }
 section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(iframe) { display: none; }
@@ -360,11 +368,37 @@ with st.sidebar:
         st.markdown("<div class='fav-judul'>★ FAVORITES</div>", unsafe_allow_html=True)
         for k in favorit:
             st.page_link(halaman[k])
-    # Iframe kosong yang menulis cookie; isinya berubah hanya kalau daftar berubah. Ditaruh di
-    # sidebar supaya urutan elemen di halaman utama (iframe chart) tidak bergeser.
+    # Tombol tersembunyi per halaman; bintang di menu (disisipkan skrip di bawah) mengkliknya.
+    for k in halaman:
+        st.button(k, key=f"favbtn_{k}", on_click=_toggle_fav, args=(k,))
+    # Iframe tersembunyi: menulis cookie dan menyisipkan bintang di tiap menu sidebar (tautan
+    # dikenali dari akhir alamatnya; halaman bawaan beralamat "/"). Isinya berubah hanya kalau
+    # daftar berubah. Ditaruh di sidebar supaya urutan elemen halaman utama (iframe chart) tetap.
     isi = ",".join(sorted(st.session_state[FAV]))
-    st.iframe(f"<script>document.cookie='dash_fav={isi}; path=/; max-age=31536000; SameSite=Lax'</script>",
-              height=1)
+    alamat = {("" if i == 0 else f.url_path): f.key for i, f in enumerate(FAMILIES.values())}
+    st.iframe(f"""<script>
+document.cookie = 'dash_fav={isi}; path=/; max-age=31536000; SameSite=Lax';
+const P = window.parent, D = P.document, ALAMAT = {json.dumps(alamat)}, FAV = new Set('{isi}'.split(','));
+function pasang() {{
+  for (const a of D.querySelectorAll('[data-testid="stSidebarNavLink"], [data-testid="stPageLink-NavLink"]')) {{
+    const k = ALAMAT[new URL(a.href).pathname.replace(/^[/]|[/]$/g, '')];
+    if (!k) continue;
+    let b = a.querySelector('.fav-bintang');
+    if (!b) {{ b = D.createElement('span'); b.className = 'fav-bintang'; a.appendChild(b); }}
+    // Dipasang ulang tiap kali: iframe ini dimuat ulang saat daftar berubah, dan fungsi dari
+    // iframe lama ikut mati (bintang lalu malah membuka halamannya).
+    b.onclick = e => {{ e.preventDefault(); e.stopPropagation();
+      D.querySelector('.st-key-favbtn_' + k + ' button').click(); }};
+    const on = FAV.has(k); b.classList.toggle('on', on); b.textContent = on ? '★' : '☆';
+    b.title = on ? 'Remove from favorites' : 'Add to favorites';
+  }}
+}}
+pasang();
+// Streamlit menggambar ulang menu saat pindah halaman: pasang lagi kalau bintang hilang.
+if (P.__favObs) P.__favObs.disconnect();
+P.__favObs = new P.MutationObserver(() => {{ if (D.querySelector('[data-testid="stSidebarNavLink"]:not(:has(.fav-bintang)), [data-testid="stPageLink-NavLink"]:not(:has(.fav-bintang))')) pasang(); }});
+P.__favObs.observe(D.querySelector('[data-testid="stSidebar"]'), {{ childList: true, subtree: true }});
+</script>""", height=1)
 nav.run()
 
 
