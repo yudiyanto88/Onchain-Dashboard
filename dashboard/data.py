@@ -295,7 +295,12 @@ def load_exchange():
     df.loc[kosong, ['Net Flow', 'Inflow', 'Outflow']] = float('nan')
     harga = _prepare(pd.read_csv("data_mvrv.csv", usecols=['date', 'btc_price'])
                      .rename(columns={'date': 'Date', 'btc_price': 'BTC Price'}))
-    df = df[['Date'] + kolom].merge(harga, on='Date', how='left')
+    # Jumlah net flow 7/14/30 hari per hari kalender (seperti halaman ETF Flows, user 25 Sep 2026);
+    # hari kosong dihitung 0.
+    flow = df.set_index('Date')['Net Flow'].asfreq('D').fillna(0)
+    for n in (7, 14, 30):
+        df[f'Net Flow {n}d'] = df['Date'].map(flow.rolling(n).sum()).where(df['Date'] >= '2012-01-30')
+    df = df[['Date'] + kolom + [f'Net Flow {n}d' for n in (7, 14, 30)]].merge(harga, on='Date', how='left')
     return df[df['Date'] >= df.loc[df['BTC Price'].notna(), 'Date'].min()]
 
 

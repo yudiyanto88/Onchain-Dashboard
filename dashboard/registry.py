@@ -664,32 +664,33 @@ CDD_VDD = MetricFamily(
 EXCHANGE_FLOW = MetricFamily(
     key="exchange_flow",
     title="Exchange Flow",
-    subtitle="Exchange Balance & Net Flow",
+    subtitle="Exchange Net Flow & Balance",
     group="Exchange",
     url_path="exchange-flow",
     loader=data.load_exchange,
-    # Disetujui user 17 Sep 2026 dari pratinjau (susunan A): harga BTC di pane sendiri, saldo
-    # bursa di pane tengah, net flow batang di pane bawah yang menyala sejak awal. Tidak dipakai
+    # Susunan sama dengan ETF Flows (user 25 Sep 2026): net flow jadi metrik utama, satu pane dengan
+    # BTC Overlay; saklar 1d (batang harian) | 7d | 14d | 30d (jumlah flow, area teal/rust), bawaan
+    # 30d (pilihan user). Saldo bursa di pane bawah, menyala awal (berbeda dengan ETF: saldo bursa cocok dengan flow,
+    # kecuali 7 hari di Okt-Des 2025, lihat handoff). Masuk bursa (+) teal, keluar rust. Tidak dipakai
     # framework v2 dan belum ada KB, jadi tanpa garis ambang.
-    btc_mode_default="Separate pane",
+    btc_mode_default="Overlay",
     metric_scale_default="Auto",
     price_scale_default="Log",
     series=[
-        # Navy = warna dasar metrik utama di semua halaman (keputusan user 17 Sep 2026; sempat
-        # cornflower #5b8def, yang terlalu mirip violet AVIV dan lebih terang dari rust/teal).
-        Series("Exchange Balance", "Exchange Balance", color="#0070a6", axis="left",
-               separate_axis="right", dim=0.49, short="Balance", precision=0, compact=True),
-        # Warna menurut tanda seperti funding: masuk bursa (positif) teal, keluar (negatif) rust.
-        # Sempat dibalik menurut arti; diganti user 17 Sep 2026 supaya batang di atas nol tidak
-        # merah (terkecoh). Sebelum 2012 dan 8 hari kosong 2026 tidak digambar.
-        # Sumbu kanan, sejajar sumbu harga dan saldo di atasnya (permintaan user 17 Sep 2026).
-        Series("Net Flow", "Net Flow", color="#0b8e89", negative_color="#bf5546", axis="right",
-               dim=0.45, kind="histogram", smoothing=False, alpha=0.80, short="Net",
-               pane="extra", precision=0, compact=True),
+        # Sebelum 2012 dan 8 hari kosong 2026 tidak digambar (load_exchange).
+        Series("Net Flow 1d (BTC)", "Net Flow", color="#0b8e89", negative_color="#bf5546",
+               axis="left", dim=0.45, kind="histogram", smoothing=False, alpha=0.80, short="1d",
+               precision=0, compact=True, unit="1d"),
+        *[Series(f"Net Flow {n}d (BTC)", f"Net Flow {n}d", color="#0b8e89", negative_color="#bf5546",
+                 axis="left", dim=0.45, kind="baseline", smoothing=False, alpha=0.45, short=f"{n}d",
+                 precision=0, compact=True, unit=f"{n}d") for n in (7, 14, 30)],
+        # Navy = warna dasar metrik utama di semua halaman (keputusan user 17 Sep 2026).
+        Series("Exchange Balance", "Exchange Balance", color="#0070a6", axis="right", dim=0.49,
+               short="Balance", precision=0, compact=True, smoothing=False, pane="extra"),
     ],
-    # Tanpa garis Zero: garis acuan hanya bisa di pane tengah (akan menarik sumbu saldo ke 0);
-    # batang net flow sudah tumbuh dari nol.
-    extra_label="Net Flow",
+    unit_switch=("1d", "7d", "14d", "30d"),
+    unit_default="30d",
+    extra_label="Balance",
     extra_default=True,
 )
 
