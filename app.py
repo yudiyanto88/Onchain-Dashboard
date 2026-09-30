@@ -46,6 +46,12 @@ section[data-testid="stSidebar"] { background-color: #151924; }
 /* Huruf pertama judul kelompok lurus dengan huruf pertama nama menu (garis kiri 3 px +
    jarak dalam 10 px pada link). Terukur sebelum ini: judul x=20, nama menu x=33. */
 [data-testid="stNavSectionHeader"] { padding-left: 13px !important; }
+/* Panah buka-tutup kelompok selalu tampil di ujung kanan, sama dengan judul FAVORITES
+   (user 30 Sep 2026; bawaan Streamlit: hanya saat disorot, tepat setelah nama kelompok). */
+[data-testid="stNavSectionHeader"] > div:last-child { visibility: visible !important; margin: 0 6px 0 auto; }
+[data-testid="stNavSectionHeader"] [data-testid="stIconMaterial"] {
+    font-size: 16px !important; text-transform: none; letter-spacing: 0; font-weight: 400 !important;
+}
 
 /* Pemisah ON-CHAIN / MARKET (pilihan user 22 Sep 2026). Menu Streamlit tidak punya pemisah,
    jadi label ditempel lewat ::before pada kelompok ke-1 dan ke-5 (Derivatives).
@@ -324,7 +330,7 @@ section[data-testid="stSidebar"] [class*="st-key-favbtn_"] { display: none; }
 /* Buka-tutup daftar favorit (user 30 Sep 2026), seperti judul kelompok menu: panah ikon Material,
    keadaan di kelas html.fav-tutup (localStorage, diatur skrip iframe), tanpa rerun. */
 .fav-judul::after { content: 'expand_more'; font-family: 'Material Symbols Rounded'; font-size: 16px;
-                    font-weight: 400; letter-spacing: 0; margin: 0 6px 0 auto; }
+                    font-weight: 400; letter-spacing: 0; margin: 0 16px 0 auto; }
 html.fav-tutup .fav-judul::after { content: 'chevron_right'; }
 html.fav-tutup section[data-testid="stSidebar"] .st-key-favlist { display: none; }
 section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(iframe) { display: none; }
@@ -368,6 +374,7 @@ nav = st.navigation(kelompok, position="sidebar", expanded=True)
 # hanya dibaca saat sesi dimulai; selama sesi daftar hidup di session_state.
 if FAV not in st.session_state:
     st.session_state[FAV] = {k for k in st.context.cookies.get("dash_fav", "").split(",") if k in halaman}
+st.sidebar.caption(f"diag cookies: {sorted(st.context.cookies.keys())}")   # DIAGNOSA SEMENTARA, hapus
 with st.sidebar:
     favorit = [k for k in halaman if k in st.session_state[FAV]]   # urutan = urutan menu
     if favorit:
