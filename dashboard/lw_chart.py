@@ -637,6 +637,10 @@ loadLib(0).then(() => {
         }))
       : spec.kind === 'histogram'
       ? panes[spec.pane].addHistogramSeries(Object.assign({ base: spec.base || 0 }, umum))
+      : spec.kind === 'agree'
+      // Total Agreement: garis tak terlihat, hanya untuk label nilai terakhir dan tooltip.
+      ? panes[spec.pane].addLineSeries(Object.assign({}, umum, {
+          lineVisible: false, crosshairMarkerVisible: false }))
       : garisNol(spec)
       ? panes[spec.pane].addBaselineSeries(Object.assign({}, umum, {
           baseValue: { type: 'price', price: spec.base || 0 }, lineWidth: 1,
@@ -662,13 +666,91 @@ loadLib(0).then(() => {
     }
     handles.push(handle);
   }
+
+  // Agreement (MVRV Percentile, user 30 Sep 2026): tiap garis spec.agree yang menyala menyumbang
+  // 1 di zona 90-100 / 0-10 dan 0,5 di 70-90 / 10-30 (ke atas untuk zona tinggi, ke bawah untuk
+  // zona rendah). Segmen = histogram kumulatif per garis berwarna garis itu; dibuat terbalik
+  // supaya kumulatif terkecil tergambar paling atas. Dihitung ulang di apply() (hitungSetuju).
+  const setujuAtas = handles.find(h => h.spec.kind === 'agree' && h.spec.col.endsWith('Up'));
+  const setujuBawah = handles.find(h => h.spec.kind === 'agree' && h.spec.col.endsWith('Down'));
+  const setuju = setujuAtas || setujuBawah;
+  const penyumbang = setuju ? handles.filter(h => h.spec.agree) : [];
+  const segmen = new Map();
+  for (const h of [...penyumbang].reverse()) {
+    segmen.set(h, panes[setuju.spec.pane].addHistogramSeries({
+      color: h.spec.color, priceScaleId: setuju.spec.axis, priceLineVisible: false,
+      lastValueVisible: false, priceFormat: formatSeri(setuju.spec) }));
+  }
+  let kunciSetuju = null;
+  function hitungSetuju() {
+    if (!setuju) return;
+    // Garis ikut dihitung walau disembunyikan saklar Lines: yang menentukan legend + saklar jendela.
+    const aktif = penyumbang.filter(h => !state.hidden.includes(h.spec.name) && satuanTampil(h.spec));
+    const pakaiAtas = !!setujuAtas && !state.hidden.includes(setujuAtas.spec.name);
+    const pakaiBawah = !!setujuBawah && !state.hidden.includes(setujuBawah.spec.name);
+    const kunci = aktif.map(h => h.spec.col).join(',') + '|' + pakaiAtas + pakaiBawah;
+    if (kunci === kunciSetuju) return;
+    kunciSetuju = kunci;
+    const titik = new Map(aktif.map(h => [h, []]));
+    // Total dibaca tooltip dan label nilai terakhir dari kolom wadahnya.
+    const totAtas = setujuAtas ? D.cols[setujuAtas.spec.col] : [];
+    const totBawah = setujuBawah ? D.cols[setujuBawah.spec.col] : [];
+    for (let i = 0; i < D.t.length; i++) {
+      let atas = 0, bawah = 0;
+      for (const h of aktif) {
+        const v = D.cols[h.spec.col][i];
+        if (v === null) continue;
+        const bobot = v >= 90 || v <= 10 ? 1 : v >= 70 || v <= 30 ? 0.5 : 0;
+        if (!bobot) continue;
+        if (v >= 70) { if (pakaiAtas) { atas += bobot; titik.get(h).push({ time: D.t[i], value: atas }); } }
+        else if (pakaiBawah) { bawah += bobot; titik.get(h).push({ time: D.t[i], value: -bawah }); }
+      }
+      if (setujuAtas) totAtas[i] = aktif.length ? atas : null;
+      if (setujuBawah) totBawah[i] = aktif.length ? -bawah : null;
+    }
+    for (const [h, seri] of segmen) seri.setData(titik.get(h) || []);
+    for (const [h, tot] of [[setujuAtas, totAtas], [setujuBawah, totBawah]]) {
+      if (h) h.line.setData(D.t.map((t, i) => tot[i] === null ? { time: t } : { time: t, value: tot[i] }));
+    }
+  }
+
+  // Latar zona + garis putus (C.zones, C.zoneLines; MVRV Percentile): digambar primitive di
+  // belakang semua seri, mengikuti sumbu metrik berentang tetap lewat seri jangkar tak terlihat
+  // (dibuat terakhir, jadi bukan seri pertama sumbu yang menentukan format angka).
+  const acuanZona = (C.zones || C.zoneLines) && handles.find(h => rentangTetap(h.spec));
+  if (acuanZona) {
+    const zona = panes.main.addLineSeries({ priceScaleId: acuanZona.spec.axis, color: 'rgba(0,0,0,0)',
+      lineVisible: false, priceLineVisible: false, lastValueVisible: false,
+      crosshairMarkerVisible: false, autoscaleInfoProvider: rentangTetap(acuanZona.spec) });
+    zona.setData(D.t.map(t => ({ time: t, value: C.metricRange[0] })));
+    const gambar = { draw: target => target.useBitmapCoordinateSpace(({ context: ctx, bitmapSize, verticalPixelRatio: r }) => {
+      if (state.garisPct === false) return;   // saklar Lines mati: zona ikut hilang
+      const y = v => { const c = zona.priceToCoordinate(v); return c === null ? null : Math.round(c * r); };
+      for (const [lo, hi, warna] of C.zones || []) {
+        const a = y(hi), b = y(lo);
+        if (a === null || b === null) continue;
+        ctx.fillStyle = warna;
+        ctx.fillRect(0, a, bitmapSize.width, b - a);
+      }
+      ctx.lineWidth = Math.max(1, Math.floor(r));
+      ctx.setLineDash([4 * r, 4 * r]);
+      for (const [v, warna] of C.zoneLines || []) {
+        const a = y(v);
+        if (a === null) continue;
+        ctx.strokeStyle = warna;
+        ctx.beginPath(); ctx.moveTo(0, a + 0.5); ctx.lineTo(bitmapSize.width, a + 0.5); ctx.stroke();
+      }
+      ctx.setLineDash([]);
+    }) };
+    zona.attachPrimitive({ updateAllViews() {}, paneViews: () => [{ zOrder: () => 'bottom', renderer: () => gambar }] });
+  }
   // Sumbu berentang tetap: ruang tepi bawaan (atas 20 %, bawah 10 %) dipersempit supaya
   // 0–100 memakai hampir seluruh tinggi pane dan tidak menyisakan pita kosong di atas 100.
   if (C.metricRange) {
     const adaTumpukan = handles.some(h => tumpukan(h.spec));
     new Set(handles.filter(h => rentangTetap(h.spec)).map(h => h.spec.axis)).forEach(side =>
       panes.main.priceScale(side).applyOptions({ scaleMargins: adaTumpukan
-        ? { top: 0.03, bottom: 0 } : { top: 0.06, bottom: 0.04 } }));
+        ? { top: 0.03, bottom: 0 } : { top: C.metricTop || 0.06, bottom: 0.04 } }));
   }
   // Tampilan awal: pulihkan zoom terakhir, atau tampilkan seluruh data.
   // Sidik data ikut disimpan, jadi kalau rentang tanggalnya memang berubah
@@ -1086,6 +1168,22 @@ loadLib(0).then(() => {
     pemisah.className = 'fssep';
     hlEl.insertBefore(pemisah, labelHighlight);
   }
+  // Saklar Lines (user 30 Sep 2026): garis percentile (spec.agree) disembunyikan tanpa keluar dari
+  // hitungan Agreement, untuk melihat Agreement + harga saja. Hanya kalau pane Agreement menyala.
+  if (setuju) {
+    if (typeof state.garisPct !== 'boolean') state.garisPct = true;
+    const labelHighlight = hlEl.querySelector('.hllabel');
+    const button = document.createElement('button');
+    button.className = 'hl';
+    button.textContent = 'Lines';
+    button.title = 'Show percentile lines (Agreement still counts them)';
+    button.onclick = () => { state.garisPct = !state.garisPct; apply(); };
+    hlEl.insertBefore(button, labelHighlight);
+    saklar.push({ button, kunci: 'garisPct' });
+    const pemisah = document.createElement('span');
+    pemisah.className = 'fssep';
+    hlEl.insertBefore(pemisah, labelHighlight);
+  }
   // Saklar bobot area bertumpuk (C.stackUnits, mis. Realized Cap | Supply; 17 Sep 2026): satu
   // yang aktif. Realized Cap = RHODL Waves, Supply = HODL Waves. Tersimpan di localStorage.
   const BOBOT = C.stackUnits || [];
@@ -1312,7 +1410,8 @@ loadLib(0).then(() => {
       const warna = hex => faded ? dimmed(hex, fadedAlpha)
         : (spec.alpha < 1 ? dimmed(hex, spec.alpha) : hex);
       handle.line.applyOptions({
-        visible: !hidden && (!handle.kembar || tampilProfit()) && satuanTampil(spec),
+        visible: !hidden && (!handle.kembar || tampilProfit()) && satuanTampil(spec)
+          && !(spec.agree && state.garisPct === false),
         color: warna(spec.color),
       });
       if (tumpukan(spec)) {
@@ -1373,10 +1472,17 @@ loadLib(0).then(() => {
     for (const { button, u } of saklarSatuan) button.classList.toggle('on', !!state.unitOn[u]);
     for (const { button, u } of saklarBobot) button.classList.toggle('on', state.stackUnit === u);
     tumpuk();
+    hitungSetuju();
     // Kelompok legend yang satuannya mati disembunyikan seluruhnya.
     if (SATUAN.length) {
       for (const { wadah, anggota } of wadahKelompok.values()) {
         wadah.style.display = anggota.some(h => satuanLegend(h.spec)) ? '' : 'none';
+      }
+      // Kotak anggota bersatuan (MVRV Percentile: 3M · 6M) hanya tampil kalau saklar satuannya menyala.
+      for (const { button, handle } of legendButtons) {
+        if (handle && handle.spec.unit && handle.spec.name !== handle.spec.group) {
+          button.style.display = satuanLegend(handle.spec) ? '' : 'none';
+        }
       }
       // Seri kembaran (tanpa legend): nyala/mati dan redup sorot ikut seri induknya.
       for (const h of handles) {
@@ -2014,7 +2120,7 @@ def _scale(mode):
 def render(df, lines, price_line, extra_lines, height, metric_mode, price_mode, store_key,
            tooltip="Cursor", metric_range=None, complement=None, view=None,
            unit_switch=None, unit_label="", stack_units=None, extra_mode="Auto",
-           price_extra=None, unit_default=None):
+           price_extra=None, unit_default=None, extra_config=None):
     """Gambar chart. height "Fit" = tinggi mengikuti layar (dihitung di browser; 720 dipakai
     sebagai tinggi awal dan dasar pembagian pane).
 
@@ -2112,6 +2218,8 @@ def render(df, lines, price_line, extra_lines, height, metric_mode, price_mode, 
         "showLeft": any(ln.axis == "left" for ln in lines) or banyak_pane,
         "showRight": any(ln.axis == "right" for ln in lines) or banyak_pane,
     }
+    # Opsi per halaman tanpa parameter sendiri (zones, zoneLines, metricTop; lihat MetricFamily).
+    config.update(extra_config or {})
 
     html = (TEMPLATE
             .replace("__TOOLBAR__", str(TOOLBAR_H))

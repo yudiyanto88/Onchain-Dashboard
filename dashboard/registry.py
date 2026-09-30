@@ -63,6 +63,9 @@ class Series:
     base: float = 0.0
     fill_colors: tuple[str, str] | None = None
     fill_alpha: float = 0.35
+    # Dihitung di pane Agreement (MVRV Percentile): garis percentile yang menyala menyumbang 1 di
+    # zona 90-100 / 0-10 dan 0,5 di 70-90 / 10-30, sebagai segmen bar berwarna garis itu.
+    agree: bool = False
 
 
 @dataclass
@@ -77,9 +80,6 @@ class RefLine:
     # Kolom seri yang diikuti sumbunya. Dipakai halaman yang satu pane-nya memuat dua skala
     # (funding di satu sumbu, OI di sumbu lain): garis nol harus di sumbu funding, bukan OI.
     follow: str | None = None
-    # Pita, bukan garis: area dari value ke zone_to berwarna color (MVRV Percentile 0-10, 90-100).
-    zone_to: float | None = None
-    color: str | None = None
 
 
 @dataclass
@@ -124,6 +124,13 @@ class MetricFamily:
     smoothing_default: list[int] = field(default_factory=list)   # periode menyala sejak awal
     # Gaya bawaan per periode, mis. {30: "Band"}; periode lain ikut urutan Dotted/Step/Band.
     smoothing_style_default: dict[int, str] = field(default_factory=dict)
+    # Latar zona di pane utama (digambar di belakang semua garis, ikut sumbu metrik): daftar
+    # [bawah, atas, warna rgba], dan garis putus tipis [nilai, warna rgba]. MVRV Percentile.
+    zones: list | None = None
+    zone_lines: list | None = None
+    # Mode Overlay: sumbu metrik berentang tetap hanya memakai bagian bawah pane (0,5 = separuh
+    # bawah); harga BTC tetap memakai seluruh tinggi. None = seluruh pane.
+    overlay_metric_top: float | None = None
 
 
 MARKET_VALUATION = MetricFamily(
@@ -234,6 +241,18 @@ MVRV_MOMENTUM = MetricFamily(
 )
 
 
+# MVRV Percentile: tiap metrik satu warna dasar; jendela 1M -> All makin gelap (dicampur putih 60 %
+# -> 0 %; 1M tidak lebih terang supaya tidak mirip garis BTC putih). Pilihan user 30 Sep 2026.
+PCT_WARNA = {
+    "MVRV": ["#99c6db", "#80b8d2", "#66a9ca", "#4c9bc1", "#338db8", "#1a7eaf", "#0070a6"],
+    "STH MVRV": ["#e5bbb5", "#dfaaa2", "#d99990", "#d2887e", "#cc776b", "#c56658", "#bf5546"],
+    "LTH MVRV": ["#9dd2d0", "#85c6c4", "#6dbbb8", "#54b0ac", "#3ca5a1", "#239995", "#0b8e89"],
+    "BTC Price": ["#fcd4a3", "#fbc98c", "#fabe76", "#f9b35f", "#f9a948", "#f89e31", "#f7931a"],
+}
+# (kolom, nama legend, nama pendek, dim, mati awal)
+PCT_METRIK = [("MVRV", "MVRV", "MVRV", 0.49, False), ("STH MVRV", "STH MVRV", "STH", 0.44, False),
+              ("LTH MVRV", "LTH MVRV", "LTH", 0.39, True), ("BTC Price", "Price", "Price", 0.28, True)]
+
 MVRV_PERCENTILE = MetricFamily(
     key="mvrv_percentile",
     title="MVRV Percentile",
@@ -245,25 +264,37 @@ MVRV_PERCENTILE = MetricFamily(
     # tapi jendela bergulir, bukan reset per siklus): percentile 0-100 sumbu kiri, BTC Log Overlay
     # kanan; saklar jendela 1M | 3M | 6M | 1Y | 2Y | 4Y | All (bawaan 1Y); LTH dan Price mati awal. Warna kohort biasa (MVRV navy, STH rust,
     # LTH teal); Price percentile = percentile harga BTC sendiri, oranye BTC (satu metrik satu warna).
-    # Pita 0-10 / 90-100 alat bantu mata, bukan ambang framework. BTC Separate pane (user 30 Sep 2026).
-    btc_mode_default="Separate pane",
+    # BTC Overlay (user 30 Sep 2026); percentile dikunci di 40 % bawah (overlay_metric_top).
+    btc_mode_default="Overlay",
     metric_scale_default="Auto",
     price_scale_default="Log",
     metric_range=(0, 100),
     series=[
-        *[Series(f"MVRV Percentile ({w})", f"MVRV Pct {w}", color="#0070a6", axis="left", dim=0.49,
-                 short="MVRV", precision=1, unit=w) for w in data.PERCENTILE_WINDOWS],
-        *[Series(f"STH MVRV Percentile ({w})", f"STH MVRV Pct {w}", color="#bf5546", axis="left",
-                 dim=0.44, short="STH", precision=1, unit=w) for w in data.PERCENTILE_WINDOWS],
-        *[Series(f"LTH MVRV Percentile ({w})", f"LTH MVRV Pct {w}", color="#0b8e89", axis="left",
-                 dim=0.39, short="LTH", precision=1, unit=w, hidden_default=True) for w in data.PERCENTILE_WINDOWS],
-        *[Series(f"Price Percentile ({w})", f"BTC Price Pct {w}", color="#F7931A", axis="left",
-                 dim=0.28, short="Price", precision=1, unit=w, hidden_default=True) for w in data.PERCENTILE_WINDOWS],
+        *[Series(f"{nama} Percentile ({w})", f"{kolom} Pct {w}", color=warna, axis="left", dim=dim,
+                 short=pendek, precision=1, unit=w, hidden_default=mati, agree=True,
+                 group=f"{nama} Percentile")   # legend per metrik, jendela = kotak kecil (3M · 6M)
+          for kolom, nama, pendek, dim, mati in PCT_METRIK
+          for w, warna in zip(data.PERCENTILE_WINDOWS, PCT_WARNA[kolom])],
+        # Agreement (user 30 Sep 2026): dihitung di browser dari garis agree yang menyala. Dua wadah
+        # total, zona tinggi (Up, ke atas) dan zona rendah (Down, ke bawah, negatif), tidak saling
+        # mengurangi; masing-masing punya label nilai terakhir dan kolom tooltip, dan bisa dimatikan
+        # di legend (segmen arah itu ikut hilang).
+        Series("Agreement (▲ 70–100)", "Agreement Up", color="#bf5546", axis="right", dim=0.5,
+               kind="agree", smoothing=False, short="Agree", precision=1, pane="extra", group="Agreement"),
+        Series("Agreement (▼ 0–30)", "Agreement Down", color="#0b8e89", axis="right", dim=0.5,
+               kind="agree", smoothing=False, precision=1, pane="extra", group="Agreement"),
     ],
     unit_switch=tuple(data.PERCENTILE_WINDOWS),
     unit_default="1Y",
-    reference_lines=[RefLine(10, "0–10", zone_to=0, color="#0b8e89"),
-                     RefLine(90, "90–100", zone_to=100, color="#bf5546")],
+    extra_label="Agreement",
+    # Zona ala CryptoQuant (0-10 / 10-30 / 30-70 / 70-90 / 90-100), bertingkat teal -> abu -> rust;
+    # garis putus di 10/30/70/90 berwarna zonanya (user 30 Sep 2026: tanpa 50). Bukan ambang framework.
+    zones=[[0, 10, "rgba(11,142,137,0.20)"], [10, 30, "rgba(11,142,137,0.09)"],
+           [30, 70, "rgba(139,148,158,0.05)"], [70, 90, "rgba(191,85,70,0.09)"],
+           [90, 100, "rgba(191,85,70,0.20)"]],
+    zone_lines=[[10, "rgba(11,142,137,0.80)"], [30, "rgba(75,145,148,0.60)"],
+                [70, "rgba(165,117,114,0.60)"], [90, "rgba(191,85,70,0.80)"]],
+    overlay_metric_top=0.6,   # percentile di 40 % bawah chart (user 30 Sep 2026)
 )
 
 

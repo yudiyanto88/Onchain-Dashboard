@@ -85,6 +85,8 @@ def load_mvrv_percentile(windows):
         for nama, hari in windows.items():
             jendela = df[kolom].expanding() if hari is None else df[kolom].rolling(hari)
             df[f'{kolom} Pct {nama}'] = jendela.rank(pct=True) * 100
+    df['Agreement Up'] = 0.0     # wadah; nilainya dihitung ulang di browser (lw_chart, hitungSetuju)
+    df['Agreement Down'] = 0.0
     return df
 
 

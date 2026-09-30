@@ -42,13 +42,15 @@ class Line:
     fill_colors: tuple | None = None
     fill_alpha: float = 0.35
     base: float = 0.0                    # patokan area kind "baseline"
+    agree: bool = False                  # dihitung di pane Agreement (lihat Series.agree)
 
 
 def render(df, lines, price_line, extra_lines, height, metric_mode, price_mode, key,
            tooltip="Cursor", metric_range=None, complement=None, view=None,
            unit_switch=None, unit_label="", stack_units=None, extra_mode="Auto",
-           price_extra=None, unit_default=None):
+           price_extra=None, unit_default=None, extra_config=None):
     """Legend dan sorot diproses di browser; key dipakai untuk menyimpan pilihan."""
     lw_chart.render(df, lines, price_line, extra_lines, height,
                     metric_mode, price_mode, key, tooltip, metric_range, complement, view,
-                    unit_switch, unit_label, stack_units, extra_mode, price_extra, unit_default)
+                    unit_switch, unit_label, stack_units, extra_mode, price_extra, unit_default,
+                    extra_config)

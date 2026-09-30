@@ -599,7 +599,7 @@ def render_metric_page(family: MetricFamily):
                          stack_index=sr.stack_index, stack_cols=sr.stack_cols,
                          show_when=sr.show_when, alpha_together=sr.alpha_together,
                          fill_with=sr.fill_with, fill_colors=sr.fill_colors,
-                         fill_alpha=sr.fill_alpha, base=sr.base))
+                         fill_alpha=sr.fill_alpha, base=sr.base, agree=sr.agree))
         if not sr.smoothing:
             continue
         for p in periods:
@@ -638,11 +638,6 @@ def render_metric_page(family: MetricFamily):
             presisi = max((ln.precision for ln in metrik), default=2)
             bulat = min((ln.whole_from for ln in metrik if ln.whole_from is not None),
                         default=None)
-            if ref.zone_to is not None:
-                plan.insert(0, Line(ref.label, ref_col, ref.color, axis, width=1, kind="baseline",
-                                    base=ref.zone_to, negative_color=ref.color, alpha=0.25,
-                                    precision=presisi, whole_from=bulat))
-                continue
             plan.insert(0, Line(ref.label, ref_col, "rgba(255,255,255,0.35)",
                                 axis, width=1, style=2, precision=presisi, whole_from=bulat))
 
@@ -665,4 +660,6 @@ def render_metric_page(family: MetricFamily):
                   view=(f"{date_from:%Y-%m-%d}", f"{date_to:%Y-%m-%d}"),
                   unit_switch=family.unit_switch, unit_label=family.unit_label,
                   stack_units=family.stack_units, extra_mode=family.extra_scale,
-                  price_extra=price_extra, unit_default=family.unit_default)
+                  price_extra=price_extra, unit_default=family.unit_default,
+                  extra_config={"zones": family.zones, "zoneLines": family.zone_lines,
+                                "metricTop": family.overlay_metric_top if btc_mode == OVERLAY else None})
