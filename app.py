@@ -320,7 +320,13 @@ span.fav-bintang.on { color: #F7E9A8 !important; visibility: visible; }
 a:hover > .fav-bintang { visibility: visible; }
 section[data-testid="stSidebar"] [class*="st-key-favbtn_"] { display: none; }
 .fav-judul { color: #F7E9A8; font-size: 11px; font-weight: 600; letter-spacing: 0.1em;
-             padding: 4px 0 2px 13px; }
+             padding: 4px 0 2px 13px; display: flex; align-items: center; cursor: pointer; }
+/* Buka-tutup daftar favorit (user 30 Sep 2026), seperti judul kelompok menu: panah ikon Material,
+   keadaan di kelas html.fav-tutup (localStorage, diatur skrip iframe), tanpa rerun. */
+.fav-judul::after { content: 'expand_more'; font-family: 'Material Symbols Rounded'; font-size: 16px;
+                    font-weight: 400; letter-spacing: 0; margin: 0 6px 0 auto; }
+html.fav-tutup .fav-judul::after { content: 'chevron_right'; }
+html.fav-tutup section[data-testid="stSidebar"] .st-key-favlist { display: none; }
 section[data-testid="stSidebar"] [data-testid="stElementContainer"]:has(iframe) { display: none; }
 /* Wadah teks Streamlit bermargin -16 px (bagian 9 handoff): tanpa ini tautan pertama menimpa judul. */
 section[data-testid="stSidebar"] [data-testid="stMarkdownContainer"]:has(.fav-judul) { margin-bottom: 0 !important; }
@@ -366,8 +372,9 @@ with st.sidebar:
     favorit = [k for k in halaman if k in st.session_state[FAV]]   # urutan = urutan menu
     if favorit:
         st.markdown("<div class='fav-judul'>★ FAVORITES</div>", unsafe_allow_html=True)
-        for k in favorit:
-            st.page_link(halaman[k])
+        with st.container(key="favlist"):
+            for k in favorit:
+                st.page_link(halaman[k])
     # Tombol tersembunyi per halaman; bintang di menu (disisipkan skrip di bawah) mengkliknya.
     for k in halaman:
         st.button(k, key=f"favbtn_{k}", on_click=_toggle_fav, args=(k,))
@@ -379,9 +386,18 @@ with st.sidebar:
     st.iframe(f"""<script>
 document.cookie = 'dash_fav={isi}; path=/; max-age=31536000; SameSite=Lax';
 const P = window.parent, D = P.document, ALAMAT = {json.dumps(alamat)}, FAV = new Set('{isi}'.split(','));
+try {{ D.documentElement.classList.toggle('fav-tutup', P.localStorage.getItem('dash_fav_tutup') === '1'); }} catch (e) {{}}
+// Kunci halaman = potongan alamat terakhir. Di Streamlit Cloud app berjalan di bawah /~/+/ dan
+// st.page_link memakai alamat relatif (/~/+/sopr), jadi "~" dan "+" dilewati.
+const kunci = a => ALAMAT[new URL(a.href).pathname.split('/').filter(s => s && s !== '~' && s !== '+').pop() || ''];
 function pasang() {{
+  const judul = D.querySelector('.fav-judul');
+  if (judul) judul.onclick = () => {{
+    const tutup = D.documentElement.classList.toggle('fav-tutup');
+    try {{ P.localStorage.setItem('dash_fav_tutup', tutup ? '1' : '0'); }} catch (e) {{}}
+  }};
   for (const a of D.querySelectorAll('[data-testid="stSidebarNavLink"], [data-testid="stPageLink-NavLink"]')) {{
-    const k = ALAMAT[new URL(a.href).pathname.replace(/^[/]|[/]$/g, '')];
+    const k = kunci(a);
     if (!k) continue;
     let b = a.querySelector('.fav-bintang');
     if (!b) {{ b = D.createElement('span'); b.className = 'fav-bintang'; a.appendChild(b); }}
@@ -389,8 +405,13 @@ function pasang() {{
     // iframe lama ikut mati (bintang lalu malah membuka halamannya).
     b.onclick = e => {{ e.preventDefault(); e.stopPropagation();
       D.querySelector('.st-key-favbtn_' + k + ' button').click(); }};
-    const on = FAV.has(k); b.classList.toggle('on', on); b.textContent = on ? '★' : '☆';
-    b.title = on ? 'Remove from favorites' : 'Add to favorites';
+    // Tulis hanya kalau berubah: tulisan memicu observer di bawah, dan kalau ada tautan yang tidak
+    // dikenali (tanpa bintang) observer memanggil pasang() terus-menerus -> halaman macet
+    // (terjadi di Streamlit Cloud 30 Sep 2026).
+    const on = FAV.has(k), teks = on ? '★' : '☆', judulB = on ? 'Remove from favorites' : 'Add to favorites';
+    if (b.classList.contains('on') !== on) b.classList.toggle('on', on);
+    if (b.textContent !== teks) b.textContent = teks;
+    if (b.title !== judulB) b.title = judulB;
   }}
 }}
 pasang();

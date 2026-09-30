@@ -64,7 +64,7 @@ def load_mvrv_momentum():
 
 
 # Jendela percentile MVRV (hari); "All" = semua hari sebelumnya sejak awal data (expanding).
-PERCENTILE_WINDOWS = {"1Y": 365, "2Y": 730, "4Y": 1460, "All": None}
+PERCENTILE_WINDOWS = {"1M": 30, "3M": 90, "6M": 180, "1Y": 365, "2Y": 730, "4Y": 1460, "All": None}
 
 
 @st.cache_data(ttl=3600)

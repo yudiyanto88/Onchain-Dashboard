@@ -243,10 +243,10 @@ MVRV_PERCENTILE = MetricFamily(
     loader=data.load_mvrv_percentile,
     # Pilihan user 30 Sep 2026 dari pratinjau (acuan: CryptoQuant "MVRV Percentile - Current Cycle",
     # tapi jendela bergulir, bukan reset per siklus): percentile 0-100 sumbu kiri, BTC Log Overlay
-    # kanan; saklar jendela 1Y | 2Y | 4Y | All (bawaan 1Y); LTH dan Price mati awal. Warna kohort biasa (MVRV navy, STH rust,
+    # kanan; saklar jendela 1M | 3M | 6M | 1Y | 2Y | 4Y | All (bawaan 1Y); LTH dan Price mati awal. Warna kohort biasa (MVRV navy, STH rust,
     # LTH teal); Price percentile = percentile harga BTC sendiri, oranye BTC (satu metrik satu warna).
-    # Pita 0-10 / 90-100 alat bantu mata, bukan ambang framework.
-    btc_mode_default="Overlay",
+    # Pita 0-10 / 90-100 alat bantu mata, bukan ambang framework. BTC Separate pane (user 30 Sep 2026).
+    btc_mode_default="Separate pane",
     metric_scale_default="Auto",
     price_scale_default="Log",
     metric_range=(0, 100),
