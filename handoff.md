@@ -1,6 +1,6 @@
 # Handoff — Dashboard Streamlit v2
 
-Diperbarui 24 Sep 2026 (versi ringkas; terakhir sesudah halaman CDD / VDD dan ETF Flows). Versi lengkap sebelum diringkas — cerita pengerjaan tiap fitur, opsi yang ditolak, hasil ukur piksel — ada di `archive/handoff_riwayat_2026-09-17.md` (buka hanya kalau perlu detail sejarah; nomor bagian 3.x yang disebut di bawah merujuk ke file itu).
+Diperbarui 25 Sep 2026 (versi ringkas; terakhir sesudah CDD / VDD, ETF Flows, favorit bintang, Exchange Flow versi saklar). Versi lengkap sebelum diringkas — cerita pengerjaan tiap fitur, opsi yang ditolak, hasil ukur piksel — ada di `archive/handoff_riwayat_2026-09-17.md` (buka hanya kalau perlu detail sejarah; nomor bagian 3.x yang disebut di bawah merujuk ke file itu).
 
 Baca dokumen ini dan `CLAUDE.md` sebelum mulai. Semua yang ditandai **ditahan/ditunda** harus ditanyakan ke user dulu.
 
@@ -20,7 +20,7 @@ Baca dokumen ini dan `CLAUDE.md` sebelum mulai. Semua yang ditandai **ditahan/di
 - **Live: 24 halaman, 8 kelompok, dua label** — **ON-CHAIN** (Valuation · Profitability · Holder Behavior · Exchange) dan **MARKET** (Derivatives · Sentiment · Macro · Liquidity). Semua halaman: slider rentang, nyaman di HP, kontrol diingat per halaman, tombol Style di chart.
 - **Langkah pertama sesi baru:**
   1. Cek server `dashboard-v2-uji` (bagian 2). Halaman yang sudah divalidasi user tidak perlu dibuka ulang.
-  2. Run bot tidak perlu dicek ulang kecuali ada gejala (data berhenti, error). Pipeline 23–26 lolos (22 Sep), Pipeline 27–28 lolos run bot pertama (dicek user 24 Sep). **Pipeline 29 (24 Sep) baru diuji lokal** — cek run bot pertama.
+  2. Run bot tidak perlu dicek ulang kecuali ada gejala (data berhenti, error). Pipeline 23–26 lolos (22 Sep), Pipeline 27–28 lolos run bot pertama (dicek user 24 Sep). Pipeline 29 (ETF) lolos run bot pertama (25 Sep 09:11 UTC).
   3. Tanyakan apakah **Cohort State** (bagian 6) sudah boleh dilanjutkan, lalu **halaman berikutnya** (kandidat dan hasil cek data di bagian 7 — jangan dicek ulang).
 - **Menambah halaman:** satu `MetricFamily` di `dashboard/registry.py` (+ loader di `data.py`). Urutan kerja yang disukai user: cek kualitas data (nilai macet, lonjakan, satuan, cakupan, revisi) → pratinjau widget dengan data asli + uji palet (bagian 8) → tunggu pilihan user → kerjakan di localhost → user bilang valid → merge dari GitHub → commit → push.
 
