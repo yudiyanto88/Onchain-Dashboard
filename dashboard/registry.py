@@ -77,6 +77,9 @@ class RefLine:
     # Kolom seri yang diikuti sumbunya. Dipakai halaman yang satu pane-nya memuat dua skala
     # (funding di satu sumbu, OI di sumbu lain): garis nol harus di sumbu funding, bukan OI.
     follow: str | None = None
+    # Pita, bukan garis: area dari value ke zone_to berwarna color (MVRV Percentile 0-10, 90-100).
+    zone_to: float | None = None
+    color: str | None = None
 
 
 @dataclass
@@ -102,10 +105,6 @@ class MetricFamily:
     extra_scale: str = "Auto"
     # Saklar bobot area bertumpuk di dalam chart, mis. ("Realized Cap", "Supply"); pilih satu.
     stack_units: tuple[str, ...] | None = None
-    # Warna garis harga BTC kalau bukan oranye bawaan (HODL Waves: putih) dan opasitas redupnya
-    # (dihitung supaya kontras redup 1,70:1 terhadap latar chart, seperti garis lain).
-    btc_color: str | None = None
-    btc_dim: float = 0.28
     # Keadaan awal kotak BTC price ("Overlay" / "Separate pane" / "Hidden").
     # Nilainya sama dengan pilihan di metric_page.
     btc_mode_default: str = "Overlay"
@@ -232,6 +231,39 @@ MVRV_MOMENTUM = MetricFamily(
     ],
     unit_switch=("Momentum", "÷ SMA180", "÷ SMA365"),
     extra_label="MVRV Ratio",
+)
+
+
+MVRV_PERCENTILE = MetricFamily(
+    key="mvrv_percentile",
+    title="MVRV Percentile",
+    subtitle="MVRV Percentile (Rolling)",
+    group="Valuation",
+    url_path="mvrv-percentile",
+    loader=data.load_mvrv_percentile,
+    # Pilihan user 30 Sep 2026 dari pratinjau (acuan: CryptoQuant "MVRV Percentile - Current Cycle",
+    # tapi jendela bergulir, bukan reset per siklus): percentile 0-100 sumbu kiri, BTC Log Overlay
+    # kanan; saklar jendela 1Y | 2Y | 4Y | All (bawaan 1Y); LTH dan Price mati awal. Warna kohort biasa (MVRV navy, STH rust,
+    # LTH teal); Price percentile = percentile harga BTC sendiri, oranye BTC (satu metrik satu warna).
+    # Pita 0-10 / 90-100 alat bantu mata, bukan ambang framework.
+    btc_mode_default="Overlay",
+    metric_scale_default="Auto",
+    price_scale_default="Log",
+    metric_range=(0, 100),
+    series=[
+        *[Series(f"MVRV Percentile ({w})", f"MVRV Pct {w}", color="#0070a6", axis="left", dim=0.49,
+                 short="MVRV", precision=1, unit=w) for w in data.PERCENTILE_WINDOWS],
+        *[Series(f"STH MVRV Percentile ({w})", f"STH MVRV Pct {w}", color="#bf5546", axis="left",
+                 dim=0.44, short="STH", precision=1, unit=w) for w in data.PERCENTILE_WINDOWS],
+        *[Series(f"LTH MVRV Percentile ({w})", f"LTH MVRV Pct {w}", color="#0b8e89", axis="left",
+                 dim=0.39, short="LTH", precision=1, unit=w, hidden_default=True) for w in data.PERCENTILE_WINDOWS],
+        *[Series(f"Price Percentile ({w})", f"BTC Price Pct {w}", color="#F7931A", axis="left",
+                 dim=0.28, short="Price", precision=1, unit=w, hidden_default=True) for w in data.PERCENTILE_WINDOWS],
+    ],
+    unit_switch=tuple(data.PERCENTILE_WINDOWS),
+    unit_default="1Y",
+    reference_lines=[RefLine(10, "0–10", zone_to=0, color="#0b8e89"),
+                     RefLine(90, "90–100", zone_to=100, color="#bf5546")],
 )
 
 
@@ -550,8 +582,6 @@ HODL_WAVES = MetricFamily(
     # Nama "HODL Waves" (sempat "RHODL Waves"), harga BTC Overlay di atas band dengan garis
     # putih seperti ChartInspect; RHODL Ratio pindah ke halaman sendiri (keputusan user 17 Sep).
     btc_mode_default="Overlay",
-    btc_color="#ffffff",
-    btc_dim=0.17,
     metric_scale_default="Auto",
     price_scale_default="Log",
     metric_range=(0, 100),
@@ -991,6 +1021,6 @@ BTC_TRADFI = MetricFamily(
 
 # Batang -> area (kind "baseline", pilihan user 22 Sep 2026): semua histogram kecuali data harian
 # yang loncat-loncat (Funding Rate, OI Change, Net Flow) — di sana batang lebih jujur.
-FAMILIES = {f.title: f for f in [MARKET_VALUATION, MVRV_MOMENTUM, PRICE_LEVELS, AVIV, REALIZED_CAP, SOPR, NUPL, UNREALIZED_PL, SUPPLY_IN_PROFIT,
+FAMILIES = {f.title: f for f in [MARKET_VALUATION, MVRV_MOMENTUM, MVRV_PERCENTILE, PRICE_LEVELS, AVIV, REALIZED_CAP, SOPR, NUPL, UNREALIZED_PL, SUPPLY_IN_PROFIT,
                                    HODL_WAVES, RHODL_RATIO, HOLDER_SUPPLY, CDD_VDD, EXCHANGE_FLOW,
                                    FUNDING_OI, FUTURES_BASIS, FEAR_GREED, VIX, BTC_TRADFI, TREASURY_YIELDS, DXY, SSR, EXCHANGE_RATIO, ETF_FLOWS]}

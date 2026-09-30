@@ -63,6 +63,29 @@ def load_mvrv_momentum():
     return df
 
 
+# Jendela percentile MVRV (hari); "All" = semua hari sebelumnya sejak awal data (expanding).
+PERCENTILE_WINDOWS = {"1Y": 365, "2Y": 730, "4Y": 1460, "All": None}
+
+
+@st.cache_data(ttl=3600)
+def load_mvrv_percentile():
+    """Percentile MVRV, STH MVRV, LTH MVRV dan harga BTC (0-100) terhadap jendela yang berakhir hari itu.
+
+    Nilai = persen hari di jendela (termasuk hari ini) dengan MVRV <= hari ini; tie dirata-rata.
+    Hanya memakai data sampai hari itu, jadi garis masa lalu tidak berubah saat data bertambah
+    (aman untuk backtest visual). "All" = expanding sejak Jul 2010, bukan percentile seluruh
+    sejarah (yang itu ikut membandingkan dengan masa depan). Pilihan user 30 Sep 2026.
+    """
+    df = _prepare(pd.read_csv("data_mvrv.csv", usecols=['date', 'btc_price', 'mvrv_ratio', 'sth_mvrv', 'lth_mvrv'])
+                  .rename(columns={'date': 'Date', 'btc_price': 'BTC Price',
+                                   'mvrv_ratio': 'MVRV', 'sth_mvrv': 'STH MVRV', 'lth_mvrv': 'LTH MVRV'}))
+    for kolom in ('MVRV', 'STH MVRV', 'LTH MVRV', 'BTC Price'):
+        for nama, hari in PERCENTILE_WINDOWS.items():
+            jendela = df[kolom].expanding() if hari is None else df[kolom].rolling(hari)
+            df[f'{kolom} Pct {nama}'] = jendela.rank(pct=True) * 100
+    return df
+
+
 @st.cache_data(ttl=3600)
 def _median_mvrv():
     """Median MVRV dan Median Realized Price dari data_median_mvrv.csv.
