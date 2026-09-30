@@ -324,7 +324,7 @@ div[class*="_fav_off"] div[data-testid="stButton"] button p { color: #8b949e !im
 span.fav-bintang { margin-left: auto; padding: 0 2px 0 8px; font-size: 17px !important; line-height: 1; color: #8b949e !important; visibility: hidden; cursor: pointer; }
 span.fav-bintang.on { color: #F7E9A8 !important; visibility: visible; }
 a:hover > .fav-bintang { visibility: visible; }
-section[data-testid="stSidebar"] [class*="st-key-favbtn_"] { display: none; }
+section[data-testid="stSidebar"] [class*="st-key-favbtn_"], .st-key-fav_masuk { display: none; }
 .fav-judul { color: #F7E9A8; font-size: 11px; font-weight: 600; letter-spacing: 0.1em;
              padding: 4px 0 2px 13px; display: flex; align-items: center; cursor: pointer; }
 /* Buka-tutup daftar favorit (user 30 Sep 2026), seperti judul kelompok menu: panah ikon Material,
@@ -370,12 +370,21 @@ for i, family in enumerate(FAMILIES.values()):
 nav = st.navigation(kelompok, position="sidebar", expanded=True)
 
 # Favorit (user 25 Sep 2026): disimpan di cookie browser "dash_fav" (key dipisah koma), jadi tiap
-# browser/HP punya daftar sendiri dan bertahan walau reload atau app di-reboot. st.context.cookies
-# hanya dibaca saat sesi dimulai; selama sesi daftar hidup di session_state.
-if FAV not in st.session_state:
-    st.session_state[FAV] = {k for k in st.context.cookies.get("dash_fav", "").split(",") if k in halaman}
-st.sidebar.caption(f"diag cookies: {sorted(st.context.cookies.keys())}")   # DIAGNOSA SEMENTARA, hapus
+# browser/HP punya daftar sendiri dan bertahan walau reload atau app di-reboot. Cookie dibaca oleh
+# skrip iframe di bawah dan dikirim lewat input tersembunyi fav_masuk, bukan st.context.cookies:
+# Streamlit Cloud tidak meneruskan cookie ke app (terukur 30 Sep 2026: st.context.cookies kosong),
+# sehingga favorit hilang tiap reload. Selama sesi daftar hidup di session_state.
+st.session_state.setdefault(FAV, set())
+
+
+def _muat_fav():
+    isi = st.session_state["fav_masuk"].removeprefix("fav:")
+    st.session_state[FAV] = {k for k in isi.split(",") if k in halaman}
+    st.session_state["fav_dimuat"] = True
+
+
 with st.sidebar:
+    st.text_input("fav", key="fav_masuk", on_change=_muat_fav, label_visibility="collapsed")
     favorit = [k for k in halaman if k in st.session_state[FAV]]   # urutan = urutan menu
     if favorit:
         st.markdown("<div class='fav-judul'>★ FAVORITES</div>", unsafe_allow_html=True)
@@ -389,10 +398,27 @@ with st.sidebar:
     # dikenali dari akhir alamatnya; halaman bawaan beralamat "/"). Isinya berubah hanya kalau
     # daftar berubah. Ditaruh di sidebar supaya urutan elemen halaman utama (iframe chart) tetap.
     isi = ",".join(sorted(st.session_state[FAV]))
+    dimuat = st.session_state.get("fav_dimuat", False)
     alamat = {("" if i == 0 else f.url_path): f.key for i, f in enumerate(FAMILIES.values())}
     st.iframe(f"""<script>
-document.cookie = 'dash_fav={isi}; path=/; max-age=31536000; SameSite=Lax';
-const P = window.parent, D = P.document, ALAMAT = {json.dumps(alamat)}, FAV = new Set('{isi}'.split(','));
+const P = window.parent, D = P.document;
+if ({json.dumps(dimuat)}) document.cookie = 'dash_fav={isi}; path=/; max-age=31536000; SameSite=Lax';
+else {{
+  // Sesi baru: kirim isi cookie ke Python (nilai input + Enter). Cookie belum ditulis supaya
+  // daftar kosong sesi baru tidak menimpanya.
+  // Dicoba ulang tiap 200 ms (maks. 10 detik): input bisa belum siap saat skrip ini jalan.
+  const m = D.cookie.match(/(?:^|; )dash_fav=([^;]*)/);
+  let coba = 0;
+  const kirim = () => {{
+    const inp = D.querySelector('.st-key-fav_masuk input');
+    if (!inp) {{ if (++coba < 50) setTimeout(kirim, 200); return; }}
+    Object.getOwnPropertyDescriptor(P.HTMLInputElement.prototype, 'value').set.call(inp, 'fav:' + (m ? decodeURIComponent(m[1]) : ''));
+    inp.dispatchEvent(new P.Event('input', {{ bubbles: true }}));
+    inp.dispatchEvent(new P.KeyboardEvent('keydown', {{ key: 'Enter', bubbles: true }}));
+  }};
+  setTimeout(kirim, 200);
+}}
+const ALAMAT = {json.dumps(alamat)}, FAV = new Set('{isi}'.split(','));
 try {{ D.documentElement.classList.toggle('fav-tutup', P.localStorage.getItem('dash_fav_tutup') === '1'); }} catch (e) {{}}
 // Kunci halaman = potongan alamat terakhir. Di Streamlit Cloud app berjalan di bawah /~/+/ dan
 // st.page_link memakai alamat relatif (/~/+/sopr), jadi "~" dan "+" dilewati.
