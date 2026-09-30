@@ -240,7 +240,7 @@ MVRV_PERCENTILE = MetricFamily(
     subtitle="MVRV Percentile (Rolling)",
     group="Valuation",
     url_path="mvrv-percentile",
-    loader=data.load_mvrv_percentile,
+    loader=lambda: data.load_mvrv_percentile(data.PERCENTILE_WINDOWS),
     # Pilihan user 30 Sep 2026 dari pratinjau (acuan: CryptoQuant "MVRV Percentile - Current Cycle",
     # tapi jendela bergulir, bukan reset per siklus): percentile 0-100 sumbu kiri, BTC Log Overlay
     # kanan; saklar jendela 1M | 3M | 6M | 1Y | 2Y | 4Y | All (bawaan 1Y); LTH dan Price mati awal. Warna kohort biasa (MVRV navy, STH rust,
