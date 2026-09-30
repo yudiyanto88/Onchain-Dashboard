@@ -248,7 +248,7 @@ Semua file punya `date`; sebagian besar punya `btc_price`. Bukan untuk halaman: 
 
 ### Alat kerja
 - **`TEMPLATE` di `lw_chart.py` string Python biasa** → JavaScript tanpa backslash (regex `[(]([0-9]+)[)]`). Cek: `python -W error::SyntaxWarning`, lalu ekstrak `<script>` ke file dan `node --check`.
-- **Patch file:** file repo CRLF/LF campur → baca bytes, olah `\n`, kembalikan ke aslinya. Heredoc Bash panjang dengan banyak kutip bisa gagal di-parse → tulis skrip Python ke scratchpad dengan Write, lalu jalankan. `git commit -m` di PowerShell rusak dengan kutip ganda → `git commit -F <file>`. Heredoc Bash juga mengubah `\n` di skrip patch jadi baris baru sungguhan → tulis skrip dengan Write, atau pakai Edit.
+- **Patch file:** file repo CRLF/LF campur → baca bytes, olah `\n`, kembalikan ke aslinya. Heredoc Bash panjang dengan banyak kutip bisa gagal di-parse → tulis skrip Python ke scratchpad dengan Write, lalu jalankan. `git commit -m` di PowerShell rusak dengan kutip ganda → `git commit -F <file>`. Heredoc Bash juga mengubah `\\n` di skrip patch jadi baris baru sungguhan → tulis skrip dengan Write, atau pakai Edit.
 - Output Python di Windows: `PYTHONIOENCODING=utf-8` kalau mencetak σ/→.
 - **Situs luar (mis. app Streamlit Cloud) dibuka di tab panel lain** (`tabs_create`), bukan di tab localhost (23 Sep server localhost sempat mati 3× saat tab yang sama dipakai; penyebab belum pasti).
 - **Panel browser Claude tidak selalu bisa dipercaya:** frame chart membeku tanpa input, screenshot sering timeout (ulangi) → verifikasi lewat `find`/`javascript_tool`. Garis silang hanya lewat `computer hover` (baca `#tip`); klik JS ke widget Streamlit (`el.click()`) andal. Sidebar/halaman di-scroll lewat `scrollTop` pada `stSidebarContent`/`stMain`.
