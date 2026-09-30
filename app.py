@@ -400,6 +400,7 @@ with st.sidebar:
     isi = ",".join(sorted(st.session_state[FAV]))
     dimuat = st.session_state.get("fav_dimuat", False)
     alamat = {("" if i == 0 else f.url_path): f.key for i, f in enumerate(FAMILIES.values())}
+    grup = {("" if i == 0 else f.url_path): f.group for i, f in enumerate(FAMILIES.values())}
     st.iframe(f"""<script>
 const P = window.parent, D = P.document;
 if ({json.dumps(dimuat)}) document.cookie = 'dash_fav={isi}; path=/; max-age=31536000; SameSite=Lax';
@@ -452,6 +453,42 @@ pasang();
 if (P.__favObs) P.__favObs.disconnect();
 P.__favObs = new P.MutationObserver(() => {{ if (D.querySelector('[data-testid="stSidebarNavLink"]:not(:has(.fav-bintang)), [data-testid="stPageLink-NavLink"]:not(:has(.fav-bintang))')) pasang(); }});
 P.__favObs.observe(D.querySelector('[data-testid="stSidebar"]'), {{ childList: true, subtree: true }});
+
+// Kategori menu: maksimal 2 terbuka (user 30 Sep 2026). Membuka yang ke-3 menutup yang paling lama
+// terbuka (urutan di localStorage dash_nav_urutan). FAVORITES tidak dihitung. Buka-tutup tetap
+// milik Streamlit (stSidebarSectionsState-); skrip ini hanya mengklik judul kategori tertua.
+// Pertama kali (belum ada urutan): hanya kategori halaman aktif yang terbuka. Pindah halaman tidak
+// membuka kategori apa pun.
+const GRUP = {json.dumps(grup)};
+const judulK = () => [...D.querySelectorAll('[data-testid="stNavSectionHeader"]')];
+const namaK = h => h.querySelector('p').textContent;
+const terbuka = h => !!h.nextElementSibling;
+let urutan = null;
+try {{ urutan = JSON.parse(P.localStorage.getItem('dash_nav_urutan')); }} catch (e) {{}}
+if (!Array.isArray(urutan)) {{
+  const aktif = GRUP[P.location.pathname.split('/').filter(s => s && s !== '~' && s !== '+').pop() || ''];
+  P.__navAuto = true;
+  for (const h of judulK()) if (terbuka(h) !== (namaK(h) === aktif)) h.click();
+  P.__navAuto = false;
+  urutan = aktif ? [aktif] : [];
+  try {{ P.localStorage.setItem('dash_nav_urutan', JSON.stringify(urutan)); }} catch (e) {{}}
+}}
+const sb = D.querySelector('[data-testid="stSidebar"]');
+if (P.__navFn) sb.removeEventListener('click', P.__navFn, true);
+P.__navFn = e => {{
+  if (P.__navAuto || !e.target.closest('[data-testid="stNavSectionHeader"]')) return;
+  setTimeout(() => {{
+    const buka = judulK().filter(terbuka).map(namaK);
+    urutan = urutan.filter(n => buka.includes(n));
+    for (const n of buka) if (!urutan.includes(n)) urutan.push(n);
+    while (urutan.length > 2) {{
+      const n = urutan.shift(), tua = judulK().find(h => namaK(h) === n);
+      if (tua) {{ P.__navAuto = true; tua.click(); P.__navAuto = false; }}
+    }}
+    try {{ P.localStorage.setItem('dash_nav_urutan', JSON.stringify(urutan)); }} catch (e) {{}}
+  }}, 50);
+}};
+sb.addEventListener('click', P.__navFn, true);
 </script>""", height=1)
 nav.run()
 
