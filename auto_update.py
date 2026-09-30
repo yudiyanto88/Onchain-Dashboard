@@ -428,24 +428,6 @@ except Exception as e:
     print(f"❌ Error Pipeline 17 Apparent Demand: {e}")
 
 # ==========================================
-# 19. PIPELINE: US 2-YEAR TREASURY YIELD (MACRO)
-# ==========================================
-print("\n[19] Menarik data US 2-Year Treasury Yield...")
-try:
-    df_t2y = fetch_data("https://chartinspect.com/api/charts/economic/indicators?indicator=2y-treasury&timeframe=all")
-
-    if not df_t2y.empty:
-        # 'time' adalah Unix timestamp (detik); 'value' adalah yield dalam persen
-        df_t2y['date'] = pd.to_datetime(df_t2y['time'], unit='s', utc=True).dt.strftime('%Y-%m-%d')
-        df_t2y = df_t2y.rename(columns={'value': 'treasury_2y_yield'})[['date', 'treasury_2y_yield']]
-        df_t2y = df_t2y.dropna(subset=['date']).drop_duplicates(subset=['date'], keep='last')
-        simpan(df_t2y, "data_treasury_2y.csv")
-    else:
-        print("❌ GAGAL: Data Treasury 2Y kosong atau gagal ditarik.")
-except Exception as e:
-    print(f"❌ Error Pipeline 19 Treasury 2Y: {e}")
-
-# ==========================================
 # 20. PIPELINE: RELATIVE UNREALIZED P/L BY COHORT
 # ==========================================
 print("\n[20] Menarik data Relative Unrealized P/L by Cohort...")
@@ -693,8 +675,7 @@ except Exception as e:
 # 25. PIPELINE: US TREASURY YIELD 2Y & 10Y (FRED)
 # ==========================================
 # FRED DGS2/DGS10 harian (persen), tanpa API key. Kalender pasar obligasi AS: Columbus Day dan
-# Veterans Day kosong, Good Friday ada nilainya; dibiarkan apa adanya. data_treasury_2y.csv
-# (Pipeline 19) = DGS2 versi bulanan (cek 21 Sep 2026: rata-rata bulanan beda maks 0,005).
+# Veterans Day kosong, Good Friday ada nilainya; dibiarkan apa adanya.
 # Seluruh sejarah ditarik ulang tiap jalan; gagal = file lama tidak diubah.
 print("\n[25] Menarik US Treasury Yield 2Y & 10Y dari FRED...")
 try:
@@ -965,7 +946,7 @@ try:
         "data_derivatives.csv", "data_sentiment.csv", "data_supply.csv",
         "data_mvrv.csv", "data_fg.csv", "data_exchange.csv", "data_rhodl.csv",
         "data_hodl_waves.csv", "data_realized_cap.csv", "data_cdd.csv", "data_lth_flow.csv",
-        "data_aviv.csv", "data_apparent_demand.csv", "data_treasury_2y.csv",
+        "data_aviv.csv", "data_apparent_demand.csv",
         "data_relative_unrealized_pl_by_cohort.csv", "data_median_mvrv.csv",
         "data_tradfi.csv", "data_vix.csv", "data_yields.csv",
         "data_futures_basis_3m.csv", "data_stablecoin_supply.csv",
