@@ -123,23 +123,32 @@ def parse_strike(cs: dict | None) -> tuple[str, str, bool]:
 
 # ---------------------------------------------------------------- Kalshi: candle
 def candle_rows(cs: list[dict]) -> pd.DataFrame:
+    """Endpoint historical memakai nama field polos (volume, close); endpoint live memakai
+    sufiks (volume_fp, close_dollars). Terima keduanya."""
+
     def f(x):
         try:
             return float(x) if x not in (None, "") else None
         except (TypeError, ValueError):
             return None
 
+    def g(d, key, suffixes=("", "_dollars", "_fp")):
+        for sfx in suffixes:
+            if d.get(key + sfx) not in (None, ""):
+                return f(d.get(key + sfx))
+        return None
+
     rows = []
     for c in cs:
         p, b, a = c.get("price", {}) or {}, c.get("yes_bid", {}) or {}, c.get("yes_ask", {}) or {}
         rows.append({
             "end_ts": c["end_period_ts"],
-            "volume": f(c.get("volume")) or 0.0,
-            "open_interest": f(c.get("open_interest")),
-            "p_open": f(p.get("open")), "p_high": f(p.get("high")), "p_low": f(p.get("low")),
-            "p_close": f(p.get("close")), "p_mean": f(p.get("mean")), "p_prev": f(p.get("previous")),
-            "bid_open": f(b.get("open")), "bid_close": f(b.get("close")),
-            "ask_open": f(a.get("open")), "ask_close": f(a.get("close")),
+            "volume": g(c, "volume") or 0.0,
+            "open_interest": g(c, "open_interest"),
+            "p_open": g(p, "open"), "p_high": g(p, "high"), "p_low": g(p, "low"),
+            "p_close": g(p, "close"), "p_mean": g(p, "mean"), "p_prev": g(p, "previous"),
+            "bid_open": g(b, "open"), "bid_close": g(b, "close"),
+            "ask_open": g(a, "open"), "ask_close": g(a, "close"),
         })
     df = pd.DataFrame(rows)
     if df.empty:
