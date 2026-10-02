@@ -143,7 +143,6 @@ MARKET_VALUATION = MetricFamily(
     # Bawaan (permintaan user 15 Sep 2026): BTC Separate pane, sumbu MVRV Log. LTH MVRV bisa
     # puluhan di puncak siklus; dengan Log, MVRV dan STH di sekitar 1 tidak ikut rata, dan
     # saat Separate pane LTH pindah ke sumbu kanan (separate_axis).
-    # Pane Z-Score tetap linear (lw_chart.render), jadi nilai negatifnya aman.
     btc_mode_default="Separate pane",
     metric_scale_default="Log",
     price_scale_default="Log",
@@ -169,40 +168,43 @@ MARKET_VALUATION = MetricFamily(
         # Bukan bagian framework v2 — tidak ada garis ambang.
         Series("Median MVRV", "Median MVRV", color="#6fb6de", axis="left", dim=0.27,
                short="Median"),
-        # Z-Score digambar sebagai area dari garis nol, bukan garis: bentuknya
-        # langsung membedakannya dari tiga rasio di atas. Tidak ikut smoothing —
-        # yang rolling sudah merupakan penghalusan, dan yang full-history bergerak
-        # seiring MVRV Ratio yang penghalusannya sudah tersedia sendiri.
-        # Nama pendek ditentukan sendiri: bawaannya kata pertama, dan ketiga seri
-        # MVRV ini akan sama-sama menulis "MVRV" di tombol sorot.
-        # Z-Score tinggal di pane sendiri paling bawah, menyala lewat kotak Z-Score.
-        # Areanya tembus pandang supaya dua kelompok bisa menyala bersamaan.
-        # Warna Z-Score ikut induknya (navy MVRV): pane-nya terpisah dari garis MVRV,
-        # jadi tidak bisa tertukar. Navy lebih gelap dari hijau Rolling, jadi dibuat
-        # lebih pekat (0.80, kontras 2.54:1 ke latar chart; pada 0.55 cuma 1.83:1).
-        # Pasangan navy + violet ditolak: sama-sama biru gelap saat bertumpuk
-        # (jarak Lab 24 untuk mata normal, 10 saat buta warna; navy + hijau 61/59).
-        # dim 0.45 x alpha 0.80 = redup 1.44:1, setara violet lama (1.40:1).
-        # Pane bawah memakai sumbu kanan (permintaan user 17 Sep 2026), begitu juga SOPR Gap
-        # dan AVIV Deviation.
-        Series("MVRV Z-Score", "MVRV Z-Score", color="#0070a6", negative_color="#0070a6", axis="right",
-               dim=0.45, kind="baseline", smoothing=False, short="Z", alpha=0.45,
-               pane="extra"),
-        # Tiga jendela rolling satu kelompok legend: namanya keterangan, angka
-        # jendelanya kotak kecil yang bisa diklik sendiri-sendiri — sama seperti
-        # angka periode smoothing. Hanya 1Y yang menyala di awal.
-        Series("Rolling Z-Score (1y)", "MVRV Z-Score 1Y", color="#97c459", negative_color="#97c459", axis="right",
-               dim=0.45, kind="baseline", smoothing=False, short="Z roll", alpha=0.35,
-               pane="extra", group="Rolling Z-Score"),
-        Series("Rolling Z-Score (2y)", "MVRV Z-Score 2Y", color="#97c459", negative_color="#97c459", axis="right",
-               dim=0.45, kind="baseline", smoothing=False, alpha=0.35,
-               pane="extra", group="Rolling Z-Score", hidden_default=True),
-        Series("Rolling Z-Score (4y)", "MVRV Z-Score 4Y", color="#97c459", negative_color="#97c459", axis="right",
-               dim=0.45, kind="baseline", smoothing=False, alpha=0.35,
-               pane="extra", group="Rolling Z-Score", hidden_default=True),
     ],
     reference_lines=[RefLine(1.0, "Neutral (1.0)")],
-    extra_label="Z-Score",
+)
+
+
+MVRV_ZSCORE = MetricFamily(
+    key="mvrv_zscore",
+    title="MVRV Z-Score",
+    subtitle="MVRV Z-Score",
+    group="Valuation",
+    url_path="mvrv-z-score",
+    loader=data.load_mvrv,
+    # Halaman sendiri sejak 2 Okt 2026 (user): dulu pane bawah halaman MVRV. BTC Log Overlay kanan,
+    # Z-Score di sumbu kiri (linear, nilainya bisa negatif).
+    btc_mode_default="Overlay",
+    metric_scale_default="Auto",
+    price_scale_default="Log",
+    series=[
+        # Z-Score digambar sebagai area dari garis nol. Tidak ikut smoothing — yang rolling
+        # sudah merupakan penghalusan. Areanya tembus pandang supaya dua kelompok bisa menyala
+        # bersamaan. Navy lebih gelap dari hijau Rolling, jadi dibuat lebih pekat (0.45 vs 0.35).
+        # Pasangan navy + violet ditolak: sama-sama biru gelap saat bertumpuk
+        # (jarak Lab 24 untuk mata normal, 10 saat buta warna; navy + hijau 61/59).
+        Series("MVRV Z-Score", "MVRV Z-Score", color="#0070a6", negative_color="#0070a6", axis="left",
+               dim=0.45, kind="baseline", smoothing=False, short="Z", alpha=0.45),
+        # Tiga jendela rolling satu kelompok legend: angka jendelanya kotak kecil yang bisa
+        # diklik sendiri-sendiri. Hanya 1Y yang menyala di awal.
+        Series("Rolling Z-Score (1y)", "MVRV Z-Score 1Y", color="#97c459", negative_color="#97c459", axis="left",
+               dim=0.45, kind="baseline", smoothing=False, short="Z roll", alpha=0.35,
+               group="Rolling Z-Score"),
+        Series("Rolling Z-Score (2y)", "MVRV Z-Score 2Y", color="#97c459", negative_color="#97c459", axis="left",
+               dim=0.45, kind="baseline", smoothing=False, alpha=0.35,
+               group="Rolling Z-Score", hidden_default=True),
+        Series("Rolling Z-Score (4y)", "MVRV Z-Score 4Y", color="#97c459", negative_color="#97c459", axis="left",
+               dim=0.45, kind="baseline", smoothing=False, alpha=0.35,
+               group="Rolling Z-Score", hidden_default=True),
+    ],
 )
 
 
@@ -1077,6 +1079,6 @@ BTC_TRADFI = MetricFamily(
 
 # Batang -> area (kind "baseline", pilihan user 22 Sep 2026): semua histogram kecuali data harian
 # yang loncat-loncat (Funding Rate, OI Change, Net Flow) — di sana batang lebih jujur.
-FAMILIES = {f.title: f for f in [MARKET_VALUATION, MVRV_MOMENTUM, MVRV_PERCENTILE, DIVERGENCE_MOMENTUM, PRICE_LEVELS, AVIV, REALIZED_CAP, SOPR, NUPL, UNREALIZED_PL, SUPPLY_IN_PROFIT,
+FAMILIES = {f.title: f for f in [MARKET_VALUATION, MVRV_ZSCORE, MVRV_MOMENTUM, MVRV_PERCENTILE, DIVERGENCE_MOMENTUM, PRICE_LEVELS, AVIV, REALIZED_CAP, SOPR, NUPL, UNREALIZED_PL, SUPPLY_IN_PROFIT,
                                    HODL_WAVES, RHODL_RATIO, HOLDER_SUPPLY, CDD_VDD, EXCHANGE_FLOW,
                                    FUNDING_OI, FUTURES_BASIS, FEAR_GREED, VIX, BTC_TRADFI, TREASURY_YIELDS, DXY, SSR, EXCHANGE_RATIO, ETF_FLOWS]}
