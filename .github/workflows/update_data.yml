@@ -22,20 +22,48 @@ jobs:
     - name: Membuka repositori
       uses: actions/checkout@v4 # (Diupdate ke v4 agar warning kuning hilang)
 
+    - name: Cek apakah hari ini sudah dijalankan (khusus run schedule)
+      id: guard
+      run: |
+        # Run schedule GitHub sering telat 4-6 jam. Kalau cron-job.org sudah
+        # menjalankan workflow hari ini (log alert hari ini + Telegram terkirim),
+        # run schedule dilewati supaya tidak dobel. Run manual dan run dari
+        # cron-job.org tidak pernah dilewati. Log tidak terbaca = jalan terus.
+        skip=$(python3 - <<'PY'
+        import glob, json, os
+        from datetime import datetime, timezone
+        today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        hit = False
+        for f in sorted(glob.glob("alerts/logs/alert_*.json"))[-3:]:
+            try:
+                d = json.load(open(f))
+                hit = hit or (d["timestamp_utc"].startswith(today) and d["telegram_sent"] is True)
+            except Exception:
+                pass
+        print("true" if hit and os.environ["GITHUB_EVENT_NAME"] == "schedule" else "false")
+        PY
+        )
+        echo "skip=$skip" >> "$GITHUB_OUTPUT"
+        if [ "$skip" = "true" ]; then echo "::notice::Dilewati: hari ini sudah dijalankan (kemungkinan cron-job.org)"; fi
+
     - name: Menyiapkan Python
+      if: steps.guard.outputs.skip != 'true'
       uses: actions/setup-python@v5 # (Diupdate ke v5)
       with:
         python-version: '3.10'
 
     - name: Menginstal bahan yang dibutuhkan (Pandas & Requests)
+      if: steps.guard.outputs.skip != 'true'
       run: |
         python -m pip install --upgrade pip
         pip install requests pandas
 
     - name: Menjalankan script auto_update.py
+      if: steps.guard.outputs.skip != 'true'
       run: python auto_update.py
 
     - name: Menyimpan hasil CSV kembali ke GitHub
+      if: steps.guard.outputs.skip != 'true'
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action Bot"
@@ -43,6 +71,7 @@ jobs:
         git diff --quiet && git diff --staged --quiet || (git commit -m "Auto-update data dari API" && git push)
 
     - name: Menjalankan daily alert analysis
+      if: steps.guard.outputs.skip != 'true'
       continue-on-error: true
       env:
         TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
@@ -50,6 +79,7 @@ jobs:
       run: python alerts/alert_check.py
 
     - name: Simpan log alert ke GitHub
+      if: steps.guard.outputs.skip != 'true'
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action Bot"
