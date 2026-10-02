@@ -494,19 +494,22 @@ def _render_window(family):
             pilih(val)
 
     # Kisi 3 kolom seperti kotak Smoothing: empat tombol sebaris terlalu sempit (popover
-    # ~190 px, "6m" terpotong). Baris 1: tiga preset; baris 2: preset keempat, isian, Set.
-    baris1 = st.columns(3, gap="small", vertical_alignment="center")
-    baris2 = st.columns(3, gap="small", vertical_alignment="center")
-    for cell, (label, days) in zip([*baris1, baris2[0]], family.window_days.items()):
+    # ~190 px, "6m" terpotong). Preset mengisi kisi berurutan, lalu isian + Set bersebelahan
+    # (4 preset: baris 2 = preset keempat, isian, Set; 8 preset: isian + Set di baris sendiri).
+    n = len(family.window_days)
+    mulai = n if n % 3 < 2 else n + 1   # isian + Set tidak boleh terbelah dua baris
+    sel = [c for _ in range((mulai + 4) // 3)
+           for c in st.columns(3, gap="small", vertical_alignment="center")]
+    for cell, (label, days) in zip(sel, family.window_days.items()):
         with cell:
             st.button(label, key=f"{k}_w_{days}", use_container_width=True,
                       type="primary" if days == aktif else "secondary",
                       on_click=pilih, args=(days,))
-    with baris2[1]:
+    with sel[mulai]:
         st.number_input("Days", min_value=30, max_value=3000, value=None,
                         placeholder=str(aktif), key=f"{k}_new_window",
                         label_visibility="collapsed")
-    with baris2[2]:
+    with sel[mulai + 1]:
         st.button("Set", key=f"{k}_set_window", use_container_width=True, on_click=pasang)
 
 

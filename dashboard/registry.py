@@ -916,6 +916,30 @@ VIX = MetricFamily(
 )
 
 
+SHARPE = MetricFamily(
+    key="sharpe_ratio",
+    title="Sharpe Ratio",
+    subtitle="Sharpe Ratio",
+    group="Sentiment",
+    url_path="sharpe-ratio",
+    loader=data.load_sharpe,
+    # Pilihan user 2 Okt 2026 dari pratinjau (acuan: chart ChartInspect "Sharpe Ratio Analysis"):
+    # area dari nol, warna dibalik (user): rust di atas nol, teal di bawah (seperti BTC vs Stocks
+    # & Gold); versi garis bergradasi ala Fear & Greed sudah dicoba dan diganti area,
+    # BTC Log Overlay kanan; kotak Window berisi lookback yang sama dengan ChartInspect, bawaan 1 tahun.
+    btc_mode_default="Overlay",
+    metric_scale_default="Auto",
+    price_scale_default="Log",
+    series=[
+        Series("Sharpe Ratio", "Sharpe Ratio", color="#bf5546", negative_color="#0b8e89",
+               axis="left", dim=0.45, kind="baseline", alpha=0.45, smoothing=False,
+               short="Sharpe", precision=2),
+    ],
+    window_days={"14d": 14, "30d": 30, "60d": 60, "90d": 90, "180d": 180, "260d": 260,
+                 "1y": 365, "2y": 730},
+)
+
+
 TREASURY_YIELDS = MetricFamily(
     key="treasury_yields",
     title="US Treasury Yields",
@@ -1081,4 +1105,4 @@ BTC_TRADFI = MetricFamily(
 # yang loncat-loncat (Funding Rate, OI Change, Net Flow) — di sana batang lebih jujur.
 FAMILIES = {f.title: f for f in [MARKET_VALUATION, MVRV_ZSCORE, MVRV_MOMENTUM, MVRV_PERCENTILE, DIVERGENCE_MOMENTUM, PRICE_LEVELS, AVIV, REALIZED_CAP, SOPR, NUPL, UNREALIZED_PL, SUPPLY_IN_PROFIT,
                                    HODL_WAVES, RHODL_RATIO, HOLDER_SUPPLY, CDD_VDD, EXCHANGE_FLOW,
-                                   FUNDING_OI, FUTURES_BASIS, FEAR_GREED, VIX, BTC_TRADFI, TREASURY_YIELDS, DXY, SSR, EXCHANGE_RATIO, ETF_FLOWS]}
+                                   FUNDING_OI, FUTURES_BASIS, FEAR_GREED, VIX, SHARPE, BTC_TRADFI, TREASURY_YIELDS, DXY, SSR, EXCHANGE_RATIO, ETF_FLOWS]}

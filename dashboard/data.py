@@ -435,6 +435,24 @@ def load_btc_tradfi(window=365):
 
 
 @st.cache_data(ttl=3600)
+def load_sharpe(window=365):
+    """Sharpe Ratio harga BTC, rumus chart ChartInspect `sharpe-ratio` (user 2 Okt 2026).
+
+    Return harian sederhana; Sharpe = (rata-rata return x 365 - 2 %) / (simpangan baku populasi
+    x akar 365) selama `window` hari, lalu dirata-rata 7 hari. 2 % = suku bunga bebas risiko
+    yang dipakai ChartInspect. Dicek 2 Okt 2026 (window 365): 5 tanggal lama (2013-2025) sama
+    persis 4 desimal dengan rumus mereka pada data mereka. Bukan bagian framework v2.
+    """
+    df = _prepare(pd.read_csv("data_mvrv.csv", usecols=['date', 'btc_price'])
+                  .rename(columns={'date': 'Date', 'btc_price': 'BTC Price'}))
+    df = df[df['BTC Price'] > 0]
+    jendela = df['BTC Price'].pct_change().rolling(int(window))
+    sharpe = (jendela.mean() * 365 - 0.02) / (jendela.std(ddof=0) * np.sqrt(365))
+    df['Sharpe Ratio'] = sharpe.rolling(7, min_periods=1).mean()
+    return df
+
+
+@st.cache_data(ttl=3600)
 def load_vix():
     """VIX (data_vix.csv, Pipeline 24 dari file resmi Cboe) + harga BTC dari data_mvrv.csv.
 
