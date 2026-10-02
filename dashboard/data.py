@@ -91,6 +91,31 @@ def load_mvrv_percentile(windows):
 
 
 @st.cache_data(ttl=3600)
+def load_divergence_momentum():
+    """Price vs MVRV Percentile Divergence Momentum, rumus chart ChartInspect `altcoin-mvrv-momentum`
+    (Asset BTC, Rolling Window 1 Year, Momentum 365d; user 2 Okt 2026).
+
+    - Percentile = persen hari di 365 hari terakhir (termasuk hari ini) dengan nilai DI BAWAH hari
+      ini (ChartInspect: `<`; halaman MVRV Percentile memakai `<=`, jadi angkanya tidak sama).
+    - Divergence = percentile harga - percentile MVRV; Momentum = Divergence - SMA365-nya.
+    Awal data memakai jendela seadanya, seperti ChartInspect. Dicek 2 Okt 2026: 4 tanggal lama
+    (2018-2025) sama persis dengan hitungan ChartInspect. Bukan bagian framework v2.
+    """
+    df = _prepare(pd.read_csv("data_mvrv.csv", usecols=['date', 'btc_price', 'mvrv_ratio'])
+                  .rename(columns={'date': 'Date', 'btc_price': 'BTC Price', 'mvrv_ratio': 'MVRV'}))
+    df = df[df['BTC Price'] > 0]
+
+    def pct(kolom):
+        jendela = df[kolom].rolling(365, min_periods=1)
+        return (jendela.rank(method='min') - 1) / jendela.count() * 100
+
+    df['Divergence'] = pct('BTC Price') - pct('MVRV')
+    df['Divergence MA'] = df['Divergence'].rolling(365, min_periods=1).mean()
+    df['Divergence Momentum'] = df['Divergence'] - df['Divergence MA']
+    return df
+
+
+@st.cache_data(ttl=3600)
 def _median_mvrv():
     """Median MVRV dan Median Realized Price dari data_median_mvrv.csv.
 

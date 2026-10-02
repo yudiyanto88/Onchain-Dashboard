@@ -298,6 +298,31 @@ MVRV_PERCENTILE = MetricFamily(
 )
 
 
+DIVERGENCE_MOMENTUM = MetricFamily(
+    key="divergence_momentum",
+    title="Divergence Momentum",
+    subtitle="Price vs MVRV Percentile Divergence Momentum",
+    group="Valuation",
+    url_path="divergence-momentum",
+    loader=data.load_divergence_momentum,
+    # Pilihan user 2 Okt 2026 dari pratinjau (acuan: chart ChartInspect berjudul sama, Asset BTC,
+    # jendela 1 Year, Momentum 365d): momentum area teal/rust dari nol, BTC Log Overlay; Divergence
+    # dan MA 365 harinya ada di legend tapi mati awal. Jendela tetap 365/365, tanpa kotak pilihan.
+    btc_mode_default="Overlay",
+    metric_scale_default="Auto",
+    price_scale_default="Log",
+    series=[
+        Series("Momentum (Divergence − 365d MA)", "Divergence Momentum", color="#0b8e89",
+               negative_color="#bf5546", axis="left", dim=0.45, kind="baseline", alpha=0.45,
+               smoothing=False, short="Momentum", precision=1),
+        Series("Divergence", "Divergence", color="#0070a6", axis="left", dim=0.49,
+               smoothing=False, precision=1, hidden_default=True),
+        Series("Divergence 365d MA", "Divergence MA", color="#8b949e", axis="left", dim=0.45,
+               smoothing=False, short="MA", precision=1, hidden_default=True),
+    ],
+)
+
+
 PRICE_LEVELS = MetricFamily(
     key="price_levels",
     title="Price Levels",
@@ -1052,6 +1077,6 @@ BTC_TRADFI = MetricFamily(
 
 # Batang -> area (kind "baseline", pilihan user 22 Sep 2026): semua histogram kecuali data harian
 # yang loncat-loncat (Funding Rate, OI Change, Net Flow) — di sana batang lebih jujur.
-FAMILIES = {f.title: f for f in [MARKET_VALUATION, MVRV_MOMENTUM, MVRV_PERCENTILE, PRICE_LEVELS, AVIV, REALIZED_CAP, SOPR, NUPL, UNREALIZED_PL, SUPPLY_IN_PROFIT,
+FAMILIES = {f.title: f for f in [MARKET_VALUATION, MVRV_MOMENTUM, MVRV_PERCENTILE, DIVERGENCE_MOMENTUM, PRICE_LEVELS, AVIV, REALIZED_CAP, SOPR, NUPL, UNREALIZED_PL, SUPPLY_IN_PROFIT,
                                    HODL_WAVES, RHODL_RATIO, HOLDER_SUPPLY, CDD_VDD, EXCHANGE_FLOW,
                                    FUNDING_OI, FUTURES_BASIS, FEAR_GREED, VIX, BTC_TRADFI, TREASURY_YIELDS, DXY, SSR, EXCHANGE_RATIO, ETF_FLOWS]}
