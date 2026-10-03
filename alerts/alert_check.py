@@ -16,6 +16,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
+import framework_v2
+
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
@@ -27,9 +29,8 @@ LOG_DIR.mkdir(parents=True, exist_ok=True)
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN", "")
 CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
 
-LOOKBACK = 120             # baris history yang diload (≥104 utk K1 gap MA90-MA60 + declining 14d)
+LOOKBACK = 120             # baris history untuk checker & blok K (≥104 utk K1 gap MA90-MA60 + declining 14d)
 PULLBACK_WINDOW = 14       # hari untuk deteksi pullback 5%
-ZONE_CONVERGENCE_PCT = 0.02  # threshold Z2 convergence (2%)
 
 # --- Posisi user saat ini — update manual kalau posisi berubah ---
 K3_ACTIVE = True           # short K3 lagi jalan; set False kalau sudah ditutup
@@ -40,18 +41,20 @@ K3_SHORT_ENTRY_PRICE = 79000  # harga entry short (Oktober 2025)
 # Data loading
 # ---------------------------------------------------------------------------
 
-def _load_tail(path: Path, n: int, date_col: str = "date") -> pd.DataFrame:
+def _load(path: Path, date_col: str = "date") -> pd.DataFrame:
     df = pd.read_csv(path, parse_dates=[date_col])
-    return df.sort_values(date_col).tail(n).reset_index(drop=True)
+    return df.sort_values(date_col).reset_index(drop=True)
 
 
 def load_data() -> pd.DataFrame:
-    price    = _load_tail(REPO_ROOT / "data_price_level.csv", LOOKBACK)
-    mvrv     = _load_tail(REPO_ROOT / "data_mvrv.csv", LOOKBACK)[
-                   ["date", "sth_mvrv", "lth_mvrv"]]
-    supply   = _load_tail(REPO_ROOT / "data_supply.csv", LOOKBACK)[
+    """Histori PENUH + kolom v2 (zona, status pasar, gate/veto). Status pasar v2
+    butuh histori panjang (SMA180, lock alarm bear) — main() yang memotong ke LOOKBACK."""
+    price    = _load(REPO_ROOT / "data_price_level.csv")
+    mvrv     = _load(REPO_ROOT / "data_mvrv.csv")[
+                   ["date", "mvrv_ratio", "sth_mvrv", "lth_mvrv"]]
+    supply   = _load(REPO_ROOT / "data_supply.csv")[
                    ["date", "percent_btc_in_profit", "pct_sth_in_profit", "pct_lth_in_profit"]]
-    momentum = _load_tail(REPO_ROOT / "data_momentum.csv", LOOKBACK)[
+    momentum = _load(REPO_ROOT / "data_momentum.csv")[
                    ["date", "asopr", "lth_sopr", "sth_sopr"]]
 
     df = price.merge(mvrv, on="date", how="left")
@@ -62,7 +65,7 @@ def load_data() -> pd.DataFrame:
     # price_at_aviv_plus_1_sigma columns use active_realized_price as base, yang salah
     # (base yang benar = btc_price / aviv_ratio) — lihat fix di archive/app_v1.py load_data_aviv() dan dashboard/data.py.
     # Di sini kita hitung sendiri dari kolom mentah, bukan ambil kolom turunan ChartInspect.
-    aviv = _load_tail(REPO_ROOT / "data_aviv.csv", LOOKBACK)[
+    aviv = _load(REPO_ROOT / "data_aviv.csv")[
                ["date", "aviv_ratio", "aviv_mean", "aviv_upper_1sd"]]
     df = df.merge(aviv, on="date", how="left")
 
@@ -81,7 +84,7 @@ def load_data() -> pd.DataFrame:
     )
     df["fg"] = fg_value
 
-    return df
+    return framework_v2.compute(df)
 
 
 # ---------------------------------------------------------------------------
@@ -89,27 +92,8 @@ def load_data() -> pd.DataFrame:
 # ---------------------------------------------------------------------------
 
 def classify_zone(row: pd.Series) -> str:
-    price    = row["btc_price"]
-    sth_rp   = row["sth_cost_basis"]
-    lth_rp   = row["lth_cost_basis"]
-    rp       = row["realized_price"]
-    av_mean  = row["aviv_mean_px"]
-    av_upper = row["aviv_upper_px"]
-
-    three_rp = [sth_rp, lth_rp, rp]
-    spread   = (max(three_rp) - min(three_rp)) / min(three_rp) if min(three_rp) > 0 else 1
-
-    if spread < ZONE_CONVERGENCE_PCT:
-        return "Z2"
-    if price >= av_upper:
-        return "Z5"
-    if price >= av_mean:
-        return "Z4"
-    if price >= rp:
-        return "Z3"
-    if price >= sth_rp:
-        return "Z1b" if sth_rp < lth_rp else "Z3"
-    return "Z1"
+    """Zona v2 (struktur × posisi harga) — dihitung framework_v2.compute()."""
+    return row["zone"]
 
 
 # ---------------------------------------------------------------------------
@@ -195,23 +179,37 @@ def check_sth_rp_cross_down(df: pd.DataFrame) -> Condition:
 
 
 def check_rp_cross_z2(df: pd.DataFrame) -> Condition:
-    """STH RP, RP, LTH RP konvergen < 2% — Z2 terbentuk, K5 mulai."""
-    row = df.iloc[-1]
-    sth_rp = row["sth_cost_basis"]
-    rp     = row["realized_price"]
-    lth_rp = row["lth_cost_basis"]
-    three  = [sth_rp, rp, lth_rp]
-    spread = (max(three) - min(three)) / min(three) if min(three) > 0 else 1
-    if spread < ZONE_CONVERGENCE_PCT:
-        return Condition("RP_CROSS_Z2", True,
-                         f"STH RP/RP/LTH RP konvergen — spread {spread*100:.1f}% < 2% "
-                         f"(STH ${sth_rp:,.0f} | RP ${rp:,.0f} | LTH ${lth_rp:,.0f}) — K5 dimulai")
-    return Condition("RP_CROSS_Z2", False, "")
+    """STH RP cross naik melewati RP — status bear dibuka, K5 mulai (v2 §0)."""
+    if len(df) < 2:
+        return Condition("STH_RP_CROSS_RP", False, "")
+    today, yesterday = df.iloc[-1], df.iloc[-2]
+    if (today["sth_cost_basis"] > today["realized_price"] and
+            yesterday["sth_cost_basis"] <= yesterday["realized_price"]):
+        return Condition("STH_RP_CROSS_RP", True,
+                         f"STH RP ${today['sth_cost_basis']:,.0f} naik memotong RP "
+                         f"${today['realized_price']:,.0f} — status bear dibuka, K5 mulai")
+    return Condition("STH_RP_CROSS_RP", False, "")
+
+
+def check_bear_alarm(df: pd.DataFrame) -> Condition:
+    """Alarm bear cepat (v2 §0): bunyi, dibuka lagi, atau ada sinyal pool baru hari ini."""
+    today = df.iloc[-1]
+    if today["fast_confirm"]:
+        return Condition("BEAR_ALARM", True,
+                         "Alarm bear CEPAT bunyi (2 dari 4 sinyal dalam 90 hari) — "
+                         "aturan beli K2/K5 berhenti")
+    if len(df) >= 2 and df.iloc[-2]["bear_active"] and not today["bear_active"]:
+        return Condition("BEAR_ALARM", True, "Status bear DIBUKA — alarm cepat lepas")
+    new = [BEAR_SIGNAL_NAMES[c] for c in framework_v2.SIGNALS if today[c]]
+    if new and not today["alarm_locked"]:
+        return Condition("BEAR_ALARM", True, "Sinyal bear baru hari ini: " + "; ".join(new))
+    return Condition("BEAR_ALARM", False, "")
 
 
 def check_pullback_5pct(df: pd.DataFrame) -> Condition:
-    """Pullback ≥5% dari high 14 hari — entry window K5."""
-    if len(df) < 2:
+    """Pullback ≥5% dari high 14 hari — entry window K5 (hanya saat K5 berlaku:
+    sejak STH RP cross RP, status bukan bear)."""
+    if len(df) < 2 or not df.iloc[-1]["k5_window"] or df.iloc[-1]["bear_active"]:
         return Condition("PULLBACK_5PCT", False, "")
     window = df.tail(PULLBACK_WINDOW)
     high_14d = window["btc_price"].max()
@@ -276,6 +274,7 @@ ALL_CHECKERS = [
     check_sth_rp_cross_up,
     check_sth_rp_cross_down,
     check_rp_cross_z2,
+    check_bear_alarm,
     check_pullback_5pct,
     check_cvdd_approaching,
     check_supply_profit_drop,
@@ -291,42 +290,82 @@ ALL_CHECKERS = [
 # Deskripsi singkat tiap zona (dipakai berulang di berbagai tempat pesan,
 # supaya Z[x] apapun yang disebut selalu ada penjelasannya).
 ZONE_DESC_SHORT = {
-    "Z1":  "harga di bawah STH RP, bear bottom terdalam",
-    "Z1b": "harga antara STH RP dan RP",
+    "ZC":  "capitulation, harga di bawah RP",
+    "ZD":  "dip dalam, harga antara RP dan STH RP",
+    "Z1":  "struktur terbalik, harga di bawah STH RP, bear bottom",
+    "Z1b": "struktur terbalik, harga antara STH RP dan RP",
     "Z2":  "STH RP≈RP≈LTH RP, konvergen",
-    "Z3":  "harga antara RP dan AVIV Mean",
+    "Z2t": "transisi, struktur terbalik tapi harga di atas RP",
+    "Z3":  "harga antara STH RP dan AVIV Mean",
     "Z4":  "harga antara AVIV Mean–AVIV Upper",
     "Z5":  "puncak siklus, di atas AVIV Upper",
 }
 
-# Batas atas tiap zona + zona tujuan kalau tembus ke atas. Z2/Z5 ditangani
+# Batas atas tiap zona + zona tujuan kalau tembus ke atas. Z2/Z2t/Z5 ditangani
 # terpisah (Z2 = state konvergen tanpa batas harga tunggal, Z5 = sudah puncak).
 ZONE_UPPER_BOUND = {
+    "ZC":  ("RP", "realized_price", "ZD"),
+    "ZD":  ("STH RP", "sth_cost_basis", "Z3"),
     "Z1":  ("STH RP", "sth_cost_basis", "Z1b"),
-    "Z1b": ("RP", "realized_price", "Z2"),
+    "Z1b": ("RP", "realized_price", "Z2t"),
     "Z3":  ("AVIV Mean", "aviv_mean_px", "Z4"),
     "Z4":  ("AVIV Upper", "aviv_upper_px", "Z5"),
 }
 
+# 4 sinyal pool alarm bear cepat (v2 §0)
+BEAR_SIGNAL_NAMES = {
+    "sig_A": "harga turun dari Z5 menembus AVIV Upper",
+    "sig_B": "gap MA90−MA60 STH-SOPR memuncak lalu turun ≥14 hari",
+    "sig_C": "MVRV Momentum bearish cross ≥7 hari",
+    "sig_D": "MVRV Ratio di bawah SMA180 ≥7 hari (Z5 ≤120 hari lalu)",
+}
 
 
 def zone_numeric_desc(row: pd.Series, zone: str) -> str:
     """Deskripsi zona SAAT INI dengan angka $ asli (bukan label generik)."""
     sth_rp, rp = row["sth_cost_basis"], row["realized_price"]
     aviv_mean, aviv_upper = row["aviv_mean_px"], row["aviv_upper_px"]
+    if zone == "ZC":
+        return f"capitulation, harga di bawah RP ${rp:,.0f}"
+    if zone == "ZD":
+        return f"dip dalam, harga antara RP ${rp:,.0f} – STH RP ${sth_rp:,.0f}"
     if zone == "Z1":
-        return f"harga di bawah STH RP ${sth_rp:,.0f}, bear bottom terdalam"
+        return f"harga di bawah STH RP ${sth_rp:,.0f}, bear bottom"
     if zone == "Z1b":
         return f"harga antara STH RP ${sth_rp:,.0f} – RP ${rp:,.0f}"
-    if zone == "Z2":
-        return "STH RP≈RP≈LTH RP, konvergen"
+    if zone in ("Z2", "Z2t"):
+        return ZONE_DESC_SHORT[zone]
     if zone == "Z3":
-        return f"harga antara RP ${rp:,.0f} – AVIV Mean ${aviv_mean:,.0f}"
+        return f"harga antara STH RP ${sth_rp:,.0f} – AVIV Mean ${aviv_mean:,.0f}"
     if zone == "Z4":
         return f"harga antara AVIV Mean ${aviv_mean:,.0f} – AVIV Upper ${aviv_upper:,.0f}"
     if zone == "Z5":
         return f"harga di atas AVIV Upper ${aviv_upper:,.0f}, puncak siklus"
     return ""
+
+
+def build_status_block(df: pd.DataFrame) -> list[str]:
+    """Status pasar v2 §0 — menentukan aturan mana yang hidup."""
+    today = df.iloc[-1]
+    if today["bear_active"]:
+        inverted = today["sth_cost_basis"] < today["realized_price"]
+        unlock = ("STH RP naik memotong RP" if inverted else
+                  "STH RP naik memotong RP setelah sempat terbalik (sekarang belum terbalik), "
+                  "atau harga ≥7 hari di Z5")
+        return [
+            f"*🧭 Status Pasar: BEAR* (alarm cepat bunyi {today['bear_since']:%d %b %Y})",
+            "Aturan beli K2/K5 berhenti.",
+            f"Dibuka lagi kalau: {unlock}",
+        ]
+    if today["alarm_locked"]:
+        return ["*🧭 Status Pasar: BULL* (status bear sudah dibuka)",
+                "Alarm bear cepat belum bisa bunyi lagi sampai harga ≥7 hari di Z5."]
+    recent = df[(df["date"] >= today["date"] - pd.Timedelta(days=framework_v2.PAIR_WINDOW))
+                & ~df["alarm_locked"]]
+    fired = [(c, recent.loc[recent[c], "date"].iloc[-1]) for c in framework_v2.SIGNALS if recent[c].any()]
+    lines = [f"*🧭 Status Pasar: BULL* (alarm bear cepat {len(fired)}/4 sinyal dalam 90 hari, bunyi kalau 2)"]
+    lines += [f"⚠️ {BEAR_SIGNAL_NAMES[c]} ({d:%d %b})" for c, d in fired]
+    return lines
 
 
 def build_zone_block(row: pd.Series, zone: str) -> list[str]:
@@ -340,8 +379,8 @@ def build_zone_block(row: pd.Series, zone: str) -> list[str]:
         lines.append(f"⬆️ {label} {pct:+.1f}% → {target} ({ZONE_DESC_SHORT[target]})")
     elif zone == "Z5":
         lines.append("⬆️ Sudah di puncak zona — tidak ada batas atas")
-    elif zone == "Z2":
-        lines.append("⬆️ Zona transisi (konvergen) — tunggu breakout arah Z3")
+    elif zone in ("Z2", "Z2t"):
+        lines.append("⬆️ Zona transisi — tunggu breakout arah Z3")
 
     cvdd = row["cvdd"]
     cvdd_ratio = price / cvdd
@@ -385,16 +424,23 @@ def build_k3_k4_block(df: pd.DataFrame) -> list[str]:
         f"→ tutup short penuh (bacaan K3 salah)"
     )
 
-    # Kondisi 3: K4 mulai aktif (zona Z1 hari ini)
-    cond3 = classify_zone(today) == "Z1"
+    # Kondisi 3: K4 mulai aktif — Z1/Z1b, atau K4-tanpa-Z1 (ZC + ≥3/4 + alarm bear cepat)
+    k4_score, k4_lines, _ = _k4_scorecard(df)
+    cond3 = _k4_active(today, k4_score)
     mark3 = "✅" if cond3 else "❌"
     lines.append(
-        f"{mark3} K4 mulai aktif, masuk Z1 ({ZONE_DESC_SHORT['Z1']}) "
+        f"{mark3} K4 mulai aktif (masuk Z1, atau di ZC dengan K4 ≥3/4 + alarm bear cepat) "
         f"→ tutup short, pindah ke akumulasi"
     )
 
+    # Kondisi 4: lantai waktu — ≥9 bulan sejak puncak siklus DAN close < RP
+    mark4 = "✅" if today["tf_on"] else "❌"
+    lines.append(
+        f"{mark4} Lantai waktu: {today['months_since_peak']:.1f} bulan sejak puncak (target ≥9) "
+        f"& harga di bawah RP (${today['realized_price']:,.0f}) → kurangi short bertahap, lalu DCA 5%/bulan"
+    )
+
     # K4 watch — 4 kondisi framework (scorecard dipakai bareng build_k4_block)
-    k4_score, k4_lines, _ = _k4_scorecard(df)
     lines += ["", f"*🎯 K4 — Akumulasi Bear Bottom* ({k4_score}/4 kondisi)"]
     lines += k4_lines
     return lines
@@ -433,9 +479,17 @@ def _k4_scorecard(df: pd.DataFrame) -> tuple[int, list[str], bool]:
     return sum([c1, c2, c3, c4]), lines, cvdd_ratio_now <= 1.0
 
 
+def _k4_active(today: pd.Series, score: int) -> bool:
+    """K4 aktif? Jalur utama (Z1/Z1b) atau K4-tanpa-Z1 (ZC + count ≥3 + alarm bear cepat)."""
+    zone = today["zone"]
+    return zone in ("Z1", "Z1b") or (zone == "ZC" and score >= 3 and bool(today["bear_active"]))
+
+
 def build_k4_block(df: pd.DataFrame) -> list[str]:
-    """K4 — Akumulasi agresif bear bottom (Z1/Z1b). Standalone (dipakai saat
-    K3 sudah ditutup). Skor 0-4 → agresivitas DCA per framework."""
+    """K4 — Akumulasi bear bottom (Z1/Z1b/ZC). Standalone (dipakai saat K3 sudah
+    ditutup). Skor 0-4 → agresivitas DCA; v2 menambah K4-tanpa-Z1 dan lantai waktu."""
+    today = df.iloc[-1]
+    zone = today["zone"]
     score, cond_lines, extreme = _k4_scorecard(df)
     dca = {
         0: "Belum beli — pantau saja",
@@ -446,7 +500,27 @@ def build_k4_block(df: pd.DataFrame) -> list[str]:
     }[score]
     lines = [f"*🎯 K4 — Akumulasi Bear Bottom* ({score}/4 kondisi)"]
     lines += cond_lines
-    lines.append(f"→ {dca}")
+
+    # Signal D: harga > STH RP ≥3 hari → K4 & lantai waktu selesai
+    above_sth = 0
+    for p, s in zip(df["btc_price"].iloc[::-1], df["sth_cost_basis"].iloc[::-1]):
+        if p > s:
+            above_sth += 1
+        else:
+            break
+    if above_sth >= 3:
+        lines.append(f"→ Signal D nyala (harga di atas STH RP {above_sth} hari) — K4 selesai, stop DCA")
+    elif _k4_active(today, score):
+        jalur = "K4-tanpa-Z1 aktif (≥3/4 + alarm bear cepat)" if zone == "ZC" else "Jalur utama"
+        lines.append(f"→ {jalur}: {dca}")
+    elif today["tf_on"]:
+        lines.append(
+            f"→ Lantai waktu aktif ({today['months_since_peak']:.1f} bulan sejak puncak & harga di bawah RP): "
+            f"DCA 5% cash pool/bulan. Spot only — tidak menyentuh loan/LTV")
+    else:
+        lines.append(
+            f"→ TUNGGU, jangan deploy. K4-tanpa-Z1 butuh ≥3/4 + alarm bear cepat; "
+            f"lantai waktu butuh ≥9 bulan sejak puncak (sekarang {today['months_since_peak']:.1f})")
     if extreme:
         lines.append("‼️ Price/CVDD ≤ 1.0 (langka, <2 hari/10thn) → boleh deploy 50% sisa cash pool hari ini")
     return lines
@@ -455,7 +529,7 @@ def build_k4_block(df: pd.DataFrame) -> list[str]:
 def build_k5_block(df: pd.DataFrame) -> list[str]:
     """K5 — Deploy loan di awal bull (Z2/Z3).
     Masuk hanya setelah pullback ≥5% dari high lokal, lalu tentukan besar deploy
-    dari F&G dan STH Loss / SOPR. LTV cap 52% (hard limit, tidak digeser sinyal)."""
+    dari F&G dan STH Loss / SOPR. LTV cap 45% (v2 — agresivitas = kecepatan deploy)."""
     today = df.iloc[-1]
     price = today["btc_price"]
 
@@ -490,7 +564,7 @@ def build_k5_block(df: pd.DataFrame) -> list[str]:
         f"{'✅' if c_fg else '❌'} F&G {fg:.0f} (target <50)",
         f"{'✅' if c_loss_sopr else '❌'} STH Loss {sth_loss:.1f}% (≥50%) "
         f"atau min(aSOPR,STH-SOPR) {sopr_min:.2f} (≤0.98)",
-        f"→ {deploy}. LTV cap 52%.",
+        f"→ {deploy}. LTV cap 45%.",
     ]
 
 
@@ -646,74 +720,60 @@ def build_k1_block(df: pd.DataFrame) -> list[str]:
 
 
 def build_k2_block(df: pd.DataFrame) -> list[str]:
-    """K2 — Masuk di bull dip (Z4/Z3, turun dari zona atas). 5 kondisi →
-    confidence Low/Medium/High/VeryHigh. Kondisi #5 (bounce AVIV Mean) hanya
-    bisa terkonfirmasi setelah bounce, jadi ditandai terpisah."""
+    """K2 — Masuk di bull dip (ZD/Z3/Z4, status bull). v2: GATE → VETO → MASUK
+    (bukan hitungan 5 kondisi lagi). Funding rate (pengubah ukuran) belum dimuat di sini."""
     today = df.iloc[-1]
-    price = today["btc_price"]
 
-    # C1: STH-MVRV<0.95 & rasio LTH/STH-MVRV naik dalam 14 hari
-    sth_mvrv = today["sth_mvrv"]
-    ratio_now = today["lth_mvrv"] / sth_mvrv if sth_mvrv > 0 else 0.0
-    idx14 = -15 if len(df) >= 15 else 0
-    base_sth = df["sth_mvrv"].iloc[idx14]
-    ratio_14 = df["lth_mvrv"].iloc[idx14] / base_sth if base_sth > 0 else ratio_now
-    c1 = sth_mvrv < 0.95 and ratio_now > ratio_14
-
-    # C2: STH-SOPR<0.97 belum >14 hari & aSOPR masih >0.95
-    below_streak = 0
+    stk97 = 0
     for v in df["sth_sopr"].iloc[::-1]:
         if v < 0.97:
-            below_streak += 1
+            stk97 += 1
         else:
             break
-    c2 = today["sth_sopr"] < 0.97 and below_streak <= 14 and today["asopr"] > 0.95
-
-    # C3: Supply Profit >60% & STH profit turun
-    sthp = today["pct_sth_in_profit"]
-    sthp_prev = df["pct_sth_in_profit"].iloc[-2] if len(df) >= 2 else sthp
-    c3 = today["percent_btc_in_profit"] > 60 and sthp < sthp_prev
-
-    # C4: LTH profit stabil — tidak turun >2 poin dari rata-rata 30 hari
     lthp = today["pct_lth_in_profit"]
-    lthp_ma30 = df["pct_lth_in_profit"].tail(30).mean()
-    c4 = lthp >= lthp_ma30 - 2
+    lthp_ma30 = df["pct_lth_in_profit"].shift(1).tail(30).mean()
 
-    # C5: close < AVIV Mean lalu close balik ke atas pada/atau sebelum hari ke-4
-    c5 = False
-    below = today["btc_price"] < today["aviv_mean_px"]
-    if not below:  # sudah balik ke atas, cek berapa lama tadi di bawah
-        days_below = 0
-        for i in range(len(df) - 2, -1, -1):
-            if df["btc_price"].iloc[i] < df["aviv_mean_px"].iloc[i]:
-                days_below += 1
-            else:
-                break
-        c5 = 1 <= days_below <= 4
+    def gate(v):
+        return "✅" if v else "❌"
 
-    base_conf = sum([c1, c2, c3, c4])   # C5 dihitung terpisah (post-bounce)
-    total = base_conf + (1 if c5 else 0)
-    level = ("Very High" if total >= 5 else "High" if total == 4
-             else "Medium" if total == 3 else "Low")
+    def veto(v):
+        return "🚫" if v else "✅"
 
-    lines = [f"*🟢 K2 — Bull Dip Entry* (confidence {level}, {total}/5)"]
-    lines += [
-        f"{'✅' if c1 else '❌'} STH-MVRV {sth_mvrv:.2f} <0.95 & rasio LTH/STH naik 14d",
-        f"{'✅' if c2 else '❌'} STH-SOPR {today['sth_sopr']:.2f} <0.97 ({below_streak}d ≤14) & aSOPR {today['asopr']:.2f} >0.95",
-        f"{'✅' if c3 else '❌'} Supply Profit {today['percent_btc_in_profit']:.1f}% >60% & STH profit turun",
-        f"{'✅' if c4 else '❌'} LTH profit {lthp:.1f}% stabil (≥ MA30 {lthp_ma30:.1f}% −2)",
-        f"{'✅' if c5 else '⏳'} Close balik di atas AVIV Mean ≤ hari ke-4 (hanya pasti setelah bounce)",
+    def tgl(d):
+        return f"{d:%d %b %Y}" if pd.notna(d) else "belum ada"
+
+    bear_x, bull_x = today["last_bear_cross"], today["last_bull_cross"]
+    lines = [
+        "*🟢 K2 — Bull Dip Entry* (gate → veto → masuk)",
+        f"MVRV Momentum: bearish cross terakhir {tgl(bear_x)} · bullish cross terakhir {tgl(bull_x)}",
+        "Gate (dua-duanya harus ✅):",
+        f"{gate(today['G1'])} STH-MVRV {today['sth_mvrv']:.2f} di band 0.80–0.97",
+        f"{gate(today['G2'])} STH-SOPR {today['sth_sopr']:.2f} <0.97 belum >14 hari ({stk97}h) "
+        f"& aSOPR {today['asopr']:.2f} >0.95",
+        "Veto (satu 🚫 = jangan masuk):",
+        f"{veto(today['V1'])} Supply in Profit {today['percent_btc_in_profit']:.1f}% (veto kalau ≤60%)",
+        f"{veto(today['V2'])} LTH profit {lthp:.1f}% vs rata-rata 30 hari {lthp_ma30:.1f}% (veto kalau turun >2 poin)",
+        f"{veto(today['stopper'])} Penghenti: MVRV di bawah SMA180 ≥7 hari & Z5 ≤120 hari lalu",
     ]
-    if level == "Low":
-        lines.append("→ Low — belum ada aksi. Cash habis dulu sebelum loan; ikuti tabel deploy K2. LTV cap 52%.")
+
+    gates = bool(today["G1"]) and bool(today["G2"])
+    vetoed = bool(today["V1"]) or bool(today["V2"]) or bool(today["stopper"])
+    if vetoed:
+        lines.append("→ Veto nyala — jangan masuk, apapun kata gate.")
+    elif not gates:
+        lines.append("→ Gate belum terbuka — loan belum boleh masuk. Cash bertahap boleh sejak bearish cross "
+                     "(25–30% cash K2 per pembelian, jarak ~2 minggu atau tiap turun ~7%).")
     else:
-        lines.append(f"→ {level} — deploy cash 100% dulu, loan sesuai price action (tabel K2). LTV cap 52%.")
+        lines.append("→ Gate terbuka, veto bersih — loan boleh masuk. LTV cap 45%.")
+        if pd.notna(bull_x) and (pd.isna(bear_x) or bull_x > bear_x):
+            lines.append("→ Bullish cross terkonfirmasi — top-up boleh, LTV gabungan maksimal 48%.")
+    if today["fg"] < 30:
+        lines.append(f"F&G {today['fg']:.0f} <30 = kelas dip dalam, BUKAN lampu hijau — periksa gate & veto lebih ketat.")
     return lines
 
 
 # Registry builder per K-node + peta zona → K-node yang aktif.
-# Dispatch otomatis: kalau zona berubah, section K ikut berubah tanpa edit build_message.
-# (K1/K2/K4 belum di-dispatch di sini — K4 masih lewat blok K3/K4 live-position.)
+# Dispatch otomatis: kalau zona/status berubah, section K ikut berubah tanpa edit build_message.
 KNODE_BUILDERS = {
     "K1": build_k1_block,
     "K2": build_k2_block,
@@ -722,17 +782,24 @@ KNODE_BUILDERS = {
     "K6": build_k6_block,
 }
 
-# K6 berlaku di Z2/Z3 (per seksi K6 doc: selesai saat masuk Z4). Z4 = K2 (dip dari
-# Z5). Z5 = K1 (kurangi puncak) + K2 (transisi turun). Z1/Z1b pakai K4 standalone
-# HANYA saat K3 sudah ditutup — kalau K3_ACTIVE, jalur K3/K4 live-position yang dipakai.
-ZONE_KNODE_MAP = {
-    "Z1":  ["K4"],
-    "Z1b": ["K4"],
-    "Z2":  ["K5", "K6"],
-    "Z3":  ["K5", "K6"],
-    "Z4":  ["K2"],
-    "Z5":  ["K1", "K2"],
-}
+def knodes_for(today: pd.Series) -> tuple[list[str], str]:
+    """K-node aktif per tabel zona v2 §1 (zona × status pasar). Return (daftar K, catatan
+    tunggu). Dipakai HANYA saat K3 sudah ditutup — kalau K3_ACTIVE, jalur K3/K4 yang dipakai."""
+    zone = today["zone"]
+    if zone == "Z5":
+        return ["K1"], ""
+    if zone in ("Z1", "Z1b", "ZC"):
+        return ["K4"], ""
+    if zone in ("Z2", "Z2t"):
+        return ["K5", "K6"], ""
+    # ZD / Z3 / Z4: aturan beli hanya hidup di status bull
+    if today["bear_active"]:
+        return [], "⏸️ *TUNGGU* — alarm bear cepat bunyi, aturan beli K2/K5 tidak berlaku di zona ini."
+    if zone == "ZD":
+        return ["K2"], ""
+    if today["k5_window"]:   # naik dari bawah (sejak STH RP cross RP, belum tembus AVIV Upper 3 hari)
+        return (["K5", "K6"] if zone == "Z3" else ["K6", "K2"]), ""
+    return ["K2"], ""        # dip dari atas
 
 
 def build_message(row: pd.Series, triggered: list[Condition], df: pd.DataFrame) -> str:
@@ -746,6 +813,9 @@ def build_message(row: pd.Series, triggered: list[Condition], df: pd.DataFrame) 
     ]
 
     lines += [""]
+    lines += build_status_block(df)
+
+    lines += [""]
     lines += build_zone_block(row, zone)
 
     if K3_ACTIVE:
@@ -754,12 +824,13 @@ def build_message(row: pd.Series, triggered: list[Condition], df: pd.DataFrame) 
         lines += [""]
         lines += build_k3_k4_block(df)
     else:
-        # Dispatch otomatis berdasarkan zona sekarang.
-        for knode in ZONE_KNODE_MAP.get(zone, []):
-            builder = KNODE_BUILDERS.get(knode)
-            if builder:
-                lines += [""]
-                lines += builder(df)
+        # Dispatch otomatis berdasarkan zona × status pasar.
+        knodes, wait_note = knodes_for(row)
+        if wait_note:
+            lines += ["", wait_note]
+        for knode in knodes:
+            lines += [""]
+            lines += KNODE_BUILDERS[knode](df)
 
     lines += ["", "*⚡ Kondisi Trigger*"]
     if triggered:
@@ -802,6 +873,7 @@ def save_log(row: pd.Series, triggered: list[Condition], sent: bool) -> None:
         "timestamp_utc": datetime.now(timezone.utc).isoformat(),
         "data_date": date_str,
         "zone": classify_zone(row),
+        "bear_active": bool(row["bear_active"]),
         "telegram_sent": sent,
         "triggered_count": len(triggered),
         "triggered_conditions": [{"name": c.name, "detail": c.detail} for c in triggered],
@@ -832,7 +904,7 @@ def main():
     print("=== BTC Alert Check ===")
 
     try:
-        df = load_data()
+        df = load_data().tail(LOOKBACK).reset_index(drop=True)
     except Exception as e:
         print(f"[ERROR] Gagal load data: {e}")
         sys.exit(1)
@@ -857,6 +929,8 @@ def main():
     print("\n--- Preview Pesan ---")
     print(message)
     print("---------------------\n")
+    if "--dry-run" in sys.argv:   # uji lokal: tidak kirim Telegram, tidak tulis log
+        return
     sent = send_telegram(message)
 
     save_log(today, triggered, sent)
